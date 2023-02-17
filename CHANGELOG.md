@@ -13,6 +13,7 @@ This is an alpha version! The changes listed here are not final.
 - Add migration progress screen and integrate into admin page
 - Adds a REST route for Migration plugin to fetch status from source site.
 - Create Migration component
+- General: enable automated plugin releases.
 - Introduce Jetpack Migration plugin structure
 - Rename Jetpack Migration to Move to WordPress.com and wpcom-migration
 
