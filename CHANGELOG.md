@@ -12,6 +12,7 @@ This is an alpha version! The changes listed here are not final.
 ### Added
 - Add migration progress screen and integrate into admin page
 - Adds a REST route for Migration plugin to fetch status from source site.
+- Add track events logic for "Get started" and "Check your migration progress" buttons
 - Create Migration component
 - General: enable automated plugin releases.
 - Introduce Jetpack Migration plugin structure
