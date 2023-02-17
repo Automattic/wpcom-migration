@@ -18,5 +18,6 @@ This is an alpha version! The changes listed here are not final.
 
 ### Changed
 - Adds a top-level menu entry for Move to WordPress.com
+- Change initial screen wording with new copy
 - Updated package dependencies.
 - Update to React 18.
