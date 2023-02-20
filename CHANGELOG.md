@@ -17,6 +17,7 @@ This is an alpha version! The changes listed here are not final.
 - General: enable automated plugin releases.
 - Introduce Jetpack Migration plugin structure
 - Rename Jetpack Migration to Move to WordPress.com and wpcom-migration
+- Update readme.txt for migration plugin
 
 ### Changed
 - Adds a top-level menu entry for Move to WordPress.com
