@@ -24,3 +24,6 @@ This is an alpha version! The changes listed here are not final.
 - Change initial screen wording with new copy
 - Updated package dependencies.
 - Update to React 18.
+
+### Fixed
+- Fix styles for mobile screens
