@@ -12,6 +12,10 @@ return array(
       'path' => 'jetpack_vendor/automattic/jetpack-assets',
       'ver' => '1.18.2',
     ),
+    'jetpack-backup-pkg' => array(
+      'path' => 'jetpack_vendor/automattic/jetpack-backup',
+      'ver' => '1.12.16',
+    ),
     'jetpack-config' => array(
       'path' => 'jetpack_vendor/automattic/jetpack-config',
       'ver' => '1.15.2',
