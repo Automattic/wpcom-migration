@@ -11,6 +11,7 @@ This is an alpha version! The changes listed here are not final.
 
 ### Added
 - Adding Jetpack Backup package in the plugin
+- Add video section to backup connect page
 
 ### Changed
 - General: indicate full compatibility with the latest version of WordPress, 6.2.
