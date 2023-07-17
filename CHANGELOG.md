@@ -13,6 +13,7 @@ This is an alpha version! The changes listed here are not final.
 - Add authentication to zendesk chat widget
 
 ### Changed
+- General: indicate full compatibility with the latest version of WordPress, 6.3.
 - Updated package dependencies.
 
 ## 1.0.0 - 2023-06-15
