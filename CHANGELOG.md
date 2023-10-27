@@ -18,6 +18,7 @@ This is an alpha version! The changes listed here are not final.
 - General: remove WP 6.1 backwards compatibility checks
 - General: update WordPress version requirements to WordPress 6.2.
 - Updated package dependencies.
+- Update lockfile
 - Use the new method to render Connection initial state.
 
 ## 1.0.0 - 2023-06-15
