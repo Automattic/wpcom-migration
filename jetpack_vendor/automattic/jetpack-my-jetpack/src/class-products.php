@@ -34,6 +34,7 @@ class Products {
 			'security'   => Products\Security::class,
 			'protect'    => Products\Protect::class,
 			'videopress' => Products\Videopress::class,
+			'stats'      => Products\Stats::class,
 		);
 
 		/**
@@ -179,5 +180,4 @@ class Products {
 			$class_name::extend_plugin_action_links();
 		}
 	}
-
 }

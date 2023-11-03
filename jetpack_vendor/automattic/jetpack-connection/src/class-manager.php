@@ -7,11 +7,12 @@
 
 namespace Automattic\Jetpack\Connection;
 
-use Automattic\Jetpack\A8c_Mc_Stats as A8c_Mc_Stats;
+use Automattic\Jetpack\A8c_Mc_Stats;
 use Automattic\Jetpack\Constants;
 use Automattic\Jetpack\Heartbeat;
 use Automattic\Jetpack\Roles;
 use Automattic\Jetpack\Status;
+use Automattic\Jetpack\Status\Host;
 use Automattic\Jetpack\Terms_Of_Service;
 use Automattic\Jetpack\Tracking;
 use Jetpack_IXR_Client;
@@ -134,6 +135,9 @@ class Manager {
 
 		// Initialize connection notices.
 		new Connection_Notice();
+
+		// Initialize token locks.
+		new Tokens_Locks();
 	}
 
 	/**
@@ -782,6 +786,25 @@ class Manager {
 
 		if ( $user_token && is_object( $user_token ) && isset( $user_token->external_user_id ) ) {
 			$connection_owner = get_userdata( $user_token->external_user_id );
+		}
+
+		if ( $connection_owner === false ) {
+			Error_Handler::get_instance()->report_error(
+				new WP_Error(
+					'invalid_connection_owner',
+					'Invalid connection owner',
+					array(
+						'user_id'           => $user_id,
+						'has_user_token'    => (bool) $user_token,
+						'error_type'        => 'connection',
+						'signature_details' => array(
+							'token' => '',
+						),
+					)
+				),
+				false,
+				true
+			);
 		}
 
 		return $connection_owner;
@@ -1647,6 +1670,11 @@ class Manager {
 			return false;
 		}
 
+		if ( ( new Status() )->is_offline_mode() && ! apply_filters( 'jetpack_connection_disconnect_site_wpcom_offline_mode', false ) ) {
+			// Prevent potential disconnect of the live site by removing WPCOM tokens.
+			return false;
+		}
+
 		/**
 		 * Fires upon the disconnect attempt.
 		 * Return `false` to prevent the disconnect.
@@ -1887,6 +1915,7 @@ class Manager {
 				'site_lang'             => get_locale(),
 				'site_created'          => $this->get_assumed_site_creation_date(),
 				'allow_site_connection' => ! $this->has_connected_owner(),
+				'calypso_env'           => ( new Host() )->get_calypso_env(),
 			)
 		);
 
@@ -2110,7 +2139,6 @@ class Manager {
 			'wordpress.com',
 			'localhost',
 			'localhost.localdomain',
-			'127.0.0.1',
 			'local.wordpress.test',         // VVV pattern.
 			'local.wordpress-trunk.test',   // VVV pattern.
 			'src.wordpress-develop.test',   // VVV pattern.
@@ -2164,6 +2192,24 @@ class Manager {
 		if ( ! function_exists( 'filter_var' ) ) {
 			// Just pass back true for now, and let wpcom sort it out.
 			return true;
+		}
+
+		$domain = preg_replace( '#^https?://#', '', untrailingslashit( $domain ) );
+
+		if ( filter_var( $domain, FILTER_VALIDATE_IP )
+			&& ! filter_var( $domain, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE )
+		) {
+			return new \WP_Error(
+				'fail_ip_forbidden',
+				sprintf(
+					/* translators: %1$s is a domain name. */
+					__(
+						'IP address `%1$s` just failed is_usable_domain check as it is in the private network.',
+						'jetpack-connection'
+					),
+					$domain
+				)
+			);
 		}
 
 		return true;
