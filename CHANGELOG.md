@@ -5,21 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 1.0.1-alpha - unreleased
-
-This is an alpha version! The changes listed here are not final.
-
+## 1.0.1 - 2023-11-03
 ### Added
-- Updated composer.lock
+- Updated composer.lock. [#31978]
 
 ### Changed
-- General: indicate full compatibility with the latest version of WordPress, 6.3.
-- General: indicate full compatibility with the latest version of WordPress, 6.4.
-- General: remove WP 6.1 backwards compatibility checks
-- General: update WordPress version requirements to WordPress 6.2.
-- Updated package dependencies.
-- Update lockfile
-- Use the new method to render Connection initial state.
+- General: Indicate full compatibility with the latest version of WordPress, 6.4. [#33776]
+- General: Remove WP 6.1 backwards compatibility checks. [#32772]
+- Updated package dependencies. [#33826]
+- Update lockfile. [#33607]
+- Use the new method to render Connection initial state. [#32499]
 
 ## 1.0.0 - 2023-06-15
 ### Added
