@@ -91,6 +91,7 @@ class ComposerStaticInitc4802e05bbcf59fd3b6350e8d3e5482c_migrationⓥ1_0_2_alpha
         'Automattic\\Jetpack\\Migration\\REST_Controller' => __DIR__ . '/../..' . '/src/class-rest-controller.php',
         'Automattic\\Jetpack\\Migration\\WPCOM_Migration' => __DIR__ . '/../..' . '/src/class-wpcom-migration.php',
         'Automattic\\Jetpack\\Modules' => __DIR__ . '/../..' . '/jetpack_vendor/automattic/jetpack-status/src/class-modules.php',
+        'Automattic\\Jetpack\\My_Jetpack\\Activitylog' => __DIR__ . '/../..' . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/class-activitylog.php',
         'Automattic\\Jetpack\\My_Jetpack\\Hybrid_Product' => __DIR__ . '/../..' . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/products/class-hybrid-product.php',
         'Automattic\\Jetpack\\My_Jetpack\\Initializer' => __DIR__ . '/../..' . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/class-initializer.php',
         'Automattic\\Jetpack\\My_Jetpack\\Module_Product' => __DIR__ . '/../..' . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/products/class-module-product.php',

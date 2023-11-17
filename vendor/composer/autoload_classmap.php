@@ -71,6 +71,7 @@ return array(
     'Automattic\\Jetpack\\Migration\\REST_Controller' => $baseDir . '/src/class-rest-controller.php',
     'Automattic\\Jetpack\\Migration\\WPCOM_Migration' => $baseDir . '/src/class-wpcom-migration.php',
     'Automattic\\Jetpack\\Modules' => $baseDir . '/jetpack_vendor/automattic/jetpack-status/src/class-modules.php',
+    'Automattic\\Jetpack\\My_Jetpack\\Activitylog' => $baseDir . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/class-activitylog.php',
     'Automattic\\Jetpack\\My_Jetpack\\Hybrid_Product' => $baseDir . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/products/class-hybrid-product.php',
     'Automattic\\Jetpack\\My_Jetpack\\Initializer' => $baseDir . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/class-initializer.php',
     'Automattic\\Jetpack\\My_Jetpack\\Module_Product' => $baseDir . '/jetpack_vendor/automattic/jetpack-my-jetpack/src/products/class-module-product.php',
