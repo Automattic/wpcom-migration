@@ -14,6 +14,9 @@ This is an alpha version! The changes listed here are not final.
 - General: update WordPress version requirements to WordPress 6.3.
 - Updated package dependencies.
 
+### Fixed
+- Improved helper script installer logging.
+
 ## 1.0.1 - 2023-11-03
 ### Added
 - Updated composer.lock. [#31978]
