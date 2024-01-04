@@ -15,6 +15,7 @@ This is an alpha version! The changes listed here are not final.
 - Updated package dependencies.
 
 ### Fixed
+- Backup: Add namespace versioning to Helper_Script_Manager and other classes
 - Improved helper script installer logging.
 
 ## 1.0.1 - 2023-11-03
