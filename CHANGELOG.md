@@ -12,6 +12,9 @@ This is an alpha version! The changes listed here are not final.
 ### Added
 - New setting in /sties/$site/settings that is not relevant to this plugin.
 
+### Changed
+- Updated package dependencies.
+
 ### Fixed
 - Write helper script to ABSPATH by default, just like we did before
 
