@@ -21,6 +21,7 @@ This is an alpha version! The changes listed here are not final.
 - Update package lock
 
 ### Fixed
+- Backup: change some error messages to not trigger security scanners
 - Write helper script to ABSPATH by default, just like we did before
 
 ## 2.0.0 - 2024-02-07
