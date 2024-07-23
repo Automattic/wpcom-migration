@@ -25,7 +25,6 @@ This is an alpha version! The changes listed here are not final.
 - Only show installation errors on plugins page
 - Remove explicit Plugin Install package dependency.
 - Remove the 'jetpack-identity-crisis' dependency.
-- Updated package dependencies.
 - Update package lock
 
 ### Removed
@@ -33,6 +32,7 @@ This is an alpha version! The changes listed here are not final.
 
 ### Fixed
 - Backup: change some error messages to not trigger security scanners
+- Updated package dependencies.
 - Write helper script to ABSPATH by default, just like we did before
 
 ## 2.0.0 - 2024-02-07
