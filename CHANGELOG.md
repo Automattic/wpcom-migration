@@ -32,6 +32,7 @@ This is an alpha version! The changes listed here are not final.
 
 ### Fixed
 - Backup: change some error messages to not trigger security scanners
+- Lossless image optimization of images in projects/plugins [subdirectories from a* through social]
 - Updated package dependencies.
 - Write helper script to ABSPATH by default, just like we did before
 
