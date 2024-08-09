@@ -13,6 +13,7 @@ This is an alpha version! The changes listed here are not final.
 - Add Woocommerce event remove_order_items to Jetpack Sync
 - New setting in /sties/$site/settings that is not relevant to this plugin.
 - Packages: add version tracking for identity-crisis package.
+- React 19 compatibility: Making sure useRef includes an argument.
 - Real time backups: Add endpoints orders to be used in real-time backups jetpack
 - Trigger red bubble notification when bad install is detected
 
