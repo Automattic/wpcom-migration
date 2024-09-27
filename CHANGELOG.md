@@ -37,6 +37,7 @@ This is an alpha version! The changes listed here are not final.
 ### Fixed
 - Backup: change some error messages to not trigger security scanners
 - Lossless image optimization of images in projects/plugins [subdirectories from a* through social]
+- My Jetpack: visual update to the GlobalNotice component look better on mobile.
 - Remove unnecessary trailing space from i18n message.
 - Revert recent SVG image optimizations.
 - Updated package dependencies.
