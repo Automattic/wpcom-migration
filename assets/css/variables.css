@@ -1,0 +1,15 @@
+:root {
+	--wpcom-migration-heading-font-family: Recoleta, "Noto Serif", Georgia, "Times New Roman", Times, serif;
+	--wpcom-migration-primary-bg: #3858e9;
+	--wpcom-migration-secondary-bg: #eff1fc;
+	--wpcom-migration-white: #fdfdfd;
+	--wpcom-migration-gray-0: #f6f7f7;
+	--wpcom-migration-gray-10: #c3c4c7;
+	--wpcom-migration-gray-50: #646970;
+	--wpcom-migration-gray-60: #50575e;
+	--wpcom-migration-gray-70: #3c434a;
+	--wpcom-migration-gray-80: #2c3338;
+	--wpcom-migration-gray-100: #101517;
+	--wpcom-migration-button-hover-color: #2145e6;
+	--wpcom-migration-link-hover-color: var( --wpcom-migration-button-hover-color );
+}
