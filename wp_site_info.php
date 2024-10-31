@@ -91,5 +91,14 @@ class WPCOMWPSiteInfo {
 	public static function isCWServer() {
 		return isset($_SERVER['cw_allowed_ip']);
 	}
+
+	public static function isWSKHosted() {
+		if (isset($_SERVER['SERVER_ADDR']) && function_exists('gethostbyaddr')) {
+			$hostFromIp = gethostbyaddr($_SERVER['SERVER_ADDR']);
+			return preg_match('/webspacekit\.com/', $hostFromIp) === 1;
+		}
+
+		return false;
+	}
 }
 endif;

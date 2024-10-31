@@ -40,6 +40,20 @@ class WPCOMWPDb {
 		return $wpdb->get_col($query, $col);
 	}
 
+	public function getAutoIncrement($table_name) {
+		$query = "SELECT `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s";
+		$results = $this->getResult($this->prepare($query, $table_name), ARRAY_A);
+		$auto_increment = null;
+		if (empty($results)) {
+			return $auto_increment;
+		}
+		$row = $results[0];
+		if ($row && isset($row["AUTO_INCREMENT"]) && is_numeric($row["AUTO_INCREMENT"])) {
+			$auto_increment = intval($row["AUTO_INCREMENT"]);
+		}
+		return $auto_increment;
+	}
+
 	public function tableName($table) {
 		return $table[0];
 	}

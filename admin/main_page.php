@@ -39,21 +39,23 @@
 				<button type="submit" id="migratesubmit">Continue</button>
 			</div>
 
-			<div class="wpcom-migration-key-section">
-				<h3>Migration in progress?</h3>
-				<p>Grab your key here.</p>
+			<?php if ( defined( 'IS_ATOMIC' ) && IS_ATOMIC && defined( 'ATOMIC_CLIENT_ID' )  && '2' === ATOMIC_CLIENT_ID ) : ?>
+				<div class="wpcom-migration-key-section">
+					<h3>Migration in progress?</h3>
+					<p>Grab your key here.</p>
 
-				<div class="wpcom-migration-input-group">
-					<label for="wpcom-migration-email">Migration Key</label>
-					<div class="wpcom-migration-key-input-wrapper">
-						<div class="wpcom-migration-key-input">
-							<input type="password" id="wpcom-migration-key" value="<?php echo esc_attr( $this->bvinfo->getConnectionKey() ); ?>" readonly>
-							<span id="wpcom-toggle-key-visibility" class="dashicons dashicons-hidden"></span>
+					<div class="wpcom-migration-input-group">
+						<label for="wpcom-migration-email">Migration Key</label>
+						<div class="wpcom-migration-key-input-wrapper">
+							<div class="wpcom-migration-key-input">
+								<input type="password" id="wpcom-migration-key" value="<?php echo esc_attr( $this->bvinfo->getConnectionKey() ); ?>" readonly>
+								<span id="wpcom-toggle-key-visibility" class="dashicons dashicons-hidden"></span>
+							</div>
+							<button type="button" id="wpcom-copy-key" class="secondary" onclick="copyToClipboard()">Copy Key</button>
 						</div>
-						<button type="button" id="wpcom-copy-key" class="secondary" onclick="copyToClipboard()">Copy Key</button>
 					</div>
 				</div>
-			</div>
+			<?php endif; ?>
 		</form>
 	</main>
 

@@ -8,9 +8,9 @@ class BVCallbackBase {
 	public static $wing_infos = array("BRAND_WING_VERSION" => '1.1',
 		"DB_WING_VERSION" => '1.3',
 		"ACCOUNT_WING_VERSION" => '1.2',
-		"MISC_WING_VERSION" => '1.3',
+		"MISC_WING_VERSION" => '1.4',
 		"FS_WING_VERSION" => '1.2',
-		"INFO_WING_VERSION" => '2.4',
+		"INFO_WING_VERSION" => '2.6',
 		"FS_WRITE_WING_VERSION" => '1.0',
 		);
 

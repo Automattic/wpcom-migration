@@ -50,16 +50,19 @@ if (!class_exists('WPCOMHelper')) :
 			return array_key_first($array);
 		}
 
-		public static function safePregReplace($replace_regex, $replace_string, $element) {
-			if (!is_string($replace_regex) || !is_string($replace_string) || !is_string($element)) {
+		public static function safePregReplace($replace_regex, $replace_string, $element, $limit = -1) {
+			if (!is_string($replace_regex) || !is_string($replace_string) || !is_string($element) || !is_int($limit)) {
 				return $element;
 			}
-			$updated_element = preg_replace($replace_regex, $replace_string, $element);
+
+			$updated_element = preg_replace($replace_regex, $replace_string, $element, $limit);
+
 			if ($updated_element === null && preg_last_error() !== PREG_NO_ERROR) {
 				return $element;
 			}
+
 			return $updated_element;
-		}
+		}	
 
 		public static function safeStrReplace($search, $replace, $subject) {
 			if (!is_string($search) || !is_string($replace) || !is_string($subject)) {

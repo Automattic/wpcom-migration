@@ -247,7 +247,7 @@ if (!class_exists('BVCallbackRequest')) :
 				return false;
 			}
 
-			$key_file = dirname( __FILE__ ) . '/../public_keys/' . $this->pubkey_name . '.pub';
+			$key_file = dirname( __DIR__ ) . '/public_keys/' . $this->pubkey_name . '.pub';
 			if (!file_exists($key_file)) {
 				$this->error["message"] = "PUBLIC_KEY_NOT_FOUND";
 				return false;

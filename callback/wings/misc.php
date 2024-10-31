@@ -11,7 +11,7 @@ class BVMiscCallback extends BVCallbackBase {
 	public $bvapi;
 	public $db;
 
-	const MISC_WING_VERSION = 1.3;
+	const MISC_WING_VERSION = 1.4;
 
 	public function __construct($callback_handler) {
 		$this->settings = $callback_handler->settings;
@@ -224,6 +224,33 @@ class BVMiscCallback extends BVCallbackBase {
 					$resp[$id]['url'] = get_permalink($id);
 				}
 			}
+			break;
+		case "stwplpwhtlbl":
+			$option = $bvinfo->wp_lp_whitelabel_option;
+			$info = array();
+
+			if (isset($params['logoFile'])) {
+				$info['logo'] = $params['logoFile'];
+			}
+
+			if (isset($params['label'])) {
+				$info['label'] = $params['label'];
+			}
+
+			if (isset($params['errorMessage'])) {
+				$info['2fa_error_message'] = $params['errorMessage'];
+			}
+
+			if (isset($params['tooltip'])) {
+				$info['2fa_tooltip'] = $params['tooltip'];
+			}
+
+			$resp = array("status" => $settings->updateOption($option, $info));
+			break;
+		case "dsblwplpwhtlbl":
+			$option = $bvinfo->wp_lp_whitelabel_option;
+			$settings->deleteOption($option);
+			$resp = array("status" => !$settings->getOption($option));
 			break;
 		default:
 			$resp = false;

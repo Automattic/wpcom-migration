@@ -81,5 +81,12 @@ if (!class_exists('WPCOMWPSettings')) :
 			}
 			return false;
 		}
+
+		public function deleteMetaData($meta_type, $object_id, $meta_key, $meta_value = '', $delete_all = false) {
+			if (function_exists('delete_metadata')) {
+				return delete_metadata($meta_type, $object_id, $meta_key, $meta_value, $delete_all);
+			}
+			return false;
+		}
 	}
 endif;

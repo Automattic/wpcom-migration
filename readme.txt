@@ -1,10 +1,10 @@
 === Migrate to WordPress.com ===
 Contributors: automattic
-Tags: migrate, migration, backup, restore, transfer, move, copy, wordpress.com, automattic, import, importer, hosting
+Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
 Tested up to: 6.6
 Requires PHP: 5.6.0
-Stable tag: 5.72
+Stable tag: 5.81
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,9 @@ Whether you’re scaling your business, expanding your online presence, or simpl
 3. Next, click the Activate button. After activating, you can navigate to Migrate to WordPress.com in your admin area.
 
 == Changelog ==
+= 5.81 =
+* Icons and Tags updated
+
 = 5.72 =
 * Improved UI/UX
 * Improved Migration Process

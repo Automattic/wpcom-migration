@@ -10,13 +10,14 @@ if (!class_exists('WPCOMInfo')) :
 		public $badgeinfo = 'wpcombadge';
 		public $ip_header_option = 'wpcomipheader';
 		public $brand_option = 'wpcombrand';
-		public $version = '5.72';
+		public $wp_lp_whitelabel_option = 'wpcomLpWhitelabelConf';
+		public $version = '5.81';
 		public $webpage = 'https://www.wordpress.com/';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'wpcom-migration/wpcom_migration.php';
 		public $plug_redirect = 'wpcomredirect';
 		public $logo = '../assets/img/wordpress.com.png';
-		public $brand_icon = '/assets/img/menu-icon.svg';
+		public $brand_icon = 'dashicons-wordpress-alt';
 		public $services_option_name = 'BVSERVICESOPTIONNAME';
 		public $author = 'WordPress.com';
 		public $title = 'Migrate to WordPress.com';
@@ -64,7 +65,7 @@ if (!class_exists('WPCOMInfo')) :
 			$encoded_url = base64_encode($bvsiteinfo->siteurl());
 			$secret = WPCOMRecover::defaultSecret($this->settings);
 
-			return base64_encode("v1:".$secret.":".$encoded_url);
+			return base64_encode("v2:".$secret.":".$encoded_url.":".$this->plugname);
 		}
 
 		public function getDefaultSecret() {
@@ -135,6 +136,11 @@ if (!class_exists('WPCOMInfo')) :
 		public function getPluginsWhitelabelInfos() {
 			$whitelabel_infos = $this->settings->getOption($this->brand_option);
 			return is_array($whitelabel_infos) ? $whitelabel_infos : array();
+		}
+
+		public function getLPWhitelabelInfo() {
+			$infos = $this->settings->getOption($this->wp_lp_whitelabel_option);
+			return is_array($infos) ? $infos : array();
 		}
 
 		public function getPluginsWhitelabelInfoByTitle() {

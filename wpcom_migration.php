@@ -5,7 +5,7 @@ Plugin URI: https://www.wordpress.com
 Description: The easiest way to migrate your site to WordPress.com.
 Author: WordPress.com
 Author URI: https://www.wordpress.com
-Version: 5.72
+Version: 5.81
 Network: True
  */
 
@@ -38,7 +38,8 @@ require_once dirname( __FILE__ ) . '/wp_actions.php';
 require_once dirname( __FILE__ ) . '/info.php';
 require_once dirname( __FILE__ ) . '/account.php';
 require_once dirname( __FILE__ ) . '/helper.php';
-##WP2FAMODULE##
+##WP_2FA_REQUIRE_FILE##
+##WP_LOGIN_WHITELABEL_REQUIRE_FILE##
 ##WPCACHEMODULE##
 
 
@@ -55,8 +56,10 @@ register_uninstall_hook(__FILE__, array('WPCOMWPAction', 'uninstall'));
 register_activation_hook(__FILE__, array($wp_action, 'activate'));
 register_deactivation_hook(__FILE__, array($wp_action, 'deactivate'));
 
+
 add_action('wp_footer', array($wp_action, 'footerHandler'), 100);
 add_action('wpcom_clear_bv_services_config', array($wp_action, 'clear_bv_services_config'));
+
 ##SOADDUNINSTALLACTION##
 
 ##DISABLE_OTHER_OPTIMIZATION_PLUGINS##
@@ -81,6 +84,7 @@ if (is_admin()) {
 	}
 	add_filter('plugin_action_links', array($wpadmin, 'settingsLink'), 10, 2);
 	add_action('admin_head', array($wpadmin, 'removeAdminNotices'), 3);
+	##POPUP_ON_DEACTIVATION##
 	##ACTIVATEWARNING##
 	add_action('admin_enqueue_scripts', array($wpadmin, 'wpcomsecAdminMenu'));
 	##ALPURGECACHEFUNCTION##
@@ -150,3 +154,7 @@ if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "
 	##HIDEPLUGINUPDATEMODULE##
 	##THIRDPARTYCACHINGMODULE##
 }
+
+##WP2FAMODULE##
+##WP_LOGIN_WHITELABEL_MODULE##
+##CLEAR_WP_2FA_CONFIG_ACTION##

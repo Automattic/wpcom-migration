@@ -48,7 +48,7 @@ class WPCOMWPAdmin {
 			$bname = $this->bvinfo->getBrandName();
 			$icon = $this->bvinfo->getBrandIcon();
 			add_menu_page($bname, $bname, 'manage_options', $this->bvinfo->plugname,
-					array($this, 'adminPage'), plugins_url($icon,  __FILE__ ));
+					array($this, 'adminPage'), $icon);
 		}
 	}
 
