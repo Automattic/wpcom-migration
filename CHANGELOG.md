@@ -11,6 +11,7 @@ This is an alpha version! The changes listed here are not final.
 
 ### Added
 - Add Woocommerce event remove_order_items to Jetpack Sync
+- Enable test coverage.
 - New setting in /sties/$site/settings that is not relevant to this plugin.
 - Packages: add version tracking for identity-crisis package.
 - React 19 compatibility: Making sure useRef includes an argument.
