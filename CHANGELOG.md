@@ -20,6 +20,7 @@ This is an alpha version! The changes listed here are not final.
 - Trigger red bubble notification when bad install is detected
 
 ### Changed
+- Backup: added next daily backup schedule time on admin page
 - Connection: Update connection ToS messaging slightly
 - General: indicate compatibility with the upcoming version of WordPress, 6.5.
 - General: indicate compatibility with the upcoming version of WordPress - 6.6.
