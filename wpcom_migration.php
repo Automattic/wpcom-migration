@@ -5,8 +5,10 @@ Plugin URI: https://www.wordpress.com
 Description: The easiest way to migrate your site to WordPress.com.
 Author: WordPress.com
 Author URI: https://www.wordpress.com
-Version: 5.81
+Version: 5.88
 Network: True
+License: GPLv2 or later
+License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
  */
 
 /*  Copyright 2017  Migrate to WordPress.com  (email : support@blogvault.net)
@@ -91,8 +93,8 @@ if (is_admin()) {
 	##ALADMINMENU##
 }
 
-if ((array_key_exists('bvreqmerge', $_POST)) || (array_key_exists('bvreqmerge', $_GET))) {
-	$_REQUEST = array_merge($_GET, $_POST);
+if ((array_key_exists('bvreqmerge', $_POST)) || (array_key_exists('bvreqmerge', $_GET))) { // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
+	$_REQUEST = array_merge($_GET, $_POST); // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.NonceVerification.Recommended
 }
 
 ##REMOVE_BV_PRELOAD_MODULE##
@@ -102,32 +104,39 @@ if ($bvinfo->hasValidDBVersion()) {
 	##MAINTENANCEMODULE##
 }
 
-if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "wpcom-migration")) {
+if ((array_key_exists('bvplugname', $_REQUEST)) && ($_REQUEST['bvplugname'] == "wpcom-migration")) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	require_once dirname( __FILE__ ) . '/callback/base.php';
 	require_once dirname( __FILE__ ) . '/callback/response.php';
 	require_once dirname( __FILE__ ) . '/callback/request.php';
 	require_once dirname( __FILE__ ) . '/recover.php';
 
-	$pubkey = WPCOMAccount::sanitizeKey($_REQUEST['pubkey']);
+	// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized, WordPress.Security.NonceVerification.Recommended
+	$pubkey = isset($_REQUEST['pubkey']) ? WPCOMAccount::sanitizeKey(wp_unslash($_REQUEST['pubkey'])) : '';
 
-	if (array_key_exists('rcvracc', $_REQUEST)) {
+	if (array_key_exists('rcvracc', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$account = WPCOMRecover::find($bvsettings, $pubkey);
 	} else {
 		$account = WPCOMAccount::find($bvsettings, $pubkey);
 	}
 
-	$request = new BVCallbackRequest($account, $_REQUEST, $bvsettings);
+	$request = new BVCallbackRequest($account, $_REQUEST, $bvsettings); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	$response = new BVCallbackResponse($request->bvb64cksize);
 
 	if ($request->authenticate() === 1) {
-		if (array_key_exists('bv_ignr_frm_cptch', $_REQUEST)) {
+		if (array_key_exists('bv_ignr_frm_cptch', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			##DISABLE_CAPTCHA_IN_FORM_PLUGINS##
-		} else {
+		}
+
+		if (array_key_exists('bv_ignr_eml', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			##DISABLE_EMAIL_IN_FORM_PLUGINS##
+		}
+
+		if (!array_key_exists('bv_ignr_frm_cptch', $_REQUEST) && !array_key_exists('bv_ignr_eml', $_REQUEST)) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			##BVBASEPATH##
 
 			require_once dirname( __FILE__ ) . '/callback/handler.php';
 
-			$params = $request->processParams($_REQUEST);
+			$params = $request->processParams($_REQUEST); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			if ($params === false) {
 				$response->terminate($request->corruptedParamsResp());
 			}

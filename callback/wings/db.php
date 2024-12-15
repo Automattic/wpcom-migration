@@ -107,7 +107,7 @@ class BVDBCallback extends BVCallbackBase {
 
 			$randomString = '';
 			for ($i = 0; $i < $bsize; $i++) {
-				$randomString .= $characters[rand(0, $charactersLength - 1)];
+				$randomString .= $characters[rand(0, $charactersLength - 1)]; // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_rand
 			}
 
 			$this->stream->writeStream($randomString);

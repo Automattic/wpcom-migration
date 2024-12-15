@@ -24,7 +24,7 @@ class WPCOMWPAdmin {
 	}
 
 	function removeAdminNotices() {
-		if (array_key_exists('page', $_REQUEST) && $_REQUEST['page'] == $this->bvinfo->plugname) {
+		if (array_key_exists('page', $_REQUEST) && $_REQUEST['page'] == $this->bvinfo->plugname) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			remove_all_actions('admin_notices');
 			remove_all_actions('all_admin_notices');
 		}
@@ -109,7 +109,7 @@ class WPCOMWPAdmin {
 				"<input type='hidden' name='plug' value='".esc_attr($this->bvinfo->plugname)."'/>\n".
 				"<input type='hidden' name='adminurl' value='".esc_attr($this->mainUrl())."'/>\n".
 				"<input type='hidden' name='bvversion' value='".esc_attr($this->bvinfo->version)."'/>\n".
-				"<input type='hidden' name='serverip' value='".esc_attr($_SERVER["SERVER_ADDR"])."'/>\n".
+				"<input type='hidden' name='serverip' value='".esc_attr(wp_unslash($_SERVER["SERVER_ADDR"]))."'/>\n".
 				"<input type='hidden' name='abspath' value='".esc_attr(ABSPATH)."'/>\n".
 				"<input type='hidden' name='secret' value='".esc_attr($secret)."'/>\n".
 				"<input type='hidden' name='public' value='".esc_attr($public)."'/>\n";

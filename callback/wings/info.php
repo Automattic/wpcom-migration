@@ -10,7 +10,7 @@ class BVInfoCallback extends BVCallbackBase {
 	public $bvinfo;
 	public $bvapi;
 	
-	const INFO_WING_VERSION = 2.6;
+	const INFO_WING_VERSION = 2.7;
 
 	public function __construct($callback_handler) {
 		$this->db = $callback_handler->db;
@@ -117,25 +117,24 @@ class BVInfoCallback extends BVCallbackBase {
 
 	public function getThemes() {
 		$result = array();
-		$themes = function_exists('wp_get_themes') ? wp_get_themes() : get_themes();
+		$themes = wp_get_themes();
 		foreach($themes as $theme) {
 			$pdata = $this->themeToArray($theme);
 			$result["themes"][] = $pdata;
 		}
-		$theme = function_exists('wp_get_theme') ? wp_get_theme() : get_current_theme();
-		$pdata = $this->themeToArray($theme);
+		$pdata = $this->themeToArray(wp_get_theme());
 		$result["currenttheme"] = $pdata;
 		return $result;
 	}
 
 	public function getSystemInfo() {
 		$sys_info = array(
-			'host' => $_SERVER['HTTP_HOST'],
+			'host' => isset($_SERVER['HTTP_HOST']) ? wp_unslash($_SERVER['HTTP_HOST']) : null, // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			'phpversion' => phpversion(),
 			'AF_INET6' => defined('AF_INET6')
 		);
 		if (array_key_exists('SERVER_ADDR', $_SERVER)) {
-			$sys_info['serverip'] = $_SERVER['SERVER_ADDR'];
+			$sys_info['serverip'] = wp_unslash($_SERVER['SERVER_ADDR']); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		}
 		if (function_exists('get_current_user')) {
 			$sys_info['user'] = get_current_user();
@@ -285,11 +284,11 @@ class BVInfoCallback extends BVCallbackBase {
 	public function getHostInfo() {
 		$host_info = $_SERVER;
 		if (function_exists('php_uname')) {
-			$host_info['PHP_SERVER_NAME'] = php_uname('\n');
+			$host_info['PHP_SERVER_NAME'] = php_uname();
 		}
 
 		if (isset($_SERVER['SERVER_ADDR']) && function_exists('gethostbyaddr')) {
-			$host_info['HOST_FROM_IP'] = gethostbyaddr($_SERVER['SERVER_ADDR']);
+			$host_info['HOST_FROM_IP'] = gethostbyaddr(wp_unslash($_SERVER['SERVER_ADDR'])); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		}
 
 		if (array_key_exists('IS_PRESSABLE', get_defined_constants())) {
@@ -313,7 +312,7 @@ class BVInfoCallback extends BVCallbackBase {
 
 	public function serverConfig() {
 		return array(
-			'software' => $_SERVER['SERVER_SOFTWARE'],
+			'software' => isset($_SERVER['SERVER_SOFTWARE']) ? wp_unslash($_SERVER['SERVER_SOFTWARE']) : null, // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			'sapi' => (function_exists('php_sapi_name')) ? php_sapi_name() : false,
 			'has_apache_get_modules' => function_exists('apache_get_modules'),
 			'posix_getuid' => (function_exists('posix_getuid')) ? posix_getuid() : null,

@@ -12,7 +12,7 @@ class WPCOMWPDb {
 
 	public function prepare($query, $args) {
 		global $wpdb;
-		return $wpdb->prepare($query, $args);
+		return $wpdb->prepare($query, $args); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public function getSiteId() {
@@ -22,27 +22,27 @@ class WPCOMWPDb {
 
 	public function getResult($query, $obj = ARRAY_A) {
 		global $wpdb;
-		return $wpdb->get_results($query, $obj);
+		return $wpdb->get_results($query, $obj); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public function query($query) {
 		global $wpdb;
-		return $wpdb->query($query);
+		return $wpdb->query($query); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public function getVar($query, $col = 0, $row = 0) {
 		global $wpdb;
-		return $wpdb->get_var($query, $col, $row);
+		return $wpdb->get_var($query, $col, $row); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public function getCol($query, $col = 0) {
 		global $wpdb;
-		return $wpdb->get_col($query, $col);
+		return $wpdb->get_col($query, $col); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
 	}
 
 	public function getAutoIncrement($table_name) {
-		$query = "SELECT `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s";
-		$results = $this->getResult($this->prepare($query, $table_name), ARRAY_A);
+		$query = "SELECT `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$table_name'";
+		$results = $this->getResult($query, ARRAY_A);
 		$auto_increment = null;
 		if (empty($results)) {
 			return $auto_increment;
@@ -84,7 +84,7 @@ class WPCOMWPDb {
 	public function describeTable($table) {
 		return $this->getResult("DESCRIBE $table;");
 	}
-	
+
 	public function showTableIndex($table) {
 		return $this->getResult("SHOW INDEX FROM $table");
 	}
@@ -111,7 +111,7 @@ class WPCOMWPDb {
 		if (!$this->isTablePresent($table)) {
 			if ($usedbdelta) {
 				if (!function_exists('dbDelta'))
-					require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
+					require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 				dbDelta($query);
 			} else {
 				$this->query($query);
@@ -180,7 +180,7 @@ class WPCOMWPDb {
 			return false;
 		}
 	}
-	
+
 	public function deleteBVTableContent($name, $filter = "") {
 		$table = $this->getBVTable($name);
 		if ($this->isTablePresent($table)) {
@@ -234,7 +234,7 @@ class WPCOMWPDb {
 		$table = $this->getBVTable($name);
 		return $wpdb->insert($table, $value);
 	}
-	
+
 	public function tinfo($name) {
 		$result = array();
 		$table = $this->getBVTable($name);

@@ -9,9 +9,9 @@ class BVCallbackBase {
 		"DB_WING_VERSION" => '1.3',
 		"ACCOUNT_WING_VERSION" => '1.2',
 		"MISC_WING_VERSION" => '1.4',
-		"FS_WING_VERSION" => '1.2',
-		"INFO_WING_VERSION" => '2.6',
-		"FS_WRITE_WING_VERSION" => '1.0',
+		"FS_WING_VERSION" => '1.3',
+		"INFO_WING_VERSION" => '2.7',
+		"FS_WRITE_WING_VERSION" => '1.1',
 		);
 
 	public function objectToArray($obj) {

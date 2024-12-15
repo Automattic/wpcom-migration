@@ -125,9 +125,14 @@ if (!class_exists('WPCOMHelper')) :
 			if (!is_string($fname) || !is_string($pattern)) {
 				return;
 			}
-			if (!file_exists($fname)) return;
 
-			$content = file_get_contents($fname);
+			$filesystem = self::get_direct_filesystem();
+
+			if (!$filesystem->exists($fname)) {
+				return;
+			}
+
+			$content = $filesystem->get_contents($fname);
 			if ($content !== false) {
 				if ($is_regex !== false) {
 					$modified_content = preg_replace($pattern, "", $content);
@@ -140,7 +145,7 @@ if (!class_exists('WPCOMHelper')) :
 				}
 
 				if ($content !== $modified_content) {
-					file_put_contents($fname, $modified_content);
+					$filesystem->put_contents($fname, $modified_content, intval($filesystem->getchmod($fname), 8));
 				}
 			}
 		}
@@ -220,6 +225,18 @@ if (!class_exists('WPCOMHelper')) :
 			}
 
 			return array(true, $decrypted_data);
+		}
+		public static function get_direct_filesystem() {
+			require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-base.php';
+			require_once ABSPATH . 'wp-admin/includes/class-wp-filesystem-direct.php';
+			return new WP_Filesystem_Direct(new StdClass());
+		}
+
+		public static function unslashIfWPLoaded($str) {
+			if (function_exists('wp_unslash')) {
+				return wp_unslash($str);
+			}
+			return $str;
 		}
 	}
 endif;

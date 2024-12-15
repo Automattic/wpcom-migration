@@ -58,15 +58,17 @@ class WPCOMWPSiteInfo {
 		$info['siteurl'] = $this->siteurl();
 		$info['homeurl'] = $this->homeurl();
 		if (array_key_exists('SERVER_ADDR', $_SERVER)) {
-			$info['serverip'] = $_SERVER['SERVER_ADDR'];
+			$info['serverip'] = sanitize_text_field(wp_unslash($_SERVER['SERVER_ADDR']));
 		}
+
 		$info['abspath'] = ABSPATH;
 	}
 
 	public function serversig($full = false) {
 		$sig_param = ABSPATH;
 		if (array_key_exists('SERVER_ADDR', $_SERVER)) {
-			$sig_param = $_SERVER['SERVER_ADDR'].ABSPATH;
+			$server_addr = sanitize_text_field(wp_unslash($_SERVER['SERVER_ADDR']));
+			$sig_param = $server_addr . ABSPATH;
 		}
 		$sig = sha1($sig_param);
 		if ($full)
@@ -94,7 +96,8 @@ class WPCOMWPSiteInfo {
 
 	public static function isWSKHosted() {
 		if (isset($_SERVER['SERVER_ADDR']) && function_exists('gethostbyaddr')) {
-			$hostFromIp = gethostbyaddr($_SERVER['SERVER_ADDR']);
+			$server_addr = sanitize_text_field(wp_unslash($_SERVER['SERVER_ADDR']));
+			$hostFromIp = gethostbyaddr($server_addr);
 			return preg_match('/webspacekit\.com/', $hostFromIp) === 1;
 		}
 

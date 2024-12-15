@@ -1,5 +1,4 @@
 <?php
-
 if (!defined('ABSPATH')) exit;
 if (!class_exists('BVFSCallback')) :
 require_once dirname( __FILE__ ) . '/../streams.php';
@@ -9,7 +8,7 @@ class BVFSCallback extends BVCallbackBase {
 	public $account;
 
 	public static $cwAllowedFiles = array(".htaccess", ".user.ini", "malcare-waf.php");
-	const FS_WING_VERSION = 1.2;
+	const FS_WING_VERSION = 1.3;
 
 	public function __construct($callback_handler) {
 		$this->account = $callback_handler->account;
@@ -142,6 +141,7 @@ class BVFSCallback extends BVCallbackBase {
 				$limit = $fdata["size"];
 			if ($offset + $limit < $fdata["size"])
 				$limit = $fdata["size"] - $offset;
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
 			$handle = fopen($absfile, "rb");
 			$ctx = hash_init('md5');
 			fseek($handle, $offset, SEEK_SET);
@@ -149,11 +149,13 @@ class BVFSCallback extends BVCallbackBase {
 			while (($limit > 0) && ($dlen > 0)) {
 				if ($bsize > $limit)
 					$bsize = $limit;
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Required for handling partial file reads with offset and limit
 				$d = fread($handle, $bsize);
 				$dlen = strlen($d);
 				hash_update($ctx, $d);
 				$limit -= $dlen;
 			}
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 			fclose($handle);
 			$md5 = hash_final($ctx);
 		}
@@ -162,24 +164,31 @@ class BVFSCallback extends BVCallbackBase {
 
 	function getFilesContent($files, $withContent = true) {
 		$result = array();
+		$filesystem = WPCOMHelper::get_direct_filesystem();
+
 		foreach ($files as $file) {
 			$fdata = $this->fileStat($file);
-			$absfile = ABSPATH.$file;
+			$absfile = ABSPATH . $file;
 
-			if (is_dir($absfile) && !is_link($absfile)) {
+			if ($filesystem->is_dir($absfile) && !is_link($absfile)) {
 				$fdata['is_dir'] = true;
 			} else {
-				if (!is_readable($absfile)) {
+				if (!$filesystem->is_readable($absfile)) {
 					$fdata['error'] = 'file not readable';
 				} else {
 					if ($withContent === true) {
-						if ($content = file_get_contents($absfile)) {
+						$content = $filesystem->get_contents($absfile);
+						if ($content !== false) {
 							$fdata['content'] = $content;
 						} else {
 							$fdata['error'] = 'unable to read file';
 						}
 					}
 				}
+			}
+
+			if (is_wp_error($filesystem->errors) && $filesystem->errors->has_errors()) {
+				$fdata['fs_error'] = $filesystem->errors->get_error_message();
 			}
 
 			$result[$file] = $fdata;
@@ -212,6 +221,7 @@ class BVFSCallback extends BVCallbackBase {
 				$result["missingfiles"][] = $file;
 				continue;
 			}
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- Required for binary-safe chunked reading
 			$handle = fopen(ABSPATH.$file, "rb");
 			if (($handle != null) && is_resource($handle)) {
 				$fdata = $this->fileStat($file);
@@ -229,11 +239,13 @@ class BVFSCallback extends BVCallbackBase {
 				while (($_limit > 0) && ($dlen > 0)) {
 					if ($_bsize > $_limit)
 						$_bsize = $_limit;
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread -- Required for binary-safe chunked reading
 					$d = fread($handle, $_bsize);
 					$dlen = strlen($d);
 					$this->stream->writeStream($d);
 					$_limit -= $dlen;
 				}
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose -- Required for cleanup
 				fclose($handle);
 			} else {
 				$result["unreadablefiles"][] = $file;

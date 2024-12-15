@@ -4,7 +4,7 @@ Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
 Tested up to: 6.7
 Requires PHP: 5.6.0
-Stable tag: 5.81
+Stable tag: 5.88
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,10 @@ Whether you’re scaling your business, expanding your online presence, or simpl
 3. Next, click the Activate button. After activating, you can navigate to Migrate to WordPress.com in your admin area.
 
 == Changelog ==
+= 5.88 =
+* Tweak: Code Restructuring
+* Tweak: Added support for PHP 8.4
+
 = 5.81 =
 * Icons and Tags updated
 
