@@ -2,7 +2,7 @@
 Contributors: automattic
 Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
-Tested up to: 6.8
+Tested up to: 6.9
 Requires PHP: 5.6.0
 Stable tag: 5.88
 License: GPLv2 or later
