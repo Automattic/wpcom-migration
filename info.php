@@ -11,7 +11,7 @@ if (!class_exists('WPCOMInfo')) :
 		public $ip_header_option = 'wpcomipheader';
 		public $brand_option = 'wpcombrand';
 		public $wp_lp_whitelabel_option = 'wpcomLpWhitelabelConf';
-		public $version = '5.88';
+		public $version = '6.65';
 		public $webpage = 'https://www.wordpress.com/';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'wpcom-migration/wpcom_migration.php';
@@ -64,14 +64,15 @@ if (!class_exists('WPCOMInfo')) :
 			$bvsiteinfo = new WPCOMWPSiteInfo();
 			$encoded_url = base64_encode($bvsiteinfo->siteurl());
 			$secret = WPCOMRecover::defaultSecret($this->settings);
+			$tag = WPCOMRecover::connectionTag($this->settings);
 
-			return base64_encode("v2:".$secret.":".$encoded_url.":".$this->plugname);
-		}
+			#No tag means this site has no salt material in wp-config.php, and there
+			#is no connection key that would be safe to hand out.
+			if (empty($secret) || empty($tag)) {
+				return null;
+			}
 
-		public function getDefaultSecret() {
-			require_once dirname( __FILE__ ) . '/recover.php';
-			$bvsiteinfo = new WPCOMWPSiteInfo();
-			return WPCOMRecover::defaultSecret($this->settings);
+			return base64_encode("v3:".$secret.":".$encoded_url.":".$this->plugname.":".$tag);
 		}
 
 		public function getLatestElementorDBVersion($file) {
@@ -86,25 +87,10 @@ if (!class_exists('WPCOMInfo')) :
 		}
 
 		public static function getRequestID() {
-			if (!defined("BV_REQUEST_ID")) {
-				define("BV_REQUEST_ID", uniqid(mt_rand())); // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
+			if (!defined("WPCOM_REQUEST_ID")) {
+				define("WPCOM_REQUEST_ID", uniqid(mt_rand())); // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_mt_rand
 			}
-			return BV_REQUEST_ID;
-		}
-
-		public function canSetCWBranding() {
-			if (WPCOMWPSiteInfo::isCWServer()) {
-
-				$bot_protect_accounts = WPCOMAccount::accountsByType($this->settings, 'botprotect');
-				if (sizeof($bot_protect_accounts) >= 1)
-					return true;
-
-				$bot_protect_accounts = WPCOMAccount::accountsByPattern($this->settings, 'email', '/@cw_user\.com$/');
-				if (sizeof($bot_protect_accounts) >= 1)
-					return true;
-			}
-
-			return false;
+			return WPCOM_REQUEST_ID;
 		}
 
 		public function canWhiteLabel($slug = NULL) {
@@ -162,7 +148,6 @@ if (!class_exists('WPCOMInfo')) :
 			if (is_array($brand) && array_key_exists('menuname', $brand)) {
 				return $brand['menuname'];
 			}
-		  
 			return $this->brandname;
 		}
 

@@ -1,12 +1,14 @@
 <?php
 
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVCallbackRequest')) :
-	class BVCallbackRequest {
+if (!class_exists('WPCOMCallbackRequest')) :
+	class WPCOMCallbackRequest {
 		public $params;
 		public $method;
 		public $wing;
 		public $is_afterload;
+		public $is_aftershutdown;
+		public $keep_page_output;
 		public $is_admin_ajax;
 		public $is_debug;
 		public $account;
@@ -24,6 +26,11 @@ if (!class_exists('BVCallbackRequest')) :
 		public $bvprmsmac;
 		public $bvboundry;
 
+		private static $SIG_HASH_ALGO_MAP = array(
+			'1' => OPENSSL_ALGO_SHA1,
+			'7' => OPENSSL_ALGO_SHA256
+		);
+
 		public function __construct($account, $in_params, $settings) {
 			$this->params = array();
 			$this->account = $account;
@@ -31,10 +38,13 @@ if (!class_exists('BVCallbackRequest')) :
 			$this->wing = $in_params['wing'];
 			$this->method = $in_params['bvMethod'];
 			$this->is_afterload = array_key_exists('afterload', $in_params);
+			$this->is_aftershutdown = array_key_exists('aftershutdown', $in_params);
+			$this->keep_page_output = $this->is_aftershutdown &&
+				array_key_exists('keeppageoutput', $in_params);
 			$this->is_admin_ajax = array_key_exists('adajx', $in_params);
 			$this->is_debug = array_key_exists('bvdbg', $in_params);
 			$this->sig = $in_params['sig'];
-			$this->sighshalgo = !empty($in_params['sighshalgo']) ? $in_params['sighshalgo'] : null;
+			$this->sighshalgo = !empty($in_params['sighshalgo']) ? $in_params['sighshalgo'] : '1';
 			$this->time = intval($in_params['bvTime']);
 			$this->version = $in_params['bvVersion'];
 			$this->is_sha1 = array_key_exists('sha1', $in_params);
@@ -94,6 +104,12 @@ if (!class_exists('BVCallbackRequest')) :
 			if ($this->is_afterload) {
 				$info["afterload"] = true;
 			}
+			if ($this->is_aftershutdown) {
+				$info["aftershutdown"] = true;
+			}
+			if ($this->keep_page_output) {
+				$info["keeppageoutput"] = true;
+			}
 			return $info;
 		}
 
@@ -151,7 +167,7 @@ if (!class_exists('BVCallbackRequest')) :
 
 					if (array_key_exists('sersafe', $in_params)) {
 						$key = $in_params['sersafe'];
-						$in_params[$key] = BVCallbackRequest::serialization_safe_decode($in_params[$key]);
+						$in_params[$key] = WPCOMCallbackRequest::serialization_safe_decode($in_params[$key]);
 					}
 
 					if (array_key_exists('bvprms', $in_params) && isset($in_params['bvprms'])) {
@@ -173,6 +189,7 @@ if (!class_exists('BVCallbackRequest')) :
 
 					if (array_key_exists('memset', $in_params)) {
 						$val = intval($in_params['memset']);
+						// phpcs:ignore Squiz.PHP.DiscouragedFunctions.Discouraged -- Required for memory limit adjustment
 						@ini_set('memory_limit', $val.'M');
 					}
 
@@ -200,7 +217,7 @@ if (!class_exists('BVCallbackRequest')) :
 
 		public static function serialization_safe_decode($data) {
 			if (is_array($data)) {
-				$data = array_map(array('BVCallbackRequest', 'serialization_safe_decode'), $data);
+				$data = array_map(array('WPCOMCallbackRequest', 'serialization_safe_decode'), $data);
 			} elseif (is_string($data)) {
 				$data = base64_decode($data);
 			}
@@ -234,14 +251,19 @@ if (!class_exists('BVCallbackRequest')) :
 				return false;
 			}
 
+			$openssl_algo = array_key_exists($sighshalgo, self::$SIG_HASH_ALGO_MAP) ? self::$SIG_HASH_ALGO_MAP[$sighshalgo] : null;
+			if ($openssl_algo === null) {
+				$this->error["message"] = "UNSUPPORTED_HASH_ALGORITHM: " . $sighshalgo;
+				return false;
+			}
+
 			$key_file = dirname( __DIR__ ) . '/public_keys/' . $this->pubkey_name . '.pub';
 			if (!file_exists($key_file)) {
 				$this->error["message"] = "PUBLIC_KEY_NOT_FOUND";
 				return false;
 			}
 
-			$filesystem = WPCOMHelper::get_direct_filesystem();
-			$public_key_str = $filesystem->get_contents($key_file);
+			$public_key_str = WPCOMWPFileSystem::getInstance()->getContents($key_file);
 
 			$public_key = openssl_pkey_get_public($public_key_str);
 			if (!$public_key) {
@@ -249,11 +271,7 @@ if (!class_exists('BVCallbackRequest')) :
 				return false;
 			}
 
-			if ($sighshalgo === 'sha256') {
-				$verify = openssl_verify($data, $sig, $public_key, OPENSSL_ALGO_SHA256);
-			} else {
-				$verify = openssl_verify($data, $sig, $public_key);
-			}
+			$verify = openssl_verify($data, $sig, $public_key, $openssl_algo);
 			if ($verify === 1) {
 				return true;
 			} elseif ($verify === 0) {
@@ -278,16 +296,13 @@ if (!class_exists('BVCallbackRequest')) :
 
 		public function authFailedResp() {
 			$api_public_key = WPCOMAccount::getApiPublicKey($this->settings);
-			$default_secret = WPCOMRecover::getDefaultSecret($this->settings);
 			$default_account_pubkey = WPCOMAccount::getDefaultPublicKey();
 			$bvinfo = new WPCOMInfo($this->settings);
 			$resp = array(
 				"request_info" => $this->info(),
 				"bvinfo" => $bvinfo->info(),
 				"statusmsg" => "FAILED_AUTH",
-				"api_pubkey" => substr($api_public_key, 0, 8),
-				"def_key_status" => WPCOMRecover::getSecretStatus($this->settings),
-				"def_sigmatch" => substr(hash('sha1', $this->method.$default_secret.$this->time.$this->version), 0, 8)
+				"api_pubkey" => substr($api_public_key, 0, 8)
 			);
 
 			if (is_string($default_account_pubkey) && strlen($default_account_pubkey) >= 32) {
@@ -296,7 +311,6 @@ if (!class_exists('BVCallbackRequest')) :
 
 			if ($this->account) {
 				$resp["account_info"] = $this->account->info();
-				$resp["sigmatch"] = substr(hash('sha1', $this->method.$this->account->secret.$this->time.$this->version), 0, 6);
 			} else {
 				$resp["account_info"] = array("error" => "ACCOUNT_NOT_FOUND");
 			}

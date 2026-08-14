@@ -43,7 +43,7 @@ if (!class_exists('WPCOMAccount')) :
 			$str = "";
 			$size = strlen($chars);
 			for( $i = 0; $i < $length; $i++ ) {
-				$str .= $chars[rand(0, $size - 1)]; // phpcs:ignore WordPress.WP.AlternativeFunctions.rand_rand
+				$str .= $chars[random_int(0, $size - 1)];
 			}
 			return $str;
 		}

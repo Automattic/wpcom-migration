@@ -1,9 +1,9 @@
 <?php
 
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVInfoCallback')) :
+if (!class_exists('WPCOMInfoCallback')) :
 
-class BVInfoCallback extends BVCallbackBase {
+class WPCOMInfoCallback extends WPCOMCallbackBase {
 	public $db;
 	public $settings;
 	public $siteinfo;
@@ -129,12 +129,12 @@ class BVInfoCallback extends BVCallbackBase {
 
 	public function getSystemInfo() {
 		$sys_info = array(
-			'host' => isset($_SERVER['HTTP_HOST']) ? wp_unslash($_SERVER['HTTP_HOST']) : null, // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			'host' => WPCOMHelper::getRawParam('SERVER', 'HTTP_HOST'),
 			'phpversion' => phpversion(),
 			'AF_INET6' => defined('AF_INET6')
 		);
 		if (array_key_exists('SERVER_ADDR', $_SERVER)) {
-			$sys_info['serverip'] = wp_unslash($_SERVER['SERVER_ADDR']); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$sys_info['serverip'] = WPCOMHelper::getRawParam('SERVER', 'SERVER_ADDR');
 		}
 		if (function_exists('get_current_user')) {
 			$sys_info['user'] = get_current_user();
@@ -288,7 +288,7 @@ class BVInfoCallback extends BVCallbackBase {
 		}
 
 		if (isset($_SERVER['SERVER_ADDR']) && function_exists('gethostbyaddr')) {
-			$host_info['HOST_FROM_IP'] = gethostbyaddr(wp_unslash($_SERVER['SERVER_ADDR'])); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			$host_info['HOST_FROM_IP'] = gethostbyaddr(WPCOMHelper::getRawParam('SERVER', 'SERVER_ADDR'));
 		}
 
 		if (array_key_exists('IS_PRESSABLE', get_defined_constants())) {
@@ -312,7 +312,7 @@ class BVInfoCallback extends BVCallbackBase {
 
 	public function serverConfig() {
 		return array(
-			'software' => isset($_SERVER['SERVER_SOFTWARE']) ? wp_unslash($_SERVER['SERVER_SOFTWARE']) : null, // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+			'software' => WPCOMHelper::getRawParam('SERVER', 'SERVER_SOFTWARE'),
 			'sapi' => (function_exists('php_sapi_name')) ? php_sapi_name() : false,
 			'has_apache_get_modules' => function_exists('apache_get_modules'),
 			'posix_getuid' => (function_exists('posix_getuid')) ? posix_getuid() : null,

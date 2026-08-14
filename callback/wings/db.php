@@ -1,10 +1,10 @@
 <?php
 
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVDBCallback')) :
+if (!class_exists('WPCOMDBCallback')) :
 require_once dirname( __FILE__ ) . '/../streams.php';
 
-class BVDBCallback extends BVCallbackBase {
+class WPCOMDBCallback extends WPCOMCallbackBase {
 	public $db;
 	public $stream;
 	public $account;
@@ -12,7 +12,7 @@ class BVDBCallback extends BVCallbackBase {
 
 	public static $bvTables = array("fw_requests", "lp_requests", "ip_store");
 
-	const DB_WING_VERSION = 1.3;
+	const DB_WING_VERSION = 1.5;
 
 	public function __construct($callback_handler) {
 		$this->db = $callback_handler->db;
@@ -30,7 +30,7 @@ class BVDBCallback extends BVCallbackBase {
 
 	public function getTableData($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, $include_rows = false) {
 		$tinfo = array();
-		
+
 		$rows_count = $this->db->rowsCount($table);
 		$result = array('count' => $rows_count);
 		if ($limit == 0) {
@@ -63,6 +63,86 @@ class BVDBCallback extends BVCallbackBase {
 			}
 			$offset += $srows;
 			$limit -= $srows;
+		}
+		$result['size'] = $offset;
+		$result['tinfo'] = $tinfo;
+		return $result;
+	}
+
+	public function buildPrimaryKeyCursorFilter($pkeys, $last_ids) {
+		if (empty($pkeys)) return null;
+		foreach($pkeys as $pk) {
+			if (!isset($last_ids[$pk]) || $last_ids[$pk] === '') return null;
+		}
+
+		$conditions = array();
+		$order_by = array();
+		foreach($pkeys as $index => $pk) {
+			$key = "`".$pk."`";
+			$order_by[] = $key;
+			$parts = array();
+			for ($eq_index = 0; $eq_index < $index; $eq_index++) {
+				$eq_pk = $pkeys[$eq_index];
+				$eq_key = "`".$eq_pk."`";
+				$eq_last_id = esc_sql((string) $last_ids[$eq_pk]);
+				$parts[] = $eq_key." = '".$eq_last_id."'";
+			}
+			$last_id = esc_sql((string) $last_ids[$pkeys[$index]]);
+			$parts[] = $key." > '".$last_id."'";
+			$condition = implode(" AND ", $parts);
+			$conditions[] = ($index == 0) ? $condition : "(".$condition.")";
+		}
+		return " WHERE ".implode(" OR ", $conditions)." ORDER BY ".implode(",", $order_by);
+	}
+
+	public function getTableDataByCursor($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, $include_rows = false, $cursor_mode = false) {
+		$tinfo = array();
+
+		$rows_count = $this->db->rowsCount($table);
+		$result = array('count' => $rows_count);
+		if ($limit == 0) {
+			$limit = $rows_count;
+		}
+		$srows = 1;
+		$current_filter = $filter;
+		$cursor_active = ($cursor_mode === true && !empty($pkeys));
+		$query_offset = $offset;
+		while (($limit > 0) && ($srows > 0)) {
+			if ($bsize > $limit)
+				$bsize = $limit;
+			$rows = $this->db->getTableContent($table, '*', $current_filter, $bsize, $query_offset);
+			$srows = sizeof($rows);
+			$data = array();
+			$data["table_name"] = $tname;
+			$data["offset"] = $offset;
+			$data["size"] = $srows;
+			$serialized_rows = serialize($rows);
+			$data['md5'] = md5($serialized_rows);
+			$data['length'] = strlen($serialized_rows);
+			array_push($tinfo, $data);
+			if (!empty($pkeys) && $srows > 0) {
+				$end_row = end($rows);
+				$last_ids = $this->getLastID($pkeys, $end_row);
+				$data['last_ids'] = $last_ids;
+				$result['last_ids'] = $last_ids;
+				if ($cursor_active) {
+					$cursor_filter = $this->buildPrimaryKeyCursorFilter($pkeys, $last_ids);
+					if ($cursor_filter !== null) {
+						$current_filter = $cursor_filter;
+					} else {
+						$current_filter = $filter;
+						$cursor_active = false;
+					}
+				}
+			}
+			if ($include_rows) {
+				$data["rows"] = $rows;
+				$str = serialize($data);
+				$this->stream->writeStream($str);
+			}
+			$offset += $srows;
+			$limit -= $srows;
+			$query_offset = $cursor_active ? 0 : $offset;
 		}
 		$result['size'] = $offset;
 		$result['tinfo'] = $tinfo;
@@ -182,7 +262,7 @@ class BVDBCallback extends BVCallbackBase {
 	public function process($request) {
 		$db = $this->db;
 		$params = $request->params;
-		$stream_init_info = BVStream::startStream($this->account, $request);
+		$stream_init_info = WPCOMStream::startStream($this->account, $request);
 
 		if (array_key_exists('stream', $stream_init_info)) {
 			$this->stream = $stream_init_info['stream'];
@@ -297,7 +377,12 @@ class BVDBCallback extends BVCallbackBase {
 				$filter = (array_key_exists('filter', $params)) ? $params['filter'] : "";
 				$tname = $params['tname'];
 				$pkeys = (array_key_exists('pkeys', $params)) ? $params['pkeys'] : array();
-				$resp = $this->getTableData($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, false);
+				$cursor_mode = (array_key_exists('cursor_mode', $params)) ? $params['cursor_mode'] : false;
+				if ($cursor_mode === true) {
+					$resp = $this->getTableDataByCursor($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, false, $cursor_mode);
+				} else {
+					$resp = $this->getTableData($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, false);
+				}
 				break;
 			case "getmulttables":
 				$result = array();
@@ -322,7 +407,12 @@ class BVDBCallback extends BVCallbackBase {
 				$filter = (array_key_exists('filter', $params)) ? $params['filter'] : "";
 				$tname = $params['tname'];
 				$pkeys = (array_key_exists('pkeys', $params)) ? $params['pkeys'] : array();
-				$resp = $this->getTableData($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, true);
+				$cursor_mode = (array_key_exists('cursor_mode', $params)) ? $params['cursor_mode'] : false;
+				if ($cursor_mode === true) {
+					$resp = $this->getTableDataByCursor($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, true, $cursor_mode);
+				} else {
+					$resp = $this->getTableData($table, $tname, $offset, $limit, $bsize, $filter, $pkeys, true);
+				}
 				break;
 			case "tblexists":
 				$resp = array("tblexists" => $db->isTablePresent($params['table']));

@@ -1,9 +1,9 @@
 <?php
 
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVMiscCallback')) :
+if (!class_exists('WPCOMMiscCallback')) :
 	
-class BVMiscCallback extends BVCallbackBase {
+class WPCOMMiscCallback extends WPCOMCallbackBase {
 	public $settings;
 	public $bvinfo;
 	public $siteinfo;

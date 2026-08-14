@@ -65,14 +65,14 @@ if (!class_exists('WPCOMWPAction')) :
 		}
 
 		private function process_deactivation_feedback(&$info) {
-			//phpcs:disable WordPress.Security.NonceVerification.Recommended
+			//phpcs:disable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			if (!isset($_GET['bv_deactivation_assets']) || !is_string($_GET['bv_deactivation_assets'])) {
 				return;
 			}
 
 			$deactivation_assets = wp_unslash($_GET['bv_deactivation_assets']);
 			$info['deactivation_feedback'] = base64_encode($deactivation_assets);
-			//phpcs:disable WordPress.Security.NonceVerification.Recommended
+			//phpcs:enable WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		}
 
 		##REMOVE_BV_PRELOAD##

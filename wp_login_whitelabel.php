@@ -34,11 +34,15 @@ class WPCOMWPLoginWhitelabel {
 
 		$logo_style = 'background-image: none, url("' . esc_attr($this->logo) . '") !important;';
 
-		echo '<style type="text/css">
-			.login h1 a {
-			' . $logo_style . '
-			}
-		</style>';
+		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
+		wp_register_style( 'bv-login-inline', false );
+		wp_enqueue_style( 'bv-login-inline' );
+
+		wp_add_inline_style(
+			'bv-login-inline',
+			'.login h1 a { ' . $logo_style . ' }'
+		);
+		// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 	}
 
 	function custom_login_message($message) {

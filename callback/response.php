@@ -1,9 +1,9 @@
 <?php
 
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVCallbackResponse')) :
+if (!class_exists('WPCOMCallbackResponse')) :
 
-	class BVCallbackResponse extends BVCallbackBase {
+	class WPCOMCallbackResponse extends WPCOMCallbackBase {
 		public $status;
 		public $bvb64cksize;
 
@@ -28,6 +28,7 @@ if (!class_exists('BVCallbackResponse')) :
 			$resp["signature"] = "Blogvault API";
 			$response = "bvbvbvbvbv".serialize($resp)."bvbvbvbvbv";
 			$response = "bvb64bvb64".$this->base64Encode($response, $this->bvb64cksize)."bvb64bvb64";
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Safe for API response
 			die($response);
 
 			exit;

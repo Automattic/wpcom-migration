@@ -1,11 +1,11 @@
 <?php
 if (!defined('ABSPATH')) exit;
-if (!class_exists('BVFSWriteCallback')) :
+if (!class_exists('WPCOMFSWriteCallback')) :
 
-class BVFSWriteCallback extends BVCallbackBase {
+class WPCOMFSWriteCallback extends WPCOMCallbackBase {
 
 	const MEGABYTE = 1048576;
-	const FS_WRITE_WING_VERSION = 1.1;
+	const FS_WRITE_WING_VERSION = 1.2;
 	
 	public function __construct() {
 	}
@@ -69,18 +69,18 @@ class BVFSWriteCallback extends BVCallbackBase {
 
 	public function removeDirs($dirs) {
 		$result = array();
-		$filesystem = WPCOMHelper::get_direct_filesystem();
 
-		foreach($dirs as $dir) {
+		foreach ($dirs as $dir) {
 			$dir_result = array();
 
-			if ($filesystem->is_dir($dir) && !is_link($dir)) {
+			if ((WPCOMWPFileSystem::getInstance()->isDir($dir) === true) && !is_link($dir)) {
 				if ($this->isEmptyDir($dir)) {
-					$dir_result['status'] = $filesystem->rmdir($dir);
+					$dir_result['status'] = WPCOMWPFileSystem::getInstance()->rmdir($dir);
 					if ($dir_result['status'] === false) {
 						$dir_result['error'] = "RMDIR_FAILED";
-						if (is_wp_error($filesystem->errors) && $filesystem->errors->has_errors()) {
-							$dir_result['fs_error'] = $filesystem->errors->get_error_message();
+						$fs_error = WPCOMWPFileSystem::getInstance()->checkForErrors();
+						if (isset($fs_error)) {
+							$dir_result['fs_error'] = $fs_error;
 						}
 					}
 				} else {
@@ -115,17 +115,17 @@ class BVFSWriteCallback extends BVCallbackBase {
 
 	public function doChmod($path_infos) {
 		$result = array();
-		$filesystem = WPCOMHelper::get_direct_filesystem();
 
-		foreach($path_infos as $path => $mode) {
+		foreach ($path_infos as $path => $mode) {
 			$path_result = array();
 
-			if ($filesystem->exists($path)) {
-				$path_result['status'] = $filesystem->chmod($path, $mode);
+			if (WPCOMWPFileSystem::getInstance()->exists($path) === true) {
+				$path_result['status'] = WPCOMWPFileSystem::getInstance()->chmod($path, $mode);
 				if ($path_result['status'] === false) {
 					$path_result['error'] = "CHMOD_FAILED";
-					if (is_wp_error($filesystem->errors) && $filesystem->errors->has_errors()) {
-						$path_result['fs_error'] = $filesystem->errors->get_error_message();
+					$fs_error = WPCOMWPFileSystem::getInstance()->checkForErrors();
+					if (isset($fs_error)) {
+						$path_result['fs_error'] = $fs_error;
 					}
 				}
 			} else {
@@ -223,19 +223,24 @@ class BVFSWriteCallback extends BVCallbackBase {
 		return $result;
 	}
 	// phpcs:enable
+
 	public function renameFiles($path_infos) {
 		$result = array();
-		$filesystem = WPCOMHelper::get_direct_filesystem();
 
 		foreach ($path_infos as $oldpath => $newpath) {
 			$action_result = array();
 
-			if ($filesystem->exists($oldpath)) {
-				$action_result['status'] = $filesystem->move($oldpath, $newpath, true);
+			if (WPCOMWPFileSystem::getInstance()->exists($oldpath)) {
+				$action_result['status'] = WPCOMWPFileSystem::getInstance()->move($oldpath, $newpath, true);
 				if ($action_result['status'] === false) {
 					$action_result['error'] = "RENAME_FAILED";
-					if (is_wp_error($filesystem->errors) && $filesystem->errors->has_errors()) {
-						$action_result['fs_error'] = $filesystem->errors->get_error_message();
+					$fs_error = WPCOMWPFileSystem::getInstance()->checkForErrors();
+					if (isset($fs_error)) {
+						$action_result['fs_error'] = $fs_error;
+					}
+				} else {
+					if (function_exists('opcache_invalidate')) {
+						$action_result['opcache'] = opcache_invalidate($newpath, true);
 					}
 				}
 			} else {
@@ -316,13 +321,12 @@ class BVFSWriteCallback extends BVCallbackBase {
 
 	public function writeContentToFile($content, $ofile) {
 		$result = array();
-		$filesystem = WPCOMHelper::get_direct_filesystem();
 
-		if ($filesystem->put_contents($ofile, $content) === false) {
+		if (WPCOMWPFileSystem::getInstance()->putContents($ofile, $content) === false) {
 			$result['error'] = 'UNABLE_TO_WRITE_TO_TMP_OFILE';
-
-			if (is_wp_error($filesystem->errors) && $filesystem->errors->has_errors()) {
-				$result['fs_error'] = $filesystem->errors->get_error_message();
+			$fs_error = WPCOMWPFileSystem::getInstance()->checkForErrors();
+			if (isset($fs_error)) {
+				$result['fs_error'] = $fs_error;
 			}
 		}
 
@@ -338,6 +342,9 @@ class BVFSWriteCallback extends BVCallbackBase {
 			$myfile = $_FILES['myfile'];
 			$is_upload_ok = false;
 
+			// Validate PHP upload errors manually
+			// This approach handles any file type (PHP, ZIP, SQL, etc.) without MIME restrictions
+			// Uses WordPress Filesystem API instead of wp_handle_upload() which is designed for media uploads
 			switch ($myfile['error']) {
 			case UPLOAD_ERR_OK:
 				$is_upload_ok = true;
@@ -359,8 +366,26 @@ class BVFSWriteCallback extends BVCallbackBase {
 			}
 
 			if ($is_upload_ok) {
-				if (move_uploaded_file($myfile['tmp_name'], $ofile) === false) {
+				$tmp_name = $myfile['tmp_name'];
+
+				// Ensure target directory exists
+				$target_dir = dirname($ofile);
+				if (!file_exists($target_dir)) {
+					// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_mkdir -- Using mkdir() directly as there is no direct support for recursion
+					if (!mkdir($target_dir, 0777, true)) {
+						$result['error'] = 'MKDIR_FAILED_FOR_TARGET';
+						return $result;
+					}
+				}
+
+				// Use WordPress Filesystem API to move the uploaded file
+				// This is WordPress.org compliant and handles any file type
+				if (WPCOMWPFileSystem::getInstance()->move($tmp_name, $ofile, true) === false) {
 					$result['error'] = 'MOVE_UPLOAD_FILE_FAILED';
+					$fs_error = WPCOMWPFileSystem::getInstance()->checkForErrors();
+					if (isset($fs_error)) {
+						$result['fs_error'] = $fs_error;
+					}
 				}
 			}
 
@@ -415,6 +440,72 @@ class BVFSWriteCallback extends BVCallbackBase {
 		return $resp;
 	}
 
+	public function runFileCmd($cmd_key, $cmd_params) {
+		switch ($cmd_key) {
+		case "wrtfle":
+			return $this->uploadFile($cmd_params);
+		case "renmefle":
+			$from = $cmd_params['from'];
+			$to = $cmd_params['to'];
+			$rename_result = $this->renameFiles(array($from => $to));
+			return isset($rename_result[$from]) ? $rename_result[$from] : array('status' => false, 'error' => 'RENAME_NO_RESULT');
+		case "chmd":
+			$path = $cmd_params['path'];
+			$chmod_result = $this->doChmod(array($path => $cmd_params['mode']));
+			return isset($chmod_result[$path]) ? $chmod_result[$path] : array('status' => false, 'error' => 'CHMOD_NO_RESULT');
+		case "mkdr":
+			$path = $cmd_params['path'];
+			$perms = isset($cmd_params['perms']) ? $cmd_params['perms'] : 0777;
+			$rec = isset($cmd_params['rec']) ? (bool) $cmd_params['rec'] : true;
+			$mkdir_result = $this->makeDirs(array($path), $perms, $rec);
+			return isset($mkdir_result[$path]) ? $mkdir_result[$path] : array('status' => false, 'error' => 'MKDIR_NO_RESULT');
+		case "rmfle":
+			$files = $cmd_params['files'];
+			$rm_result = $this->removeFiles($files);
+			$first = reset($files);
+			return isset($rm_result[$first]) ? $rm_result[$first] : array('status' => false, 'error' => 'RMFLE_NO_RESULT');
+		case "rmdr":
+			$dirs = $cmd_params['dirs'];
+			$rmdr_result = $this->removeDirs($dirs);
+			$first = reset($dirs);
+			return isset($rmdr_result[$first]) ? $rmdr_result[$first] : array('status' => false, 'error' => 'RMDR_NO_RESULT');
+		default:
+			return array('status' => false, 'error' => 'UNKNOWN_CMD');
+		}
+	}
+
+	public function executeFileOps($ops, $all_required = false) {
+		$result = array();
+		$all_success = true;
+
+		foreach ($ops as $op) {
+			$identifier = $op['identifier'];
+			$cmds = $op['cmds'];
+			$op_result = array();
+
+			foreach ($cmds as $cmd) {
+				foreach ($cmd as $cmd_key => $cmd_params) {
+					$cmd_result = $this->runFileCmd($cmd_key, $cmd_params);
+					$op_result[$cmd_key] = $cmd_result;
+
+					if (isset($cmd_result['status']) && $cmd_result['status'] === false) {
+						$all_success = false;
+						break 2;
+					}
+				}
+			}
+
+			$result[$identifier] = $op_result;
+
+			if ($all_required && !$all_success) {
+				break;
+			}
+		}
+
+		$result['status'] = $all_success;
+		return $result;
+	}
+
 	public function process($request) {
 		$params = $request->params;
 
@@ -437,8 +528,12 @@ class BVFSWriteCallback extends BVCallbackBase {
 		case "wrtfle":
 			$resp = $this->uploadFile($params);
 			break;
+		case "fleops":
+			$all_required = isset($params['all_required']) ? (bool) $params['all_required'] : false;
+			$resp = $this->executeFileOps($params['ops'], $all_required);
+			break;
 		case "cncatfls":
-			$bsize = (isset($params['bsize'])) ? $params['bsize'] : (8 * BVFSWriteCallback::MEGABYTE);
+			$bsize = (isset($params['bsize'])) ? $params['bsize'] : (8 * WPCOMFSWriteCallback::MEGABYTE);
 			$offset = (isset($params['offset'])) ? $params['offset'] : 0;
 			$resp = $this->concatFiles($params['infiles'], $params['ofile'], $bsize, $offset);
 			break;

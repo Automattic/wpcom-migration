@@ -2,9 +2,9 @@
 Contributors: automattic
 Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
-Tested up to: 7.0 
-Requires PHP: 5.6.0
-Stable tag: 5.88
+Tested up to: 7.1
+Requires PHP: 7.0
+Stable tag: 6.65
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,16 @@ Whether you’re scaling your business, expanding your online presence, or simpl
 3. Next, click the Activate button. After activating, you can navigate to Migrate to WordPress.com in your admin area.
 
 == Changelog ==
+= 6.65 =
+* Improvement: Enhanced secret generation using the secure random_int function.
+* Improvement: Improved connection key generation mechanism.
+* Improvement: Optimized migration of large database tables.
+* Tweak: Improved file upload.
+* Tweak: Improved validation for streamed callbacks.
+* Compatibility: Minimum supported PHP version is now 7.0.
+* Tweak: Improvements in fetching File Stats.
+* Tweak: Code Restructuring.
+
 = 5.88 =
 * Tweak: Code Restructuring
 * Tweak: Added support for PHP 8.4

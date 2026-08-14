@@ -1,5 +1,5 @@
 <?php
-
+// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
 if (!defined('ABSPATH')) exit;
 if (!class_exists('WPCOMWPDb')) :
 
@@ -12,7 +12,7 @@ class WPCOMWPDb {
 
 	public function prepare($query, $args) {
 		global $wpdb;
-		return $wpdb->prepare($query, $args); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->prepare($query, $args);
 	}
 
 	public function getSiteId() {
@@ -22,36 +22,37 @@ class WPCOMWPDb {
 
 	public function getResult($query, $obj = ARRAY_A) {
 		global $wpdb;
-		return $wpdb->get_results($query, $obj); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_results($query, $obj);
 	}
 
 	public function query($query) {
 		global $wpdb;
-		return $wpdb->query($query); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->query($query);
 	}
 
 	public function getVar($query, $col = 0, $row = 0) {
 		global $wpdb;
-		return $wpdb->get_var($query, $col, $row); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_var($query, $col, $row);
 	}
 
 	public function getCol($query, $col = 0) {
 		global $wpdb;
-		return $wpdb->get_col($query, $col); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared
+		return $wpdb->get_col($query, $col);
 	}
 
-	public function getAutoIncrement($table_name) {
-		$query = "SELECT `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '$table_name'";
-		$results = $this->getResult($query, ARRAY_A);
-		$auto_increment = null;
-		if (empty($results)) {
-			return $auto_increment;
+	public function getLastRowId($col_name, $table_name) {
+		$query = "SELECT MAX($col_name) AS last_id FROM $table_name";
+		$results = $this->getResult($query);
+		if (empty($results) || !is_array($results) || !is_array($results[0]) ||
+				!array_key_exists("last_id", $results[0])) {
+			return null;
 		}
-		$row = $results[0];
-		if ($row && isset($row["AUTO_INCREMENT"]) && is_numeric($row["AUTO_INCREMENT"])) {
-			$auto_increment = intval($row["AUTO_INCREMENT"]);
+		$last_id = $results[0]['last_id'];
+		if ($last_id === null) {
+			return 0;
+		} else if (is_numeric($last_id) === true) {
+			return (int) $last_id;
 		}
-		return $auto_increment;
 	}
 
 	public function tableName($table) {
