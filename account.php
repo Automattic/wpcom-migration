@@ -17,6 +17,10 @@ if (!class_exists('WPCOMAccount')) :
 		}
 
 		public static function find($settings, $public) {
+			if (!is_string($public)) {
+				return null;
+			}
+
 			$accounts = self::allAccounts($settings);
 			if (array_key_exists($public, $accounts) && isset($accounts[$public]['secret'])) {
 				$secret = $accounts[$public]['secret'];
@@ -49,6 +53,10 @@ if (!class_exists('WPCOMAccount')) :
 		}
 
 		public static function sanitizeKey($key) {
+			if (!is_string($key)) {
+				return '';
+			}
+
 			return preg_replace('/[^a-zA-Z0-9_\-]/', '', $key);
 		}
 

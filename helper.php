@@ -3,6 +3,51 @@ if (!defined('ABSPATH') && !defined('MCDATAPATH') && !defined('PHP_ERR_MONIT_PAT
 
 if (!class_exists('WPCOMHelper')) :
 	class WPCOMHelper {
+		const MIN_SALT_LENGTH = 32;
+		const SALT_PLACEHOLDER = 'put your unique phrase here';
+		const SALT_CONSTANTS = array(
+			'AUTH_KEY', 'AUTH_SALT', 'SECURE_AUTH_KEY', 'SECURE_AUTH_SALT',
+			'LOGGED_IN_KEY', 'LOGGED_IN_SALT', 'NONCE_KEY', 'NONCE_SALT'
+		);
+
+		public static function configSalt($constant) {
+			if (!defined($constant)) {
+				return null;
+			}
+
+			$value = constant($constant);
+			if (!is_string($value) || strlen($value) < self::MIN_SALT_LENGTH) {
+				return null;
+			}
+
+			if (self::isSaltPlaceholder($value) || self::isSharedSalt($constant, $value)) {
+				return null;
+			}
+
+			return $value;
+		}
+
+		private static function isSaltPlaceholder($value) {
+			if ($value === self::SALT_PLACEHOLDER) {
+				return true;
+			}
+
+			#wp-config-sample.php is localized for some locales, so the placeholder is
+			#not always the English string. wp_salt() guards the translated form too.
+			// phpcs:ignore WordPress.WP.I18n.MissingArgDomain
+			return function_exists('__') && $value === __('put your unique phrase here');
+		}
+
+		private static function isSharedSalt($constant, $value) {
+			foreach (self::SALT_CONSTANTS as $other) {
+				if ($other !== $constant && defined($other) && constant($other) === $value) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		public static function safePregMatch($pattern, $subject, &$matches = null, $flags = 0, $offset = 0) {
 			if (!is_string($pattern) || !is_string($subject)) {
 				return false;

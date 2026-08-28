@@ -11,7 +11,7 @@ if (!class_exists('WPCOMInfo')) :
 		public $ip_header_option = 'wpcomipheader';
 		public $brand_option = 'wpcombrand';
 		public $wp_lp_whitelabel_option = 'wpcomLpWhitelabelConf';
-		public $version = '6.65';
+		public $version = '6.72';
 		public $webpage = 'https://www.wordpress.com/';
 		public $appurl = 'https://migrate.blogvault.net';
 		public $slug = 'wpcom-migration/wpcom_migration.php';

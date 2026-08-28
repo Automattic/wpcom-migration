@@ -49,7 +49,7 @@ if (!class_exists('WPCOMCallbackRequest')) :
 			$this->version = $in_params['bvVersion'];
 			$this->is_sha1 = array_key_exists('sha1', $in_params);
 			$this->bvb64stream = isset($in_params['bvb64stream']);
-			$this->bvb64cksize = array_key_exists('bvb64cksize', $in_params) ? intval($in_params['bvb64cksize']) : false;
+			$this->bvb64cksize = array_key_exists('bvb64cksize', $in_params) ? intval($in_params['bvb64cksize']) : 0;
 			$this->checksum = array_key_exists('checksum', $in_params) ? $in_params['checksum'] : false;
 			$this->pubkey_name = !empty($in_params['pubkeyname']) ?
 					WPCOMAccount::sanitizeKey($in_params['pubkeyname']) : 'm_public';
