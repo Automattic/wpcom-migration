@@ -5,6 +5,7 @@
  * @package wpcom-migration
  */
 
+use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
 use Automattic\WPCOM_Migration\REST_Controller;
 
@@ -38,5 +39,9 @@ add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) )
 // Leaving the plugin leaves the connection; a secret WordPress.com installed
 // has no owner without it.
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Connection::class, 'disconnect' ) );
+
+if ( is_admin() ) {
+	new Connect_Page( $wpcom_migration_plugin_file );
+}
 
 unset( $wpcom_migration_plugin_file, $wpcom_migration_connection_autoloader );
