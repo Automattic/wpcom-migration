@@ -144,8 +144,8 @@ class Settings_Page {
 	public function handle_save_secret() {
 		$this->authorize( self::SAVE_SECRET_ACTION );
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- Nonce checked in authorize(). An HMAC key is stored verbatim; it is only ever output through esc_attr().
-		$secret = isset( $_POST[ self::SECRET_FIELD ] ) && is_scalar( $_POST[ self::SECRET_FIELD ] ) ? trim( (string) wp_unslash( $_POST[ self::SECRET_FIELD ] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in authorize().
+		$secret = sanitize_text_field( wp_unslash( $_POST[ self::SECRET_FIELD ] ?? '' ) );
 
 		if ( '' === $secret ) {
 			$this->redirect_with_notice( 'not_configured' );
@@ -378,7 +378,7 @@ class Settings_Page {
 	 */
 	private function render_result_notice() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- The fixed query value selects a read-only notice.
-		$result = isset( $_GET[ self::NOTICE_QUERY_ARG ] ) && is_scalar( $_GET[ self::NOTICE_QUERY_ARG ] ) ? sanitize_key( wp_unslash( $_GET[ self::NOTICE_QUERY_ARG ] ) ) : '';
+		$result = sanitize_key( wp_unslash( $_GET[ self::NOTICE_QUERY_ARG ] ?? '' ) );
 
 		$notices = array(
 			'saved'           => array( 'success', __( 'Secret saved.', 'wpcom-migration' ) ),
