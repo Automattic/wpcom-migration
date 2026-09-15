@@ -17,25 +17,16 @@
 	<exclude-pattern>*/vendor/*</exclude-pattern>
 
 	<!--
-		Scoping is done with include-pattern, not exclude-pattern: PHPCS unions
-		the patterns of a sniff across every rule block that names it, which
-		makes an exclude on one block leak into the others. Rules must be ordered
-		so more specific standards (WordPress-Core, WordPress-Docs) precede more
-		general ones (WordPress).
+		PHPCS applies a rule's include-pattern to the sniffs that rule is the
+		first to register, so order matters: Core and Docs go first with no
+		pattern and run on every listed file; Extra comes after, and only the
+		sniffs it adds are limited to the plugin glue.
 	-->
+	<rule ref="WordPress-Core"/>
+	<rule ref="WordPress-Docs"/>
 
-	<!-- CLI scripts: formatting and docs, not the WordPress runtime rules. -->
-	<rule ref="WordPress-Core">
-		<include-pattern>*/bin/*</include-pattern>
-		<include-pattern>*/tests/*</include-pattern>
-	</rule>
-	<rule ref="WordPress-Docs">
-		<include-pattern>*/bin/*</include-pattern>
-		<include-pattern>*/tests/*</include-pattern>
-	</rule>
-
-	<!-- Plugin glue: the full WordPress standard. -->
-	<rule ref="WordPress">
+	<!-- The WordPress runtime rules: plugin glue only. CLI scripts run outside a request. -->
+	<rule ref="WordPress-Extra">
 		<include-pattern>*/plugin/reprint/*</include-pattern>
 	</rule>
 
