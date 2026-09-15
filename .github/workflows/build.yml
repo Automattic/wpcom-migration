@@ -1,0 +1,102 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: Build ZIP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - name: Install root tooling
+        run: composer install --no-interaction --no-progress
+      - name: Install the PHP 5.6 build tool
+        run: composer install --no-interaction --no-progress --working-dir=tools/php56-build
+      - name: Build
+        run: bin/build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wpcom-migration
+          path: build/wpcom-migration.zip
+          if-no-files-found: error
+
+  lint-built-tree:
+    name: php -l (PHP ${{ matrix.php }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.0', '7.4', '8.4']
+    steps:
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - uses: actions/download-artifact@v4
+        with:
+          name: wpcom-migration
+      - name: Unzip
+        run: unzip -q wpcom-migration.zip
+      - name: Lint every PHP file in the built tree
+        run: |
+          status=0
+          while IFS= read -r -d '' f; do
+            php -l "$f" >/dev/null || status=1
+          done < <(find wpcom-migration -name '*.php' -print0)
+          exit "$status"
+
+  phpcs:
+    name: PHPCS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - run: composer install --no-interaction --no-progress
+      - run: composer lint
+
+  build-tool-tests:
+    name: Build tool fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+          coverage: none
+      - run: composer install --no-interaction --no-progress --working-dir=tools/php56-build
+      - run: composer --working-dir=tools/php56-build test
+
+  smoke:
+    name: Playground smoke test
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: wpcom-migration
+          path: build
+      - name: Unzip the artifact
+        run: unzip -q build/wpcom-migration.zip -d build
+      - name: Run the smoke test against the ZIP contents
+        run: tests/smoke/run.sh build/wpcom-migration
