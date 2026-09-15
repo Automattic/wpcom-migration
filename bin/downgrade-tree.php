@@ -1,7 +1,7 @@
 #!/usr/bin/env php
 <?php
 /**
- * Downgrades a staged copy of the plugin to PHP 5.6 syntax with Rector, then
+ * Downgrades a staged copy of the plugin to PHP 7.0 syntax with Rector, then
  * checks the result with the build tool's syntax validator.
  *
  * Usage: php bin/downgrade-tree.php <staging-root> <source-root> <relative-path>...
@@ -24,7 +24,7 @@ if ( $argc < 4 ) {
 }
 
 if ( ! is_file( $wpcom_migration_autoload ) || ! is_file( $wpcom_migration_rector ) ) {
-	wpcom_migration_fail( 'Install the PHP 5.6 build tool with: composer install --working-dir=tools/php56-build' );
+	wpcom_migration_fail( 'Install the PHP 7.0 build tool with: composer install --working-dir=tools/php56-build' );
 }
 
 $wpcom_migration_staging_root = realpath( $argv[1] );
@@ -56,22 +56,22 @@ wpcom_migration_assert_reserved_variables_are_unused( $wpcom_migration_paths );
 $wpcom_migration_command = escapeshellarg( $wpcom_migration_rector )
 	. ' process '
 	. implode( ' ', array_map( 'escapeshellarg', $wpcom_migration_paths ) )
-	. ' --config ' . escapeshellarg( $wpcom_migration_tool_root . '/rector.php' )
+	. ' --config ' . escapeshellarg( $wpcom_migration_tool_root . '/rector-php70.php' )
 	. ' --no-progress-bar --no-diffs --clear-cache';
 passthru( $wpcom_migration_command, $wpcom_migration_status );
 if ( 0 !== $wpcom_migration_status ) {
-	wpcom_migration_fail( sprintf( 'The PHP 5.6 Rector downgrade failed with exit code %d.', $wpcom_migration_status ) );
+	wpcom_migration_fail( sprintf( 'The PHP 7.0 Rector downgrade failed with exit code %d.', $wpcom_migration_status ) );
 }
 
 require_once $wpcom_migration_autoload;
 
 try {
-	( new Php56SyntaxValidator() )->assertPaths( $wpcom_migration_paths );
+	( new Php56SyntaxValidator( '7.0' ) )->assertPaths( $wpcom_migration_paths );
 } catch ( Throwable $throwable ) {
 	wpcom_migration_fail( $throwable->getMessage() );
 }
 
-fwrite( STDOUT, "Downgraded tree contains none of the syntax the PHP 5.6 build rejects.\n" );
+fwrite( STDOUT, "Downgraded tree contains none of the syntax the PHP 7.0 build rejects.\n" );
 
 /**
  * Stops the build if staged code already uses the temporary variable prefix

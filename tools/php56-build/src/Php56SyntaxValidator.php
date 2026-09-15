@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WordPress\Reprint\Build;
 
+use InvalidArgumentException;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
 use PhpParser\Node\Expr\ArrowFunction;
@@ -32,9 +33,14 @@ use RuntimeException;
 final class Php56SyntaxValidator
 {
     private Parser $parser;
+    private string $target_version;
 
-    public function __construct()
+    public function __construct(string $target_version = '5.6')
     {
+        if (!in_array($target_version, ['5.6', '7.0'], true)) {
+            throw new InvalidArgumentException(sprintf('Unsupported target version: %s.', $target_version));
+        }
+        $this->target_version = $target_version;
         $this->parser = (new ParserFactory())->createForNewestSupportedVersion();
     }
 
@@ -74,12 +80,14 @@ final class Php56SyntaxValidator
         $statements = $name_resolver->traverse($statements);
 
         $traverser = new NodeTraverser();
-        $traverser->addVisitor(new class ($file) extends NodeVisitorAbstract {
+        $traverser->addVisitor(new class ($file, $this->target_version) extends NodeVisitorAbstract {
             private string $file;
+            private string $target_version;
 
-            public function __construct(string $file)
+            public function __construct(string $file, string $target_version)
             {
                 $this->file = $file;
+                $this->target_version = $target_version;
             }
 
             public function enterNode(Node $node): ?Node
@@ -106,7 +114,8 @@ final class Php56SyntaxValidator
                     return 'a promoted parameter';
                 }
                 if (
-                    $node instanceof Param
+                    $this->target_version === '5.6'
+                    && $node instanceof Param
                     && $node->type !== null
                     && !$this->isPhp56ParameterType($node->type)
                 ) {
@@ -118,25 +127,30 @@ final class Php56SyntaxValidator
                 if ($node instanceof ClassConst && $node->flags !== 0) {
                     return 'a class-constant modifier';
                 }
-                if ($node instanceof Coalesce || $node instanceof AssignCoalesce) {
+                if ($this->target_version === '5.6' && $node instanceof Coalesce) {
                     return 'a null-coalescing operator';
                 }
-                if ($node instanceof Spaceship) {
+                if ($node instanceof AssignCoalesce) {
+                    return $this->target_version === '7.0'
+                        ? 'a null-coalescing assignment'
+                        : 'a null-coalescing operator';
+                }
+                if ($this->target_version === '5.6' && $node instanceof Spaceship) {
                     return 'a spaceship operator';
                 }
-                if ($node instanceof YieldFrom) {
+                if ($this->target_version === '5.6' && $node instanceof YieldFrom) {
                     return 'a yield-from expression';
                 }
                 if ($node instanceof ArrowFunction) {
                     return 'an arrow function';
                 }
-                if ($node instanceof GroupUse) {
+                if ($this->target_version === '5.6' && $node instanceof GroupUse) {
                     return 'a grouped use declaration';
                 }
                 if ($node instanceof Catch_ && count($node->types) !== 1) {
                     return 'a multi-catch declaration';
                 }
-                if ($node instanceof New_ && $node->class instanceof Class_) {
+                if ($this->target_version === '5.6' && $node instanceof New_ && $node->class instanceof Class_) {
                     return 'an anonymous class';
                 }
                 if ($node instanceof List_) {

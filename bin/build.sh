@@ -24,7 +24,7 @@ for command_name in php composer rsync zip; do
 done
 
 if [ ! -x "$TOOL_ROOT/vendor/bin/rector" ]; then
-    echo "Error: the PHP 5.6 build tool is not installed." >&2
+    echo "Error: the PHP 7.0 build tool is not installed." >&2
     echo "Run: composer install --working-dir=tools/php56-build" >&2
     exit 1
 fi

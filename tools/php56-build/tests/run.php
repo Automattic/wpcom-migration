@@ -54,18 +54,50 @@ try {
         fail_test("The unsupported null-coalescing fixture did not fail with the expected message.\n" . $unsupported_output);
     }
 
-    echo "PHP 5.6 Rector fixtures passed.\n";
+    $php70_input = $fixture_root . '/php70-target.input.php';
+    $php70_generated = $temporary_root . '/php70-target.php';
+    copy($php70_input, $php70_generated);
+
+    run_rector($tool_root, $php70_generated, true, 'rector-php70.php');
+    (new Php56SyntaxValidator('7.0'))->assertFile($php70_generated);
+
+    $php70_expected = $fixture_root . '/php70-target.expected.php';
+    if (!is_file($php70_expected)) {
+        fail_test(sprintf('Missing expected Rector fixture %s.', $php70_expected));
+    }
+    assert_same_file($php70_expected, $php70_generated);
+
+    $php70_input_output = run_php($php70_input);
+    $php70_generated_output = run_php($php70_generated);
+    if ($php70_input_output !== $php70_generated_output) {
+        fail_test(sprintf(
+            "The generated PHP 7.0 fixture changed behavior.\nInput: %s\nGenerated: %s",
+            $php70_input_output,
+            $php70_generated_output
+        ));
+    }
+
+    try {
+        (new Php56SyntaxValidator())->assertFile($php70_generated);
+        fail_test('The PHP 7.0 fixture unexpectedly passed the PHP 5.6 syntax check.');
+    } catch (RuntimeException $runtime_exception) {
+        if (strpos($runtime_exception->getMessage(), 'null-coalescing') === false) {
+            throw $runtime_exception;
+        }
+    }
+
+    echo "PHP 5.6 and 7.0 Rector fixtures passed.\n";
 } finally {
     remove_tree($temporary_root);
 }
 
-function run_rector(string $tool_root, string $path, bool $must_succeed): string
+function run_rector(string $tool_root, string $path, bool $must_succeed, string $config = 'rector.php'): string
 {
     $command = escapeshellarg($tool_root . '/vendor/bin/rector')
         . ' process '
         . escapeshellarg($path)
         . ' --config '
-        . escapeshellarg($tool_root . '/rector.php')
+        . escapeshellarg($tool_root . '/' . $config)
         . ' --no-progress-bar --clear-cache 2>&1';
     exec($command, $lines, $status);
     $output = implode("\n", $lines);
