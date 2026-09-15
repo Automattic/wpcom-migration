@@ -25,14 +25,14 @@ class Settings_Page {
 	const PAGE_SLUG = 'wpcom-migration-reprint';
 
 	/**
-	 * admin-post action that saves the secret.
+	 * The admin-post action that saves the secret.
 	 *
 	 * @var string
 	 */
 	const SAVE_SECRET_ACTION = 'wpcom_migration_reprint_save_secret';
 
 	/**
-	 * admin-post action that opens or closes the window.
+	 * The admin-post action that opens or closes the window.
 	 *
 	 * @var string
 	 */
