@@ -11,6 +11,7 @@
 	<config name="minimum_wp_version" value="4.0"/>
 
 	<file>plugin/reprint</file>
+	<file>plugin/connection</file>
 	<file>bin</file>
 	<file>tests</file>
 
@@ -28,6 +29,7 @@
 	<!-- The WordPress runtime rules: plugin glue only. CLI scripts run outside a request. -->
 	<rule ref="WordPress-Extra">
 		<include-pattern>*/plugin/reprint/*</include-pattern>
+		<include-pattern>*/plugin/connection/*</include-pattern>
 	</rule>
 
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
@@ -35,6 +37,7 @@
 			<property name="prefixes" type="array">
 				<element value="wpcom_migration"/>
 				<element value="Automattic\WPCOM_Migration"/>
+				<element value="WPCOM_MIGRATION"/>
 			</property>
 		</properties>
 	</rule>

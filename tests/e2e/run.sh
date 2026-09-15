@@ -24,7 +24,7 @@ E2E_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
-SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted screen)
+SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted screen connection)
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
