@@ -2,6 +2,7 @@
     "name": "automattic/wpcom-migration",
     "description": "Runtime dependencies of the Migrate to WordPress.com plugin.",
     "license": "GPL-2.0-or-later",
+    "version": "dev-trunk",
     "require": {
         "php": ">=7.0",
         "automattic/jetpack-autoloader": "^6",
