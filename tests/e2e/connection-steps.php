@@ -12,6 +12,7 @@
 
 use Automattic\Jetpack\Connection\Plugin_Storage;
 use Automattic\Jetpack\Connection\Rest_Authentication;
+use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
 use Automattic\WPCOM_Migration\Reprint\Exporter;
 
@@ -150,6 +151,76 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'render-not-connected':
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			break;
+
+		case 'connect-registration-fails':
+			// WordPress.com is unreachable; make registration fail before the
+			// network, the way a site with a blocked outbound connection would.
+			add_filter(
+				'jetpack_pre_register',
+				function () {
+					return new WP_Error( 'e2e_blocked', 'Blocked by the e2e scenario.' );
+				}
+			);
+			// The handler redirects and exits; keep the destination for the next step.
+			add_filter(
+				'wp_redirect',
+				function ( $location ) {
+					update_option( 'wpcom_migration_e2e_last_redirect', $location );
+					return $location;
+				}
+			);
+			wpcom_migration_e2e_post( Connect_Page::CONNECT_ACTION, array() );
+			( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->handle_connect(); // Redirects and exits.
+			break;
+
+		case 'assert-registration-failure-reported':
+			$location = get_option( 'wpcom_migration_e2e_last_redirect' );
+			$query    = array();
+			wp_parse_str( (string) wp_parse_url( (string) $location, PHP_URL_QUERY ), $query );
+			if ( ! isset( $query[ Connect_Page::NOTICE_QUERY_ARG ], $query[ Connect_Page::CODE_QUERY_ARG ] )
+				|| 'register_failed' !== $query[ Connect_Page::NOTICE_QUERY_ARG ]
+				|| 'e2e_blocked' !== $query[ Connect_Page::CODE_QUERY_ARG ] ) {
+				throw new RuntimeException( "Step '$step': expected a register_failed redirect with the error code, got: " . var_export( $location, true ) );
+			}
+			if ( Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': a failed registration must write no tokens." );
+			}
+			$_GET[ Connect_Page::NOTICE_QUERY_ARG ] = 'register_failed';
+			$_GET[ Connect_Page::CODE_QUERY_ARG ]   = 'e2e_blocked';
+			$html                                   = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'could not register', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'e2e_blocked', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Blocked by the e2e scenario', $step );
+			delete_option( 'wpcom_migration_e2e_last_redirect' );
+			break;
+
+		case 'render-connected':
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'https://wordpress.com/setup/site-migration?from=' . rawurlencode( home_url() ), $step );
+			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
+			break;
+
+		case 'render-connected-without-user-data':
+			delete_transient( 'jetpack_connected_user_data_1' );
+			// Cache the failure the package would otherwise record after a
+			// remote call, so the render is offline and quick.
+			set_transient( 'jetpack_connected_user_data_1', 'error', 5 * MINUTE_IN_SECONDS );
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Connected to WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			break;
+
 		default:
 			throw new RuntimeException( 'Unknown connection step: ' . $step );
 	}
@@ -213,5 +284,72 @@ function wpcom_migration_e2e_signed_rest_request( $route, $access_token, $user_i
 function wpcom_migration_e2e_expect_rest_status( $response, $expected, $step ) {
 	if ( $expected !== $response->get_status() ) {
 		throw new RuntimeException( sprintf( "Step '%s': expected HTTP %d, got %d: %s", $step, $expected, $response->get_status(), wp_json_encode( $response->get_data() ) ) );
+	}
+}
+
+/**
+ * Renders the connect screen and returns the markup.
+ *
+ * @return string
+ */
+function wpcom_migration_e2e_render_connect_page() {
+	ob_start();
+	( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->render_page();
+	return ob_get_clean();
+}
+
+// screen-steps.php defines the three helpers below with the same bodies. One
+// blueprint loads one file, so they never meet; the guards cover a future
+// combined load.
+if ( ! function_exists( 'wpcom_migration_e2e_post' ) ) {
+	/**
+	 * Fills in a nonce-bearing POST request for an admin-post action.
+	 *
+	 * @param string $action The admin-post action.
+	 * @param array  $fields Extra form fields.
+	 */
+	function wpcom_migration_e2e_post( $action, array $fields ) {
+		$_POST    = array_merge(
+			array(
+				'action'   => $action,
+				'_wpnonce' => wp_create_nonce( $action ),
+			),
+			$fields
+		);
+		$_REQUEST = $_POST;
+
+		$_SERVER['REQUEST_METHOD'] = 'POST';
+	}
+}
+
+if ( ! function_exists( 'wpcom_migration_e2e_expect_contains' ) ) {
+	/**
+	 * Fails unless the markup contains a needle.
+	 *
+	 * @param string $html   Rendered markup.
+	 * @param string $needle Text expected to appear.
+	 * @param string $step   Step name, for the message.
+	 * @throws RuntimeException When the needle is absent.
+	 */
+	function wpcom_migration_e2e_expect_contains( $html, $needle, $step ) {
+		if ( false === strpos( $html, $needle ) ) {
+			throw new RuntimeException( "Step '$step': expected to find '$needle' in: " . substr( $html, 0, 400 ) );
+		}
+	}
+}
+
+if ( ! function_exists( 'wpcom_migration_e2e_expect_not_contains' ) ) {
+	/**
+	 * Fails unless the markup does not contain a needle.
+	 *
+	 * @param string $html   Rendered markup.
+	 * @param string $needle Text expected to be absent.
+	 * @param string $step   Step name, for the message.
+	 * @throws RuntimeException When the needle is present.
+	 */
+	function wpcom_migration_e2e_expect_not_contains( $html, $needle, $step ) {
+		if ( false !== strpos( $html, $needle ) ) {
+			throw new RuntimeException( "Step '$step': expected not to find '$needle' in: " . substr( $html, 0, 400 ) );
+		}
 	}
 }
