@@ -5,8 +5,8 @@
  *
  * Usage: php tests/smoke/request.php <base-url> <built-plugin-dir> <scenario>
  *
- * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted. The
- * secret must match the one the matching blueprint stores.
+ * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen.
+ * The secret must match the one the matching blueprint stores.
  *
  * @package wpcom-migration
  */
@@ -29,15 +29,14 @@ require_once $wpcom_migration_client_file;
 
 switch ( $wpcom_migration_scenario ) {
 	case 'open':
-		$response = wpcom_migration_smoke_request( $wpcom_migration_endpoint, wpcom_migration_smoke_signed_headers( $wpcom_migration_secret ) );
-		wpcom_migration_smoke_expect_status( $response, 200 );
-		$json = wpcom_migration_smoke_expect_json( $response );
-		foreach ( array( 'ok', 'protocol_version', 'php', 'wp_detect' ) as $key ) {
-			if ( ! array_key_exists( $key, $json ) ) {
-				wpcom_migration_smoke_fail( "Preflight JSON lacks the '$key' key: " . $response['body'] );
-			}
-		}
-		wpcom_migration_smoke_expect_header( $response, 'access-control-allow-origin', '*' );
+		wpcom_migration_smoke_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
+		break;
+
+	case 'screen':
+		// The screen blueprint ends with the window open (secret valid,
+		// enabled); the same signed-preflight assertions prove the screen's
+		// form handlers left the exporter in a working state.
+		wpcom_migration_smoke_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
 		break;
 
 	case 'closed':
@@ -79,6 +78,35 @@ switch ( $wpcom_migration_scenario ) {
 }
 
 fwrite( STDOUT, "Scenario '$wpcom_migration_scenario' passed.\n" );
+
+/**
+ * Asserts a signed preflight request answers as the window being open.
+ *
+ * @param string $url    Preflight endpoint URL.
+ * @param string $secret The shared secret.
+ */
+function wpcom_migration_smoke_assert_open( $url, $secret ) {
+	$response = wpcom_migration_smoke_request( $url, wpcom_migration_smoke_signed_headers( $secret ) );
+	wpcom_migration_smoke_expect_status( $response, 200 );
+	$json = wpcom_migration_smoke_expect_json( $response );
+	foreach ( array( 'ok', 'protocol_version', 'php', 'wp_detect' ) as $key ) {
+		if ( ! array_key_exists( $key, $json ) ) {
+			wpcom_migration_smoke_fail( "Preflight JSON lacks the '$key' key: " . $response['body'] );
+		}
+	}
+	if ( true !== $json['ok'] ) {
+		wpcom_migration_smoke_fail(
+			sprintf(
+				"Preflight reported ok=false. error=%s wp_detect=%s db=%s\nBody: %s",
+				isset( $json['error'] ) ? print_r( $json['error'], true ) : '(absent)',
+				isset( $json['wp_detect'] ) ? print_r( $json['wp_detect'], true ) : '(absent)',
+				isset( $json['db'] ) ? print_r( $json['db'], true ) : '(absent)',
+				$response['body']
+			)
+		);
+	}
+	wpcom_migration_smoke_expect_header( $response, 'access-control-allow-origin', '*' );
+}
 
 /**
  * X-Auth-* header lines for an empty-bodied signed request.

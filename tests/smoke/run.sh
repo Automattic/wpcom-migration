@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Boots the built plugin in WordPress Playground once per credential state
-# and checks the export endpoint's answers.
+# and checks the export endpoint's answers, then once more to drive the
+# settings screen through its form handlers.
 #
 # Usage: tests/smoke/run.sh <built-plugin-dir>
 #   e.g. tests/smoke/run.sh build/wpcom-migration
@@ -23,7 +24,7 @@ SMOKE_DIR="$(cd "$(dirname "$0")" && pwd)"
 PORT="${SMOKE_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
-SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted)
+SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted screen)
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -62,6 +63,7 @@ for scenario in "${SCENARIOS[@]}"; do
         --port="$PORT" \
         --blueprint="$SMOKE_DIR/blueprint-$scenario.json" \
         --mount="$PLUGIN_DIR:/wordpress/wp-content/plugins/wpcom-migration" \
+        --mount="$SMOKE_DIR:/wordpress/wp-content/wpcom-migration-smoke" \
         >"$server_log" 2>&1 &
     server_pid=$!
 
