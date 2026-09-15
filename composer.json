@@ -15,7 +15,10 @@
     },
     "scripts": {
         "build": "bin/build.sh",
-        "lint": "phpcs",
+        "lint": [
+            "phpcs",
+            "phpcs --standard=tools/php56-build/phpcs.xml.dist"
+        ],
         "smoke": "tests/smoke/run.sh build/wpcom-migration",
         "test:build-tool": "@composer --working-dir=tools/php56-build test"
     }

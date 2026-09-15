@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="wpcom-migration">
-	<description>Coding standards for the code this repository owns. The BlogVault tree under plugin/ is upstream code and is not checked.</description>
+	<description>Coding standards for the code this repository owns. The BlogVault tree under plugin/ is upstream code and is not checked; tools/php56-build has its own ruleset.</description>
 
 	<arg name="basepath" value="."/>
 	<arg name="extensions" value="php"/>
@@ -13,16 +13,30 @@
 	<file>plugin/reprint</file>
 	<file>bin</file>
 	<file>tests</file>
-	<file>tools/php56-build</file>
 
 	<exclude-pattern>*/vendor/*</exclude-pattern>
-	<exclude-pattern>tools/php56-build/tests/Fixture/*</exclude-pattern>
+
+	<!--
+		Scoping is done with include-pattern, not exclude-pattern: PHPCS unions
+		the patterns of a sniff across every rule block that names it, which
+		makes an exclude on one block leak into the others. Rules must be ordered
+		so more specific standards (WordPress-Core, WordPress-Docs) precede more
+		general ones (WordPress).
+	-->
+
+	<!-- CLI scripts: formatting and docs, not the WordPress runtime rules. -->
+	<rule ref="WordPress-Core">
+		<include-pattern>*/bin/*</include-pattern>
+		<include-pattern>*/tests/*</include-pattern>
+	</rule>
+	<rule ref="WordPress-Docs">
+		<include-pattern>*/bin/*</include-pattern>
+		<include-pattern>*/tests/*</include-pattern>
+	</rule>
 
 	<!-- Plugin glue: the full WordPress standard. -->
 	<rule ref="WordPress">
-		<exclude-pattern>bin/*</exclude-pattern>
-		<exclude-pattern>tests/*</exclude-pattern>
-		<exclude-pattern>tools/*</exclude-pattern>
+		<include-pattern>*/plugin/reprint/*</include-pattern>
 	</rule>
 
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
@@ -32,21 +46,5 @@
 				<element value="Automattic\WPCOM_Migration"/>
 			</property>
 		</properties>
-	</rule>
-
-	<!-- CLI scripts: formatting and docs, not the WordPress runtime rules. -->
-	<rule ref="WordPress-Core">
-		<exclude-pattern>tools/*</exclude-pattern>
-	</rule>
-	<rule ref="WordPress-Docs">
-		<exclude-pattern>tools/*</exclude-pattern>
-	</rule>
-
-	<!-- The build tool is a copy of reprint/tools/php56-build and keeps its style. -->
-	<rule ref="PSR12">
-		<exclude-pattern>plugin/*</exclude-pattern>
-		<exclude-pattern>bin/*</exclude-pattern>
-		<exclude-pattern>tests/*</exclude-pattern>
-		<exclude name="Generic.Files.LineLength"/>
 	</rule>
 </ruleset>
