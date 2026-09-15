@@ -23,7 +23,7 @@ bin/build.sh
 
 The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
 
-To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent.
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That `plugin/vendor/` is not downgraded, so it needs PHP 7.2 or newer; only the built ZIP runs on 7.0.
 
 ## The export screen
 
