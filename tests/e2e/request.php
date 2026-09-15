@@ -6,7 +6,8 @@
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
  * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen,
- * provisioning. The secret must match the one the matching blueprint stores.
+ * provisioning, connection. The secret must match the one the matching
+ * blueprint stores.
  *
  * @package wpcom-migration
  */
@@ -154,6 +155,10 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_error_json( $response, 403 );
 
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $new_secret );
+		break;
+
+	case 'connection':
+		// Task 5 adds the HTTP checks for this scenario.
 		break;
 
 	default:

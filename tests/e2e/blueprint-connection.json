@@ -1,0 +1,22 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"preferredVersions": { "php": "8.2", "wp": "latest" },
+	"steps": [
+		{
+			"step": "activatePlugin",
+			"pluginPath": "wpcom-migration/wpcom_migration.php"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'assert-registered-not-connected' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'plant-tokens' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'assert-connected' );"
+		}
+	]
+}

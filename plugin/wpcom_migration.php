@@ -32,6 +32,7 @@ License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licen
 
 if (!defined('ABSPATH')) exit;
 require_once __DIR__ . '/reprint/bootstrap.php';
+require_once __DIR__ . '/connection/bootstrap.php';
 ##OLDWPR##
 
 require_once dirname( __FILE__ ) . '/wp_settings.php';
