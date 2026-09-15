@@ -41,9 +41,23 @@ fi
 server_pid=""
 server_log=""
 
+# npx wraps the real server in a child process, and a signal to the wrapper
+# does not always reach it. Signal every descendant, deepest first.
+kill_tree() {
+    local pid="$1" child
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        kill_tree "$child"
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+}
+
+port_in_use() {
+    (exec 3<>"/dev/tcp/127.0.0.1/$PORT") 2>/dev/null
+}
+
 stop_server() {
     if [ -n "$server_pid" ]; then
-        kill "$server_pid" 2>/dev/null || true
+        kill_tree "$server_pid"
         wait "$server_pid" 2>/dev/null || true
         server_pid=""
     fi
@@ -53,6 +67,21 @@ stop_server() {
     fi
 }
 trap stop_server EXIT
+
+# The next boot needs the port; a server that is still shutting down holds it.
+wait_for_port_free() {
+    local _
+    for _ in $(seq 1 30); do
+        if ! port_in_use; then
+            return 0
+        fi
+        sleep 1
+    done
+    echo "Port $PORT is still in use after 30s; is another Playground running?" >&2
+    exit 1
+}
+
+wait_for_port_free
 
 for scenario in "${SCENARIOS[@]}"; do
     echo "== $scenario"
@@ -92,6 +121,7 @@ for scenario in "${SCENARIOS[@]}"; do
     fi
 
     stop_server
+    wait_for_port_free
 done
 
 echo "Smoke test passed."
