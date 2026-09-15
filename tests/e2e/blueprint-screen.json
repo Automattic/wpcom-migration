@@ -1,0 +1,50 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"preferredVersions": { "php": "8.2", "wp": "latest" },
+	"steps": [
+		{
+			"step": "activatePlugin",
+			"pluginPath": "wpcom-migration/wpcom_migration.php"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'render-unconfigured' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'save-secret-empty' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-unconfigured' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'save-secret' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-secret-saved' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-enabled' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'disable' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-disabled' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
+		}
+	]
+}

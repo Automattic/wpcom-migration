@@ -17,7 +17,7 @@ use Automattic\WPCOM_Migration\Reprint\Settings_Page;
  * @param string $step Step name.
  * @throws RuntimeException When an expectation fails.
  */
-function wpcom_migration_smoke_screen_step( $step ) {
+function wpcom_migration_e2e_screen_step( $step ) {
 	require_once ABSPATH . 'wp-admin/includes/template.php';
 
 	wp_set_current_user( 1 );
@@ -30,14 +30,14 @@ function wpcom_migration_smoke_screen_step( $step ) {
 
 	switch ( $step ) {
 		case 'render-unconfigured':
-			$html = wpcom_migration_smoke_render( $page );
-			wpcom_migration_smoke_expect_contains( $html, 'Not configured yet', $step );
-			wpcom_migration_smoke_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
-			wpcom_migration_smoke_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'Not configured yet', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
 			break;
 
 		case 'save-secret-empty':
-			wpcom_migration_smoke_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => '' ) );
+			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => '' ) );
 			$page->handle_save_secret(); // Redirects and exits.
 			break;
 
@@ -49,7 +49,7 @@ function wpcom_migration_smoke_screen_step( $step ) {
 			break;
 
 		case 'save-secret':
-			wpcom_migration_smoke_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => $secret ) );
+			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => $secret ) );
 			$page->handle_save_secret();
 			break;
 
@@ -58,14 +58,14 @@ function wpcom_migration_smoke_screen_step( $step ) {
 			if ( ! $state['secret_valid'] || $state['window_open'] ) {
 				throw new RuntimeException( 'Saving the secret should store a valid secret and leave the window closed: ' . wp_json_encode( $state ) );
 			}
-			$html = wpcom_migration_smoke_render( $page );
-			wpcom_migration_smoke_expect_contains( $html, 'Exporter disabled', $step );
-			wpcom_migration_smoke_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
-			wpcom_migration_smoke_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'Exporter disabled', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
+			wpcom_migration_e2e_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
 			break;
 
 		case 'enable':
-			wpcom_migration_smoke_post( Settings_Page::SAVE_ENABLED_ACTION, array( Settings_Page::ENABLED_FIELD => '1' ) );
+			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array( Settings_Page::ENABLED_FIELD => '1' ) );
 			$page->handle_save_enabled();
 			break;
 
@@ -74,12 +74,12 @@ function wpcom_migration_smoke_screen_step( $step ) {
 			if ( ! $state['window_open'] ) {
 				throw new RuntimeException( 'Enabling should open the window: ' . wp_json_encode( $state ) );
 			}
-			$html = wpcom_migration_smoke_render( $page );
-			wpcom_migration_smoke_expect_contains( $html, 'Exporter enabled until', $step );
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'Exporter enabled until', $step );
 			break;
 
 		case 'disable':
-			wpcom_migration_smoke_post( Settings_Page::SAVE_ENABLED_ACTION, array() );
+			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array() );
 			$page->handle_save_enabled();
 			break;
 
@@ -101,7 +101,7 @@ function wpcom_migration_smoke_screen_step( $step ) {
  * @param Settings_Page $page The screen.
  * @return string
  */
-function wpcom_migration_smoke_render( Settings_Page $page ) {
+function wpcom_migration_e2e_render( Settings_Page $page ) {
 	ob_start();
 	$page->render_page();
 	return ob_get_clean();
@@ -113,7 +113,7 @@ function wpcom_migration_smoke_render( Settings_Page $page ) {
  * @param string $action The admin-post action.
  * @param array  $fields Extra form fields.
  */
-function wpcom_migration_smoke_post( $action, array $fields ) {
+function wpcom_migration_e2e_post( $action, array $fields ) {
 	$post = array_merge(
 		array(
 			'action'   => $action,
@@ -137,7 +137,7 @@ function wpcom_migration_smoke_post( $action, array $fields ) {
  * @param string $step  Name of the step, for the error message.
  * @throws RuntimeException When the needle is absent.
  */
-function wpcom_migration_smoke_expect_contains( $html, $needle, $step ) {
+function wpcom_migration_e2e_expect_contains( $html, $needle, $step ) {
 	if ( false === strpos( $html, $needle ) ) {
 		throw new RuntimeException( "Step '$step': expected to find '$needle' in: " . substr( $html, 0, 300 ) );
 	}
@@ -151,7 +151,7 @@ function wpcom_migration_smoke_expect_contains( $html, $needle, $step ) {
  * @param string $step  Name of the step, for the error message.
  * @throws RuntimeException When the needle is present.
  */
-function wpcom_migration_smoke_expect_not_contains( $html, $needle, $step ) {
+function wpcom_migration_e2e_expect_not_contains( $html, $needle, $step ) {
 	if ( false !== strpos( $html, $needle ) ) {
 		throw new RuntimeException( "Step '$step': expected not to find '$needle' in: " . substr( $html, 0, 300 ) );
 	}
