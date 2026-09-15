@@ -15,4 +15,8 @@
 	<rule ref="PSR12">
 		<exclude name="Generic.Files.LineLength"/>
 	</rule>
+
+	<rule ref="PSR1.Files.SideEffects">
+		<exclude-pattern>*/tests/run.php</exclude-pattern>
+	</rule>
 </ruleset>

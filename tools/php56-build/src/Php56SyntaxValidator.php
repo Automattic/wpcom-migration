@@ -30,6 +30,14 @@ use PhpParser\Parser;
 use PhpParser\ParserFactory;
 use RuntimeException;
 
+/**
+ * Rejects the constructs the downgrade rules are meant to remove.
+ *
+ * This is not a full parser-level check of the target PHP version: it walks
+ * the AST for the specific node shapes the Rector rules downgrade, not every
+ * construct that version's parser would reject. CI's `php -l` on the target
+ * PHP version is the real gate.
+ */
 final class Php56SyntaxValidator
 {
     private Parser $parser;
