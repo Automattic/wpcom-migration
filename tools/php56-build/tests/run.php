@@ -58,8 +58,20 @@ try {
     $php70_generated = $temporary_root . '/php70-target.php';
     copy($php70_input, $php70_generated);
 
+    $php70_validator = new Php56SyntaxValidator('7.0');
+    try {
+        $php70_validator->assertFile($php70_generated);
+        fail_test('The PHP 7.0 fixture unexpectedly passed the pre-downgrade syntax check.');
+    } catch (RuntimeException $runtime_exception) {
+        // The fixture's private class constant precedes its typed method in
+        // traversal order, so that is the first node this check rejects.
+        if (strpos($runtime_exception->getMessage(), 'class-constant modifier') === false) {
+            throw $runtime_exception;
+        }
+    }
+
     run_rector($tool_root, $php70_generated, true, 'rector-php70.php');
-    (new Php56SyntaxValidator('7.0'))->assertFile($php70_generated);
+    $php70_validator->assertFile($php70_generated);
 
     $php70_expected = $fixture_root . '/php70-target.expected.php';
     if (!is_file($php70_expected)) {
@@ -82,6 +94,29 @@ try {
         fail_test('The PHP 7.0 fixture unexpectedly passed the PHP 5.6 syntax check.');
     } catch (RuntimeException $runtime_exception) {
         if (strpos($runtime_exception->getMessage(), 'null-coalescing') === false) {
+            throw $runtime_exception;
+        }
+    }
+
+    $nullable = $temporary_root . '/php70-nullable-param.php';
+    file_put_contents($nullable, "<?php\nfunction php70_nullable(?array \$options)\n{\n    return \$options;\n}\n");
+    try {
+        $php70_validator->assertFile($nullable);
+        fail_test('The nullable-parameter fixture unexpectedly passed the PHP 7.0 syntax check.');
+    } catch (RuntimeException $runtime_exception) {
+        if (strpos($runtime_exception->getMessage(), 'PHP 7.0 cannot parse') === false) {
+            throw $runtime_exception;
+        }
+    }
+
+    $scalar = $temporary_root . '/php70-scalar-param.php';
+    file_put_contents($scalar, "<?php\nfunction php70_scalar(int \$limit, Throwable \$error)\n{\n    return \$limit;\n}\n");
+    $php70_validator->assertFile($scalar);
+    try {
+        (new Php56SyntaxValidator())->assertFile($scalar);
+        fail_test('The scalar-parameter fixture unexpectedly passed the PHP 5.6 syntax check.');
+    } catch (RuntimeException $runtime_exception) {
+        if (strpos($runtime_exception->getMessage(), 'PHP 5.6 cannot parse') === false) {
             throw $runtime_exception;
         }
     }

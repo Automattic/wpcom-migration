@@ -103,9 +103,10 @@ foreach ( $wpcom_migration_own_classes as $class ) {
 	}
 }
 
-// The package declares no psr-4 namespace, so the psr-4 manifest gains
-// nothing from it. The manifest is only written when something declares one;
-// no file at all is the strongest form of this assertion.
+// The package declares no psr-4 namespace of its own. The manifest still
+// exists and is non-empty, because the Jetpack autoloader always writes an
+// entry for its own namespace; the assertion is that none of its entries
+// point into reprint-server.
 foreach ( $wpcom_migration_psr4 as $namespace => $data ) {
 	foreach ( (array) $data['path'] as $path ) {
 		if ( false !== strpos( $path, $wpcom_migration_package_dir ) ) {

@@ -114,12 +114,13 @@ final class Php56SyntaxValidator
                     return 'a promoted parameter';
                 }
                 if (
-                    $this->target_version === '5.6'
-                    && $node instanceof Param
+                    $node instanceof Param
                     && $node->type !== null
-                    && !$this->isPhp56ParameterType($node->type)
+                    && !$this->isSupportedParameterType($node->type)
                 ) {
-                    return 'a parameter type which PHP 5.6 cannot parse';
+                    return $this->target_version === '7.0'
+                        ? 'a parameter type which PHP 7.0 cannot parse'
+                        : 'a parameter type which PHP 5.6 cannot parse';
                 }
                 if ($node instanceof Property && $node->type !== null) {
                     return 'a typed property';
@@ -171,6 +172,29 @@ final class Php56SyntaxValidator
                 }
 
                 return null;
+            }
+
+            private function isSupportedParameterType(Node $type): bool
+            {
+                if ($this->isPhp56ParameterType($type)) {
+                    return true;
+                }
+
+                if ($this->target_version !== '7.0') {
+                    return false;
+                }
+
+                if ($type instanceof Name) {
+                    $resolved_name = $type->getAttribute('resolvedName');
+                    $type_name = $resolved_name instanceof Name
+                        ? $resolved_name->toString()
+                        : $type->toString();
+
+                    return strtolower($type_name) === 'throwable';
+                }
+
+                return $type instanceof Identifier
+                    && in_array(strtolower($type->name), ['int', 'float', 'string', 'bool'], true);
             }
 
             private function isPhp56ParameterType(Node $type): bool

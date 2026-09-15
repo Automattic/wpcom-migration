@@ -75,7 +75,9 @@ fwrite( STDOUT, "Downgraded tree contains none of the syntax the PHP 7.0 build r
 
 /**
  * Stops the build if staged code already uses the temporary variable prefix
- * the null-coalescing downgrade introduces.
+ * the downgrade rules introduce. Kept even though the PHP 7.0 target no
+ * longer runs the null-coalescing rule, so rector.php's PHP 5.6 config can
+ * be swapped back in here without losing this guard.
  *
  * @param string[] $paths Files and directories to inspect.
  */
