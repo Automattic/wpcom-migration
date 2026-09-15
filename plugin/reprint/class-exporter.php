@@ -17,47 +17,17 @@ use WordPress\Reprint\Server\HTTPServer;
  */
 class Exporter {
 
-	/**
-	 * Query argument that selects the export endpoint.
-	 *
-	 * @var string
-	 */
-	const QUERY_VAR = 'reprint-api-wpcom-migration';
+	const QUERY_VAR    = 'reprint-api-wpcom-migration';
+	const EVENT_ACTION = 'wpcom_migration_reprint_export_event';
 
-	/**
-	 * Option holding the HMAC shared secret.
-	 *
-	 * @var string
-	 */
-	const SECRET_OPTION = 'wpcom_migration_reprint_secret';
-
-	/**
-	 * Option holding the HMAC of the secret under the site's auth salt.
-	 *
-	 * @var string
-	 */
-	const SECRET_HASH_OPTION = 'wpcom_migration_reprint_secret_hash';
-
-	/**
-	 * Option holding the unix time the export window was last opened. The
-	 * window is a sliding 60-minute one.
-	 *
-	 * @var string
-	 */
-	const ENABLED_OPTION = 'wpcom_migration_reprint_enabled';
-
-	/**
-	 * Option holding the HMAC of the window stamp under the site's auth salt.
-	 *
-	 * @var string
-	 */
+	// The secret and the window stamp, each with its HMAC under the site's
+	// auth salt. The window is a sliding 60-minute one.
+	const SECRET_OPTION       = 'wpcom_migration_reprint_secret';
+	const SECRET_HASH_OPTION  = 'wpcom_migration_reprint_secret_hash';
+	const ENABLED_OPTION      = 'wpcom_migration_reprint_enabled';
 	const ENABLED_HASH_OPTION = 'wpcom_migration_reprint_enabled_hash';
 
-	/**
-	 * The options only this class may write.
-	 *
-	 * @var string[]
-	 */
+	// The options only this class may write.
 	const GUARDED_OPTIONS = array(
 		self::SECRET_OPTION,
 		self::SECRET_HASH_OPTION,
@@ -65,19 +35,8 @@ class Exporter {
 		self::ENABLED_HASH_OPTION,
 	);
 
-	/**
-	 * Clock-skew tolerance, in seconds, allowed for HMAC signatures.
-	 *
-	 * @var int
-	 */
+	// Clock skew, in seconds, allowed for HMAC signatures.
 	const HMAC_CLOCK_SKEW = 300;
-
-	/**
-	 * Action fired for export events.
-	 *
-	 * @var string
-	 */
-	const EVENT_ACTION = 'wpcom_migration_reprint_export_event';
 
 	/**
 	 * Whether the exporter is in the middle of one of its own option writes.

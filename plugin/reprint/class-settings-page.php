@@ -17,54 +17,13 @@ namespace Automattic\WPCOM_Migration\Reprint;
  */
 class Settings_Page {
 
-	/**
-	 * Page slug; the screen lives at admin.php?page=<slug>.
-	 *
-	 * @var string
-	 */
-	const PAGE_SLUG = 'wpcom-migration-reprint';
-
-	/**
-	 * admin-post action that saves the secret.
-	 *
-	 * @var string
-	 */
-	const SAVE_SECRET_ACTION = 'wpcom_migration_reprint_save_secret';
-
-	/**
-	 * admin-post action that opens or closes the window.
-	 *
-	 * @var string
-	 */
+	const PAGE_SLUG           = 'wpcom-migration-reprint';
+	const SAVE_SECRET_ACTION  = 'wpcom_migration_reprint_save_secret';
 	const SAVE_ENABLED_ACTION = 'wpcom_migration_reprint_save_enabled';
-
-	/**
-	 * Query argument carrying the result of a form post back to the screen.
-	 *
-	 * @var string
-	 */
-	const NOTICE_QUERY_ARG = 'wpcom_migration_reprint_notice';
-
-	/**
-	 * Name of the secret input.
-	 *
-	 * @var string
-	 */
-	const SECRET_FIELD = 'wpcom_migration_reprint_secret';
-
-	/**
-	 * Name of the enable checkbox.
-	 *
-	 * @var string
-	 */
-	const ENABLED_FIELD = 'wpcom_migration_reprint_enabled';
-
-	/**
-	 * Script handle for settings-page.js.
-	 *
-	 * @var string
-	 */
-	const SCRIPT_HANDLE = 'wpcom-migration-reprint-settings';
+	const NOTICE_QUERY_ARG    = 'wpcom_migration_reprint_notice';
+	const SECRET_FIELD        = 'wpcom_migration_reprint_secret';
+	const ENABLED_FIELD       = 'wpcom_migration_reprint_enabled';
+	const SCRIPT_HANDLE       = 'wpcom-migration-reprint-settings';
 
 	/**
 	 * Absolute path of the plugin's main file.
