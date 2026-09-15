@@ -10,7 +10,6 @@
 	<config name="text_domain" value="wpcom-migration"/>
 	<config name="minimum_wp_version" value="4.0"/>
 
-	<file>rector.php</file>
 	<file>plugin/reprint</file>
 	<file>bin</file>
 	<file>tests</file>

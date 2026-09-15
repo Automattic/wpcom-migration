@@ -4,7 +4,7 @@
     "license": "GPL-2.0-or-later",
     "version": "dev-trunk",
     "require": {
-        "php": ">=7.1",
+        "php": ">=7.4",
         "automattic/jetpack-autoloader": "^6",
         "wp-php-toolkit/reprint-server": "0.10.8"
     },

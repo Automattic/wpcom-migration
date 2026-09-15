@@ -6,7 +6,6 @@
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpcompatibility/php-compatibility": "^10.0@alpha",
-        "rector/rector": "^2.6",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {

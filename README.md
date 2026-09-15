@@ -6,7 +6,6 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
 - `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
-- `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
 - `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the settings screen, one that provisions through the REST routes.
@@ -16,13 +15,13 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 Needs PHP 8.2+, Composer, `rsync`, `zip`.
 
 ```sh
-composer install      # PHPCS, WPCS, Rector
+composer install      # PHPCS, WPCS
 bin/build.sh
 ```
 
-The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there to PHP 7.1 syntax, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
+The build runs `composer install` in `plugin/`, copies the tree to a staging directory, checks the autoload manifest there, then writes `build/`. The plugin needs PHP 7.4 or newer (`Requires PHP: 7.4`), the floor of the Jetpack packages it uses.
 
-To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter and the WordPress.com connection are absent.
 
 ## The Reprint migration screen
 
@@ -50,9 +49,9 @@ composer lint:php:compat          # PHPCompatibility, testVersion 7.1-
 composer test:e2e                 # Playground e2e against build/wpcom-migration
 ```
 
-`lint:php:compat` checks the repository's own PHP against the 7.1 floor, including functions `php -l` cannot see; `vendor/` is each package's own job. PHPCompatibility 10 is pinned at a pre-release; move the constraint to `^10.0` when it ships.
+`lint:php:compat` checks the repository's own PHP against the 7.4 floor, including functions `php -l` cannot see; `vendor/` is each package's own job. PHPCompatibility 10 is pinned at a pre-release; move the constraint to `^10.0` when it ships.
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS and the compatibility lint; the Playground e2e scenarios against the ZIP.
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.4 and 8.4; PHPCS and the compatibility lint; the Playground e2e scenarios against the ZIP.
 
 Publishing to wp.org is not automated.
 
