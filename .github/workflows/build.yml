@@ -24,10 +24,8 @@ jobs:
           php-version: '8.2'
           tools: composer
           coverage: none
-      - name: Install root tooling
+      - name: Install tooling
         run: composer install --no-interaction --no-progress
-      - name: Install the PHP 5.6 build tool
-        run: composer install --no-interaction --no-progress --working-dir=tools/php56-build
       - name: Build
         run: bin/build.sh
       - uses: actions/upload-artifact@v4
@@ -43,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php: ['7.0', '7.4', '8.4']
+        php: ['7.1', '7.4', '8.4']
     steps:
       - uses: shivammathur/setup-php@v2
         with:
@@ -74,19 +72,6 @@ jobs:
           coverage: none
       - run: composer install --no-interaction --no-progress
       - run: composer lint
-
-  build-tool-tests:
-    name: Build tool fixtures
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          tools: composer
-          coverage: none
-      - run: composer install --no-interaction --no-progress --working-dir=tools/php56-build
-      - run: composer --working-dir=tools/php56-build test
 
   smoke:
     name: Playground smoke test

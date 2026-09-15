@@ -6,24 +6,23 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
 - `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (admin screen), `bootstrap.php`.
-- `tools/php56-build/` — Rector rules and syntax validator that downgrade a copy of `vendor/` and `reprint/` to PHP 7.0 syntax so the ZIP keeps `Requires PHP: 7.0`. Copied from `reprint/tools/php56-build`; the name is upstream's, the 7.0 target lives in `rector-php70.php`.
+- `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
 - `tests/smoke/` — Playground blueprints and a signed-request script that exercise the endpoint in each credential state.
 
 ## Build
 
-Needs PHP 8.1+, Composer, `rsync`, `zip`.
+Needs PHP 8.2+, Composer, `rsync`, `zip`.
 
 ```sh
-composer install                                     # PHPCS + WPCS
-composer install --working-dir=tools/php56-build     # Rector
+composer install      # PHPCS, WPCS, Rector
 bin/build.sh
 ```
 
-The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
+The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there to PHP 7.1 syntax, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
 
-To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That `plugin/vendor/` is not downgraded, so it needs PHP 7.2 or newer; only the built ZIP runs on 7.0.
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
 
 ## The export screen
 
@@ -34,12 +33,11 @@ Each state change and every served or refused request fires `wpcom_migration_rep
 ## Checks
 
 ```sh
-composer lint                     # PHPCS: WordPress on plugin/reprint, bin, tests; PSR-12 on tools/php56-build
-composer test:build-tool          # Rector fixture tests
+composer lint                     # PHPCS, WordPress Coding Standards
 composer smoke                    # Playground smoke test against build/wpcom-migration
 ```
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.0, 7.4 and 8.4; PHPCS; the build-tool fixtures; the Playground smoke test against the ZIP.
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
 
 Publishing to wp.org is not automated.
 

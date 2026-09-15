@@ -3,8 +3,9 @@
 # Builds the shippable plugin tree and ZIP from plugin/.
 #
 # The source tree is never rewritten: the plugin is copied to a temporary
-# staging directory, vendor/ and reprint/ are downgraded there, and the result
-# is checked before it lands in build/.
+# staging directory, vendor/ and reprint/ are downgraded to PHP 7.1 syntax
+# there with Rector, and the autoload manifest is checked before the result
+# lands in build/.
 #
 # Usage: bin/build.sh
 #
@@ -12,7 +13,6 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLUGIN_SRC="$REPO_ROOT/plugin"
-TOOL_ROOT="$REPO_ROOT/tools/php56-build"
 BUILD_DIR="$REPO_ROOT/build"
 SLUG="wpcom-migration"
 
@@ -23,11 +23,9 @@ for command_name in php composer rsync zip; do
     fi
 done
 
-# The tool keeps its upstream php56-build name; its PHP 7.0 target lives in
-# rector-php70.php, used by bin/downgrade-tree.php below.
-if [ ! -x "$TOOL_ROOT/vendor/bin/rector" ]; then
-    echo "Error: the PHP 7.0 build tool is not installed." >&2
-    echo "Run: composer install --working-dir=tools/php56-build" >&2
+if [ ! -x "$REPO_ROOT/vendor/bin/rector" ]; then
+    echo "Error: Rector is not installed." >&2
+    echo "Run: composer install" >&2
     exit 1
 fi
 
@@ -48,7 +46,20 @@ rsync -a \
     --exclude '.DS_Store' \
     "$PLUGIN_SRC/" "$STAGING/$SLUG/"
 
-php "$REPO_ROOT/bin/downgrade-tree.php" "$STAGING/$SLUG" "$PLUGIN_SRC" vendor reprint
+# Belt and braces: the staging dir comes from mktemp, so this cannot be the
+# source tree, but Rector rewrites in place and the check is free.
+if [ "$(cd "$STAGING/$SLUG" && pwd -P)" = "$(cd "$PLUGIN_SRC" && pwd -P)" ]; then
+    echo "Error: refusing to downgrade the source tree." >&2
+    exit 1
+fi
+
+"$REPO_ROOT/vendor/bin/rector" process \
+    "$STAGING/$SLUG/vendor" \
+    "$STAGING/$SLUG/reprint" \
+    --config "$REPO_ROOT/rector.php" \
+    --no-progress-bar \
+    --no-diffs \
+    --clear-cache
 php "$REPO_ROOT/bin/check-autoload-manifest.php" "$STAGING/$SLUG"
 
 rm -rf "$BUILD_DIR/$SLUG" "$BUILD_DIR/$SLUG.zip"

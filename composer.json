@@ -5,6 +5,7 @@
     "license": "GPL-2.0-or-later",
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "rector/rector": "^2.6",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -15,11 +16,7 @@
     },
     "scripts": {
         "build": "bin/build.sh",
-        "lint": [
-            "phpcs",
-            "phpcs --standard=tools/php56-build/phpcs.xml.dist"
-        ],
-        "smoke": "tests/smoke/run.sh build/wpcom-migration",
-        "test:build-tool": "@composer --working-dir=tools/php56-build test"
+        "lint": "phpcs",
+        "smoke": "tests/smoke/run.sh build/wpcom-migration"
     }
 }

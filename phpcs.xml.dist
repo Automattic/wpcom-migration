@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <ruleset name="wpcom-migration">
-	<description>Coding standards for the code this repository owns. The BlogVault tree under plugin/ is upstream code and is not checked; tools/php56-build has its own ruleset.</description>
+	<description>Coding standards for the code this repository owns. The BlogVault tree under plugin/ is upstream code and is not checked.</description>
 
 	<arg name="basepath" value="."/>
 	<arg name="extensions" value="php"/>
@@ -10,6 +10,7 @@
 	<config name="text_domain" value="wpcom-migration"/>
 	<config name="minimum_wp_version" value="4.0"/>
 
+	<file>rector.php</file>
 	<file>plugin/reprint</file>
 	<file>bin</file>
 	<file>tests</file>
