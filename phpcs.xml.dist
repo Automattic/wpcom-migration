@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<ruleset name="wpcom-migration">
+	<description>Coding standards for the code this repository owns. The BlogVault tree under plugin/ is upstream code and is not checked.</description>
+
+	<arg name="basepath" value="."/>
+	<arg name="extensions" value="php"/>
+	<arg name="parallel" value="8"/>
+	<arg value="ps"/>
+
+	<config name="text_domain" value="wpcom-migration"/>
+	<config name="minimum_wp_version" value="4.0"/>
+
+	<file>rector.php</file>
+	<file>plugin/reprint</file>
+	<file>bin</file>
+	<file>tests</file>
+
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+
+	<!--
+		PHPCS applies a rule's include-pattern to the sniffs that rule is the
+		first to register, so order matters: Core and Docs go first with no
+		pattern and run on every listed file; Extra comes after, and only the
+		sniffs it adds are limited to the plugin glue.
+	-->
+	<rule ref="WordPress-Core"/>
+	<rule ref="WordPress-Docs"/>
+
+	<!-- The WordPress runtime rules: plugin glue only. CLI scripts run outside a request. -->
+	<rule ref="WordPress-Extra">
+		<include-pattern>*/plugin/reprint/*</include-pattern>
+	</rule>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="wpcom_migration"/>
+				<element value="Automattic\WPCOM_Migration"/>
+			</property>
+		</properties>
+	</rule>
+</ruleset>

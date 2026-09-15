@@ -1,0 +1,22 @@
+{
+    "name": "automattic/wpcom-migration-dev",
+    "description": "Development tooling for the Migrate to WordPress.com plugin repository.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "rector/rector": "^2.6",
+        "wp-coding-standards/wpcs": "^3.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "build": "bin/build.sh",
+        "lint": "phpcs",
+        "smoke": "tests/smoke/run.sh build/wpcom-migration"
+    }
+}

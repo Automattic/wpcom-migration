@@ -1,5 +1,52 @@
 # Migrate to WordPress.com
 
+Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-migration/) plugin. This repository is the source of record; the tree that ships is built from it.
+
+## Layout
+
+- `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
+- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (admin screen), `bootstrap.php`.
+- `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
+- `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
+- `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
+- `tests/smoke/` — Playground blueprints and a signed-request script that exercise the endpoint in each credential state.
+
+## Build
+
+Needs PHP 8.2+, Composer, `rsync`, `zip`.
+
+```sh
+composer install      # PHPCS, WPCS, Rector
+bin/build.sh
+```
+
+The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there to PHP 7.1 syntax, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
+
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
+
+## The export screen
+
+`wp-admin/admin.php?page=wpcom-migration-reprint` (no menu entry; `manage_options`; single-site only). Paste the shared secret WordPress.com hands out, then tick *Enable the exporter*. The window stays open for an hour after the last export request. The remote API URL is `home_url( '?reprint-api-wpcom-migration' )`. Activating or deactivating the plugin discards the stored secret and window; the hooks are registered from `plugin/reprint/bootstrap.php`.
+
+Each state change and every served or refused request fires `wpcom_migration_reprint_export_event` with an event name and context; none carries the secret, a hash or a signature.
+
+## Checks
+
+```sh
+composer lint                     # PHPCS, WordPress Coding Standards
+composer smoke                    # Playground smoke test against build/wpcom-migration
+```
+
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
+
+Publishing to wp.org is not automated.
+
+## Known limitations
+
+- Running this plugin next to `reprint-server-wp` is unsupported. Both ship the same package; a request that loads classes from both copies can fatal on the package's path-required function files.
+- The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
+- Sites on placeholder salts get the write veto but not the salt binding: `wp_salt()` stores its own salt in `wp_options`, where whoever can write the credential can read it.
+
 ## Security
 
 Need to report a security vulnerability? Go to [https://automattic.com/security/](https://automattic.com/security/) or directly to our security bug bounty site [https://hackerone.com/automattic](https://hackerone.com/automattic).
