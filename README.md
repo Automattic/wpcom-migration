@@ -34,10 +34,13 @@ Each state change and every served or refused request fires `wpcom_migration_rep
 
 ```sh
 composer lint                     # PHPCS, WordPress Coding Standards
+composer lint:php:compat          # PHPCompatibility, testVersion 7.4-
 composer smoke                    # Playground smoke test against build/wpcom-migration
 ```
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
+`lint:php:compat` checks the repository's own PHP against the 7.4 floor, including functions `php -l` cannot see; `vendor/` is each package's own job. PHPCompatibility 10 is pinned at a pre-release; move the constraint to `^10.0` when it ships.
+
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS and the compatibility lint; the Playground smoke test against the ZIP.
 
 Publishing to wp.org is not automated.
 
