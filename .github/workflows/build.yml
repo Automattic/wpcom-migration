@@ -74,8 +74,8 @@ jobs:
       - run: composer lint
       - run: composer lint:php:compat
 
-  smoke:
-    name: Playground smoke test
+  e2e:
+    name: Playground e2e
     needs: build
     runs-on: ubuntu-latest
     steps:
@@ -93,5 +93,5 @@ jobs:
           path: build
       - name: Unzip the artifact
         run: unzip -q build/wpcom-migration.zip -d build
-      - name: Run the smoke test against the ZIP contents
-        run: tests/smoke/run.sh build/wpcom-migration
+      - name: Run the e2e scenarios against the ZIP contents
+        run: tests/e2e/run.sh build/wpcom-migration
