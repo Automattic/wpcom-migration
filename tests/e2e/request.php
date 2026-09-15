@@ -75,7 +75,25 @@ switch ( $wpcom_migration_scenario ) {
 		break;
 
 	case 'connection':
-		// Task 5 adds the HTTP checks for this scenario.
+		// Over HTTP, unsigned: the routes exist and refuse.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+			if ( ! isset( $json['routes'][ $route ] ) ) {
+				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
+			}
+		}
+
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret', array(), 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 401 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		if ( ! isset( $json['code'] ) || 'rest_forbidden' !== $json['code'] ) {
+			wpcom_migration_e2e_fail( 'Unsigned rotate should answer rest_forbidden: ' . $response['body'] );
+		}
+
+		// The window the REST route opened serves a real export.
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
 		break;
 
 	default:
@@ -129,23 +147,25 @@ function wpcom_migration_e2e_signed_headers( $secret ) {
 }
 
 /**
- * Sends a GET request.
+ * Sends a request with no body.
  *
  * @param string   $url     Request URL.
  * @param string[] $headers Header lines.
+ * @param string   $method  GET or POST.
  * @return array{status: int, headers: array<string, string>, body: string}
  */
-function wpcom_migration_e2e_request( $url, array $headers ) {
-	$context = stream_context_create(
-		array(
-			'http' => array(
-				'method'        => 'GET',
-				'header'        => implode( "\r\n", $headers ),
-				'ignore_errors' => true,
-				'timeout'       => 120,
-			),
-		)
+function wpcom_migration_e2e_request( $url, array $headers, $method = 'GET' ) {
+	$http = array(
+		'method'        => $method,
+		'header'        => implode( "\r\n", $headers ),
+		'ignore_errors' => true,
+		'timeout'       => 120,
 	);
+	if ( 'POST' === $method ) {
+		$http['content'] = '';
+		$http['header']  = trim( $http['header'] . "\r\nContent-Length: 0" );
+	}
+	$context = stream_context_create( array( 'http' => $http ) );
 
 	$body = file_get_contents( $url, false, $context );
 	if ( false === $body ) {

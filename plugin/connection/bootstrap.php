@@ -6,6 +6,7 @@
  */
 
 use Automattic\WPCOM_Migration\Connection;
+use Automattic\WPCOM_Migration\REST_Controller;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -31,6 +32,8 @@ if ( ! defined( 'WPCOM_MIGRATION_SLUG' ) ) {
 }
 
 Connection::init();
+
+add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) );
 
 // Leaving the plugin leaves the connection; a secret WordPress.com installed
 // has no owner without it.
