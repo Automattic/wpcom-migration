@@ -38,8 +38,35 @@ $wpcom_migration_expected_classes = array(
 );
 
 $wpcom_migration_own_classes = array(
+	'Automattic\\WPCOM_Migration\\Connect_Page',
+	'Automattic\\WPCOM_Migration\\Connection',
+	'Automattic\\WPCOM_Migration\\REST_Controller',
 	'Automattic\\WPCOM_Migration\\Reprint\\Exporter',
 	'Automattic\\WPCOM_Migration\\Reprint\\Settings_Page',
+);
+
+// Every vendor package that may publish classes through the site-wide
+// manifests. A package Composer pulls in that is not listed here is a
+// decision to make, not a side effect of a version bump.
+$wpcom_migration_expected_packages = array(
+	'automattic/jetpack-a8c-mc-stats',
+	'automattic/jetpack-admin-ui',
+	'automattic/jetpack-assets',
+	'automattic/jetpack-config',
+	'automattic/jetpack-connection',
+	'automattic/jetpack-constants',
+	'automattic/jetpack-ip',
+	'automattic/jetpack-redirect',
+	'automattic/jetpack-roles',
+	'automattic/jetpack-status',
+	'wp-php-toolkit/reprint-server',
+);
+
+// The `files` autoload entries the packages declare; each is loaded on every
+// request through jetpack_autoload_filemap.php.
+$wpcom_migration_expected_files = array(
+	'vendor/automattic/jetpack-assets/actions.php',
+	'vendor/automattic/jetpack-connection/actions.php',
 );
 
 if ( 2 !== $argc ) {
@@ -115,11 +142,49 @@ foreach ( $wpcom_migration_psr4 as $namespace => $data ) {
 	}
 }
 
+// Every classmap entry under vendor/ belongs to a listed package, and every
+// listed package publishes at least one class.
+$wpcom_migration_packages_seen = array();
+foreach ( $wpcom_migration_classmap as $class => $data ) {
+	if ( ! preg_match( '#(?:^|/)vendor/([^/]+/[^/]+)/#', $data['path'], $match ) ) {
+		continue;
+	}
+	$wpcom_migration_packages_seen[ $match[1] ] = true;
+	if ( 'automattic/jetpack-autoloader' === $match[1] ) {
+		continue; // The autoloader's own classes are its business.
+	}
+	if ( ! in_array( $match[1], $wpcom_migration_expected_packages, true ) ) {
+		$wpcom_migration_errors[] = sprintf( 'Unexpected package publishes %s: %s (list it on purpose, or drop the dependency)', $class, $match[1] );
+	}
+}
+foreach ( $wpcom_migration_expected_packages as $package ) {
+	if ( ! isset( $wpcom_migration_packages_seen[ $package ] ) ) {
+		$wpcom_migration_errors[] = sprintf( 'Expected package publishes no classes: %s', $package );
+	}
+}
+
+// The filemap is exactly the two actions.php files, and each shipped.
+$wpcom_migration_filemap = wpcom_migration_manifest( $wpcom_migration_plugin_root, 'jetpack_autoload_filemap.php', true );
+$wpcom_migration_files   = array();
+foreach ( $wpcom_migration_filemap as $data ) {
+	if ( preg_match( '#(vendor/.+)$#', $data['path'], $match ) ) {
+		$wpcom_migration_files[] = $match[1];
+	}
+	if ( ! is_file( $data['path'] ) ) {
+		$wpcom_migration_errors[] = sprintf( 'Filemap entry does not exist: %s', $data['path'] );
+	}
+}
+sort( $wpcom_migration_files );
+sort( $wpcom_migration_expected_files );
+if ( $wpcom_migration_files !== $wpcom_migration_expected_files ) {
+	$wpcom_migration_errors[] = 'Filemap differs from the expected list: ' . json_encode( $wpcom_migration_files );
+}
+
 if ( array() !== $wpcom_migration_errors ) {
 	wpcom_migration_fail( implode( "\n", $wpcom_migration_errors ) );
 }
 
-fwrite( STDOUT, sprintf( "Autoload manifest check passed: %d reprint-server classes published.\n", count( $wpcom_migration_found ) ) );
+fwrite( STDOUT, sprintf( "Autoload manifest check passed: %d reprint-server classes, %d packages published.\n", count( $wpcom_migration_found ), count( $wpcom_migration_packages_seen ) ) );
 
 /**
  * Loads one of the generated manifests.

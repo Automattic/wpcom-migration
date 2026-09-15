@@ -5,7 +5,7 @@
     "license": "GPL-2.0-or-later",
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
-        "rector/rector": "^2.6",
+        "phpcompatibility/php-compatibility": "^10.0@alpha",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -17,6 +17,7 @@
     "scripts": {
         "build": "bin/build.sh",
         "lint": "phpcs",
-        "smoke": "tests/smoke/run.sh build/wpcom-migration"
+        "lint:php:compat": "phpcs --standard=PHPCompatibility --runtime-set testVersion 7.4- -ps plugin/reprint plugin/connection bin tests",
+        "test:e2e": "tests/e2e/run.sh build/wpcom-migration"
     }
 }

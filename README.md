@@ -6,23 +6,23 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
 - `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (admin screen), `bootstrap.php`.
-- `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
+- `plugin/connection/` — the WordPress.com connection: `Connection` (package setup, connect, disconnect), `REST_Controller` (`wpcom-migration/v1/reprint/rotate-export-secret`, `…/enable-export`), `Connect_Page` (admin screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/smoke/` — Playground blueprints and a signed-request script that exercise the endpoint in each credential state.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the settings screen.
 
 ## Build
 
 Needs PHP 8.2+, Composer, `rsync`, `zip`.
 
 ```sh
-composer install      # PHPCS, WPCS, Rector
+composer install      # PHPCS, WPCS
 bin/build.sh
 ```
 
-The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there to PHP 7.1 syntax, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
+The build runs `composer install` in `plugin/`, copies the tree to a staging directory, checks the autoload manifest there, then writes `build/`. The plugin needs PHP 7.4 or newer (`Requires PHP: 7.4`), the floor of the Jetpack packages it uses.
 
-To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter and the WordPress.com connection are absent.
 
 ## The export screen
 
@@ -30,14 +30,25 @@ To activate a source checkout directly (without a build), run `composer install 
 
 Each state change and every served or refused request fires `wpcom_migration_reprint_export_event` with an event name and context; none carries the secret, a hash or a signature.
 
+## The WordPress.com account screen
+
+`wp-admin/admin.php?page=wpcom-migration-connect` (under the plugin's menu; `manage_options` to view, the `administrator` role to act; single-site only). *Log in with WordPress.com* registers the site with WordPress.com through `automattic/jetpack-connection` and sends the user to WordPress.com to authorize; the package's webhook brings them back. Once connected the screen shows the WordPress.com login, the blog ID, a *Continue on WordPress.com* link (filter `wpcom_migration_continue_url`) and *Disconnect*. Deactivating the plugin disconnects.
+
+With a user connection in place, WordPress.com provisions the exporter through two routes, both `POST`, both signed with the user token of an administrator: `wpcom-migration/v1/reprint/rotate-export-secret` returns a new secret, `wpcom-migration/v1/reprint/enable-export` opens the export window; both answers carry `export_url`. Connection events fire `wpcom_migration_connection_event` with an event name and context; none carries a token or secret.
+
+On a site where Jetpack is already connected, the screen reads as connected at once: the connection is shared, and this plugin is one more plugin using it.
+
 ## Checks
 
 ```sh
 composer lint                     # PHPCS, WordPress Coding Standards
-composer smoke                    # Playground smoke test against build/wpcom-migration
+composer lint:php:compat          # PHPCompatibility, testVersion 7.4-
+composer test:e2e                 # Playground e2e against build/wpcom-migration
 ```
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
+`lint:php:compat` checks the repository's own PHP against the 7.4 floor, including functions `php -l` cannot see; `vendor/` is each package's own job. PHPCompatibility 10 is pinned at a pre-release; move the constraint to `^10.0` when it ships.
+
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.4 and 8.4; PHPCS and the compatibility lint; the Playground e2e scenarios against the ZIP.
 
 Publishing to wp.org is not automated.
 
@@ -46,6 +57,8 @@ Publishing to wp.org is not automated.
 - Running this plugin next to `reprint-server-wp` is unsupported. Both ship the same package; a request that loads classes from both copies can fatal on the package's path-required function files.
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
 - Sites on placeholder salts get the write veto but not the salt binding: `wp_salt()` stores its own salt in `wp_options`, where whoever can write the credential can read it.
+- The connection package requires PHP 7.4, so the plugin does too.
+- `tests/e2e/` plants tokens instead of logging in; the login redirect and WordPress.com's side of registration are not exercised.
 
 ## Security
 
