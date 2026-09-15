@@ -323,7 +323,7 @@ class Settings_Page {
 				data-hide-label="<?php esc_attr_e( 'Hide secret', 'wpcom-migration' ); ?>">
 				<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
 			</button>
-			<?php submit_button( __( 'Save secret', 'wpcom-migration' ) ); ?>
+			<?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_secret_submit' ); ?>
 		</form>
 		<?php
 	}
@@ -347,7 +347,7 @@ class Settings_Page {
 				<?php esc_html_e( 'Enable the exporter', 'wpcom-migration' ); ?>
 			</label>
 			<p class="description"><?php esc_html_e( 'While enabled, anyone with the shared secret can download this site\'s database and files. It turns itself off an hour after the last export request.', 'wpcom-migration' ); ?></p>
-			<?php submit_button( __( 'Save', 'wpcom-migration' ), 'secondary' ); ?>
+			<?php submit_button( __( 'Save', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_enabled_submit' ); ?>
 		</form>
 		<?php
 	}
