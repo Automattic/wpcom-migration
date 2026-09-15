@@ -30,6 +30,7 @@ License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licen
 /* Global response array */
 
 if (!defined('ABSPATH')) exit;
+require_once __DIR__ . '/reprint/bootstrap.php';
 ##OLDWPR##
 
 require_once dirname( __FILE__ ) . '/wp_settings.php';
@@ -58,6 +59,8 @@ $wp_action = new WPCOMWPAction($bvsettings, $bvsiteinfo, $bvapi);
 register_uninstall_hook(__FILE__, array('WPCOMWPAction', 'uninstall'));
 register_activation_hook(__FILE__, array($wp_action, 'activate'));
 register_deactivation_hook(__FILE__, array($wp_action, 'deactivate'));
+register_activation_hook(__FILE__, array('Automattic\WPCOM_Migration\Reprint\Exporter', 'discard_credentials'));
+register_deactivation_hook(__FILE__, array('Automattic\WPCOM_Migration\Reprint\Exporter', 'discard_credentials'));
 
 
 add_action('wp_footer', array($wp_action, 'footerHandler'), 100);
