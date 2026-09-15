@@ -6,7 +6,6 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
 - `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (admin screen), `bootstrap.php`.
-- `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
 - `tests/smoke/` — Playground blueprints and a signed-request script that exercise the endpoint in each credential state.
@@ -16,13 +15,13 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 Needs PHP 8.2+, Composer, `rsync`, `zip`.
 
 ```sh
-composer install      # PHPCS, WPCS, Rector
+composer install      # PHPCS, WPCS
 bin/build.sh
 ```
 
-The build runs `composer install` in `plugin/`, copies the tree to a staging directory, downgrades `vendor/` and `reprint/` there to PHP 7.1 syntax, checks the autoload manifest, then writes `build/`. `plugin/` itself is never rewritten.
+The build runs `composer install` in `plugin/`, copies the tree to a staging directory, checks the autoload manifest there, then writes `build/`. The plugin needs PHP 7.4 or newer (`Requires PHP: 7.4`), the floor of the Jetpack packages it uses.
 
-To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
+To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter and the WordPress.com connection are absent.
 
 ## The export screen
 
@@ -37,7 +36,7 @@ composer lint                     # PHPCS, WordPress Coding Standards
 composer smoke                    # Playground smoke test against build/wpcom-migration
 ```
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.1, 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.4 and 8.4; PHPCS; the Playground smoke test against the ZIP.
 
 Publishing to wp.org is not automated.
 

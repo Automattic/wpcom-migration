@@ -6,6 +6,7 @@ Description: The easiest way to migrate your site to WordPress.com.
 Author: WordPress.com
 Author URI: https://www.wordpress.com
 Version: 6.72
+Requires PHP: 7.4
 Network: True
 License: GPLv2 or later
 License URI: [http://www.gnu.org/licenses/gpl-2.0.html](http://www.gnu.org/licenses/gpl-2.0.html)
