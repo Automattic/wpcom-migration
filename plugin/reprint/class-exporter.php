@@ -351,6 +351,11 @@ class Exporter {
 			return;
 		}
 
+		// Multisite is out of scope; the screen refuses networks, so never serve one.
+		if ( is_multisite() ) {
+			return;
+		}
+
 		// Any origin: the client may run in a browser (Playground) from
 		// deployments we cannot know ahead of time, and origin is no boundary
 		// when every request needs the HMAC secret anyway. Preflights come
@@ -464,7 +469,7 @@ class Exporter {
 	}
 
 	/**
-	 * Emits the CORS headers the export client needs.
+	 * Emits no-cache and CORS headers the export client needs.
 	 *
 	 * Sent only with responses we produce, so a request that falls through to
 	 * WordPress does not pick them up.
@@ -473,6 +478,8 @@ class Exporter {
 		if ( headers_sent() ) {
 			return;
 		}
+
+		nocache_headers();
 
 		header( 'Access-Control-Allow-Origin: *' );
 		header( 'Access-Control-Allow-Methods: GET, POST, OPTIONS' );
