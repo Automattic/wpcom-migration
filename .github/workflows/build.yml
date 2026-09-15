@@ -1,8 +1,17 @@
 name: Build
 
+# A branch with an open pull request runs once, through pull_request; pushes
+# to trunk run on their own. A newer push to the same branch cancels the run
+# still going for the old one.
 on:
   push:
+    branches:
+      - trunk
   pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
