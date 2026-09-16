@@ -89,6 +89,47 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'calypso-retry-without-user-token':
+			// Calypso re-enters the flow through a URL it hardcodes
+			// (admin.php?page=jetpack&connect_url_redirect=true) when an
+			// authorization attempt fails. Site connected, user not.
+			Jetpack_Options::delete_option( 'user_tokens' );
+			Jetpack_Options::delete_option( 'master_user' );
+			if ( ! Connection::is_site_connected() || Connection::is_user_connected() ) {
+				throw new RuntimeException( "Step '$step': expected site-connected and not user-connected." );
+			}
+			wpcom_migration_e2e_calypso_retry(); // Redirects and exits.
+			break;
+
+		case 'assert-calypso-retry-authorize-url':
+			$location = (string) get_option( 'wpcom_migration_e2e_last_redirect' );
+			$query    = array();
+			wp_parse_str( (string) wp_parse_url( $location, PHP_URL_QUERY ), $query );
+			if ( 0 !== strpos( $location, 'https://jetpack.wordpress.com/jetpack.authorize/' ) ) {
+				throw new RuntimeException( "Step '$step': expected a redirect to the authorize URL, got: " . var_export( $location, true ) );
+			}
+			if ( ! isset( $query['redirect_after_auth'], $query['skip_pricing'] ) || Connect_Page::page_url() !== $query['redirect_after_auth'] || '1' !== $query['skip_pricing'] ) {
+				throw new RuntimeException( "Step '$step': the authorize URL should return to the screen: " . $location );
+			}
+			delete_option( 'wpcom_migration_e2e_last_redirect' );
+			break;
+
+		case 'calypso-retry-with-user-token':
+			// Planted again by the previous step; nothing to authorize.
+			if ( ! Connection::is_user_connected() ) {
+				throw new RuntimeException( "Step '$step': expected user-connected." );
+			}
+			wpcom_migration_e2e_calypso_retry(); // Redirects and exits.
+			break;
+
+		case 'assert-calypso-retry-screen':
+			$location = (string) get_option( 'wpcom_migration_e2e_last_redirect' );
+			if ( Connect_Page::page_url() !== $location ) {
+				throw new RuntimeException( "Step '$step': expected a redirect to the screen, got: " . var_export( $location, true ) );
+			}
+			delete_option( 'wpcom_migration_e2e_last_redirect' );
+			break;
+
 		case 'rest-rotate-secret-user-token':
 			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_USER_TOKEN, 1 );
 			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
@@ -302,6 +343,32 @@ function wpcom_migration_e2e_expect_rest_status( $response, $expected, $step ) {
 	if ( $expected !== $response->get_status() ) {
 		throw new RuntimeException( sprintf( "Step '%s': expected HTTP %d, got %d: %s", $step, $expected, $response->get_status(), wp_json_encode( $response->get_data() ) ) );
 	}
+}
+
+/**
+ * Runs the handler for Calypso's retry URL, keeping where it redirected in an
+ * option for the next step. The handler exits.
+ */
+function wpcom_migration_e2e_calypso_retry() {
+	$_GET     = array(
+		'page'                           => 'jetpack',
+		'connect_url_redirect'           => 'true',
+		'jetpack_connect_login_redirect' => 'true',
+		'from'                           => '[unknown]',
+		'redirect_after_auth'            => Connect_Page::page_url(),
+	);
+	$_REQUEST = $_GET;
+
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+
+	add_filter(
+		'wp_redirect',
+		function ( $location ) {
+			update_option( 'wpcom_migration_e2e_last_redirect', $location );
+			return $location;
+		}
+	);
+	( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->handle_calypso_retry();
 }
 
 /**
