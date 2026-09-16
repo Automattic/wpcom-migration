@@ -201,6 +201,35 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			delete_option( 'wpcom_migration_e2e_last_redirect' );
 			break;
 
+		case 'authorization-url-returns-to-screen':
+			// Calypso's authorize page, not the site's webhook, decides where the
+			// browser lands afterwards. It reads redirect_after_auth from the
+			// authorize URL and, with skip_pricing, goes straight there; a `from`
+			// starting with wpcom-migration would send the user to Calypso's
+			// migration flow instead.
+			$authorization_url = Connection::authorization_url( Connect_Page::page_url() );
+			if ( is_wp_error( $authorization_url ) ) {
+				throw new RuntimeException( "Step '$step': authorization_url() failed: " . $authorization_url->get_error_code() );
+			}
+			$query = array();
+			wp_parse_str( (string) wp_parse_url( $authorization_url, PHP_URL_QUERY ), $query );
+			if ( ! isset( $query['redirect_after_auth'] ) || Connect_Page::page_url() !== $query['redirect_after_auth'] ) {
+				throw new RuntimeException( "Step '$step': redirect_after_auth should be the screen URL, got: " . $authorization_url );
+			}
+			if ( ! isset( $query['skip_pricing'] ) || '1' !== $query['skip_pricing'] ) {
+				throw new RuntimeException( "Step '$step': skip_pricing=1 is missing: " . $authorization_url );
+			}
+			if ( isset( $query['from'] ) && 0 === strpos( $query['from'], 'wpcom-migration' ) ) {
+				throw new RuntimeException( "Step '$step': a wpcom-migration `from` diverts the user to Calypso's migration flow: " . $authorization_url );
+			}
+			// The site's webhook, which WordPress.com calls, reads its own copy.
+			$redirect_uri_query = array();
+			wp_parse_str( (string) wp_parse_url( (string) ( $query['redirect_uri'] ?? '' ), PHP_URL_QUERY ), $redirect_uri_query );
+			if ( ! isset( $redirect_uri_query['redirect'] ) || Connect_Page::page_url() !== $redirect_uri_query['redirect'] ) {
+				throw new RuntimeException( "Step '$step': redirect_uri should carry the screen URL as redirect, got: " . $authorization_url );
+			}
+			break;
+
 		case 'render-connected':
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
