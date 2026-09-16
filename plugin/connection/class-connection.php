@@ -180,7 +180,22 @@ class Connection {
 			self::record_event( 'site_registered', array( 'user_id' => get_current_user_id() ) );
 		}
 
-		return $manager->get_authorization_url( wp_get_current_user(), $return_url );
+		$authorization_url = $manager->get_authorization_url( wp_get_current_user(), $return_url );
+
+		// The package puts $return_url inside redirect_uri, which only the
+		// site's webhook reads, and WordPress.com calls that webhook itself.
+		// The browser goes where Calypso's authorize page says: it reads
+		// redirect_after_auth from the authorize URL, and without skip_pricing
+		// it detours through the Jetpack plans page and ends at
+		// admin.php?page=jetpack. No `from` here: one starting with
+		// wpcom-migration would send the user to Calypso's migration flow.
+		return add_query_arg(
+			array(
+				'redirect_after_auth' => rawurlencode( $return_url ),
+				'skip_pricing'        => '1',
+			),
+			$authorization_url
+		);
 	}
 
 	/**

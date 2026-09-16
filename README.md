@@ -32,7 +32,7 @@ Each state change and every served or refused request fires `wpcom_migration_rep
 
 ## The WordPress.com account screen
 
-`wp-admin/admin.php?page=wpcom-migration-connect` (under the plugin's menu; `manage_options` to view, the `administrator` role to act; single-site only). *Log in with WordPress.com* registers the site with WordPress.com through `automattic/jetpack-connection` and sends the user to WordPress.com to authorize; the package's webhook brings them back. Once connected the screen shows the WordPress.com login, the blog ID, a *Continue on WordPress.com* link (filter `wpcom_migration_continue_url`) and *Disconnect*. Deactivating the plugin disconnects.
+`wp-admin/admin.php?page=wpcom-migration-connect` (under the plugin's menu; `manage_options` to view, the `administrator` role to act; single-site only). *Log in with WordPress.com* registers the site with WordPress.com through `automattic/jetpack-connection` and sends the user to WordPress.com to authorize; WordPress.com's authorize page sends them back to this screen (`redirect_after_auth`, with `skip_pricing` so it skips the Jetpack plans page). Once connected the screen shows the WordPress.com login, the blog ID, a *Continue on WordPress.com* link (filter `wpcom_migration_continue_url`) and *Disconnect*. Deactivating the plugin disconnects.
 
 With a user connection in place, WordPress.com provisions the exporter through two routes, both `POST`, both signed with the user token of an administrator: `wpcom-migration/v1/reprint/rotate-export-secret` returns a new secret, `wpcom-migration/v1/reprint/enable-export` opens the export window; both answers carry `export_url`. Connection events fire `wpcom_migration_connection_event` with an event name and context; none carries a token or secret.
 
@@ -58,7 +58,7 @@ Publishing to wp.org is not automated.
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
 - Sites on placeholder salts get the write veto but not the salt binding: `wp_salt()` stores its own salt in `wp_options`, where whoever can write the credential can read it.
 - The connection package requires PHP 7.4, so the plugin does too.
-- `tests/e2e/` plants tokens instead of logging in; the login redirect and WordPress.com's side of registration are not exercised.
+- `tests/e2e/` plants tokens instead of logging in; it checks the authorize URL the screen sends the user to, but not WordPress.com's side of registration or authorization.
 
 ## Security
 
