@@ -103,9 +103,7 @@ class Connect_Page {
 	}
 
 	/**
-	 * Starts the connection: registers the site if needed, then sends the
-	 * user to WordPress.com to log in. The package's webhook brings them
-	 * back to this screen.
+	 * Starts the connection.
 	 */
 	public function handle_connect() {
 		$this->authorize( self::CONNECT_ACTION );
@@ -114,8 +112,8 @@ class Connect_Page {
 	}
 
 	/**
-	 * Registers the site if needed and sends the user to WordPress.com to
-	 * authorize, or back to the screen with the registration error code.
+	 * Registers the site if needed and sends the user to WordPress.com, or
+	 * back here with the registration error code.
 	 */
 	private function send_to_wordpress_com() {
 		$authorization_url = Connection::authorization_url( self::page_url() );
@@ -130,28 +128,20 @@ class Connect_Page {
 	}
 
 	/**
-	 * Answers the URL Calypso re-enters the flow through when an authorization
-	 * attempt fails or its secret has expired.
-	 *
-	 * Calypso hardcodes admin.php?page=jetpack&connect_url_redirect=true for
-	 * this. The connection package answers it on load-toplevel_page_jetpack,
-	 * which only fires on a site with a Jetpack top-level menu; this plugin
-	 * adds none, so WordPress would refuse the page. Hooked where that refusal
-	 * happens, so on a site where Jetpack or another Jetpack plugin has the
-	 * page, theirs answers and this never runs. Same outcome as the package's
-	 * handler: a fresh authorize URL, or the screen when there is nothing
-	 * left to authorize. No nonce is possible on a URL Calypso builds; an
-	 * administrator's session is the check, as it is for the package.
+	 * Answers admin.php?page=jetpack&connect_url_redirect=true, the URL
+	 * WordPress.com retries a failed authorization through. This plugin has
+	 * no page with that slug, so it is handled where WordPress would refuse
+	 * it; a site with a real Jetpack page keeps its own handler.
 	 */
 	public function handle_calypso_retry() {
-		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Calypso builds this URL; see above.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- WordPress.com builds this URL; no nonce possible.
 		if ( ! isset( $_GET['page'], $_GET['connect_url_redirect'] ) || 'jetpack' !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
 			return;
 		}
 		// phpcs:enable
 
 		if ( is_multisite() || ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			return; // WordPress refuses the page as it would have.
+			return;
 		}
 
 		if ( Connection::is_user_connected() ) {
