@@ -6,6 +6,7 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\REST_Controller;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -25,6 +26,8 @@ if ( ! file_exists( $wpcom_migration_reprint_autoloader ) ) {
 require_once $wpcom_migration_reprint_autoloader;
 
 Exporter::maybe_init();
+
+add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) );
 
 // Credentials never survive an activation boundary: whatever was written
 // while the write veto was not in place is discarded.
