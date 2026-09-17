@@ -104,7 +104,9 @@ class Connect_Page {
 	 * Answers admin.php?page=jetpack&connect_url_redirect=true, the URL
 	 * WordPress.com retries a failed authorization through. This plugin has
 	 * no page with that slug, so it is handled where WordPress would refuse
-	 * it; a site with a real Jetpack page keeps its own handler.
+	 * it; a site with a real Jetpack page keeps its own handler. Only a
+	 * registered site with no user token goes back to WordPress.com; any
+	 * other state lands on the screen.
 	 */
 	public function handle_calypso_retry() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- WordPress.com builds this URL; no nonce possible.
@@ -117,7 +119,9 @@ class Connect_Page {
 			return;
 		}
 
-		if ( Connection::is_user_connected() ) {
+		// An unregistered site has no authorization to retry, and sending it
+		// on would register it on an unnonced GET.
+		if ( ! Connection::is_site_connected() || Connection::is_user_connected() ) {
 			wp_safe_redirect( self::page_url() );
 			exit;
 		}

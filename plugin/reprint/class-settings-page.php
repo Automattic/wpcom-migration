@@ -1,6 +1,7 @@
 <?php
 /**
- * Admin screen for the Reprint exporter: shared secret and export window.
+ * Admin screen for the Reprint exporter: shared secret, export window, and
+ * the WordPress.com connection section.
  *
  * Modeled on reprint-server-wp's SettingsPage.
  *
@@ -10,7 +11,8 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 /**
- * Renders wp-admin/admin.php?page=wpcom-migration-status and handles its forms.
+ * Renders wp-admin/admin.php?page=wpcom-migration-status, handles its forms,
+ * and hosts the WordPress.com connection section.
  *
  * Both forms post to admin-post.php rather than options.php: the Settings API
  * writes the option itself, and Exporter's write veto would discard it.

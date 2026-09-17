@@ -2,11 +2,9 @@
 /**
  * REST routes WordPress.com calls to provision the exporter.
  *
- * WordPress.com holds an application password an administrator approved on
- * core's authorize-application screen, installs the plugin through
- * wp/v2/plugins, then calls these two routes with basic auth. Core's own
- * authentication decides who the caller is; this class only checks that it
- * is an administrator.
+ * Two ways in: core's own authentication (an application password, or a
+ * cookie with a valid REST nonce) or a Jetpack user token. Either way the
+ * caller must be an administrator. A user set by anything else is refused.
  *
  * @package wpcom-migration
  */

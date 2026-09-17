@@ -1,6 +1,7 @@
 <?php
 /**
- * Loads the WordPress.com connection: package setup, REST routes, screen.
+ * Sets up the connection package and attaches the WordPress.com connection
+ * section to the Reprint migration screen.
  *
  * @package wpcom-migration
  */

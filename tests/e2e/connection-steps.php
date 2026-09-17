@@ -108,6 +108,26 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'calypso-retry-unregistered':
+			// Nothing to retry on a site never registered; the retry must not
+			// register it either.
+			if ( Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': expected the site not to be registered." );
+			}
+			wpcom_migration_e2e_calypso_retry(); // Redirects and exits.
+			break;
+
+		case 'assert-calypso-retry-unregistered':
+			$location = (string) get_option( 'wpcom_migration_e2e_last_redirect' );
+			if ( Settings_Page::page_url() !== $location ) {
+				throw new RuntimeException( "Step '$step': expected a redirect to the screen, got: " . var_export( $location, true ) );
+			}
+			if ( null !== Connection::blog_id() || Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': the retry must not register the site." );
+			}
+			delete_option( 'wpcom_migration_e2e_last_redirect' );
+			break;
+
 		case 'calypso-retry-without-user-token':
 			// Calypso re-enters the flow through a URL it hardcodes
 			// (admin.php?page=jetpack&connect_url_redirect=true) when an
@@ -161,6 +181,27 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'rest-rotate-secret-cookie-nonce':
+			// A logged-in administrator with a valid REST nonce: core's
+			// cookie lane.
+			wp_set_current_user( 1 );
+			$_REQUEST['_wpnonce'] = wp_create_nonce( 'wp_rest' );
+			$response             = rest_do_request( new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/rotate-export-secret' ) );
+			unset( $_REQUEST['_wpnonce'] );
+			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
+			if ( ! get_option( Exporter::SECRET_OPTION ) ) {
+				throw new RuntimeException( "Step '$step': a cookie-and-nonce rotation should store a secret." );
+			}
+			break;
+
+		case 'rest-rotate-secret-cookie-bad-nonce':
+			wp_set_current_user( 1 );
+			$_REQUEST['_wpnonce'] = 'not-a-nonce';
+			$response             = rest_do_request( new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/rotate-export-secret' ) );
+			unset( $_REQUEST['_wpnonce'] );
+			wpcom_migration_e2e_expect_rest_status( $response, 403, $step );
+			break;
+
 		case 'rest-rotate-secret-user-token':
 			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_USER_TOKEN, 1 );
 			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
@@ -203,11 +244,14 @@ function wpcom_migration_e2e_connection_step( $step ) {
 
 		case 'rest-rotate-secret-blog-token':
 			// A blog token sets no user, so WordPress answers 401, not 403.
-			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_BLOG_TOKEN, 0 );
-			wpcom_migration_e2e_expect_rest_status( $response, 401, $step );
 			$secret_before = get_option( Exporter::SECRET_OPTION );
 			if ( ! $secret_before ) {
 				throw new RuntimeException( "Step '$step': the earlier user-token rotation should have left a secret." );
+			}
+			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_BLOG_TOKEN, 0 );
+			wpcom_migration_e2e_expect_rest_status( $response, 401, $step );
+			if ( get_option( Exporter::SECRET_OPTION ) !== $secret_before ) {
+				throw new RuntimeException( "Step '$step': a refused request must not rotate the secret." );
 			}
 			break;
 
