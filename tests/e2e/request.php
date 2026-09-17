@@ -158,7 +158,22 @@ switch ( $wpcom_migration_scenario ) {
 		break;
 
 	case 'connection':
-		// Task 5 adds the HTTP checks for this scenario.
+		// Over HTTP, unsigned: the routes exist and refuse.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+			if ( ! isset( $json['routes'][ $route ] ) ) {
+				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
+			}
+		}
+
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret', array(), 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 401 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
+
+		// The window the REST route opened serves a real export.
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
 		break;
 
 	default:
