@@ -382,7 +382,7 @@ class Exporter {
 			if ( ! $window_open ) {
 				return;
 			}
-			$this->error( 503, 'Export not configured. Save a shared secret on the Migrate to WordPress.com Migration status screen.' );
+			$this->error( 503, 'Export not configured. Save a shared secret on the Migrate to WordPress.com Reprint migration screen.' );
 			return;
 		}
 

@@ -5,7 +5,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Migration status screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `rector.php` — Rector's own downgrade set, applied at build time to a copy of `vendor/` and `reprint/` so the ZIP runs on PHP 7.1 (`Requires PHP: 7.1`).
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
@@ -24,7 +24,7 @@ The build runs `composer install` in `plugin/`, copies the tree to a staging dir
 
 To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter is absent. That un-downgraded `plugin/vendor/` needs PHP 7.2 or newer; only the built ZIP runs on 7.1.
 
-## The migration status screen
+## The Reprint migration screen
 
 `wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options`; single-site only). A table shows the export secret and the exporter window, with one line of advice: a site WordPress.com provisioned reads "nothing to do here", a fresh one reads "start on WordPress.com, or set up by hand". Under *Set up by hand*: the secret form, the enable toggle and the export URL. The window stays open for an hour after the last export request. Activating or deactivating the plugin discards the stored secret and window.
 

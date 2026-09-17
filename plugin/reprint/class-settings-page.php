@@ -116,8 +116,8 @@ class Settings_Page {
 	public function add_admin_menu() {
 		$this->page_hook = add_submenu_page(
 			self::PARENT_SLUG,
-			__( 'Migration status', 'wpcom-migration' ),
-			__( 'Migration status', 'wpcom-migration' ),
+			__( 'Reprint migration', 'wpcom-migration' ),
+			__( 'Reprint migration', 'wpcom-migration' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -232,7 +232,7 @@ class Settings_Page {
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Migration status', 'wpcom-migration' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Reprint migration', 'wpcom-migration' ) . '</h1>';
 
 		if ( is_multisite() ) {
 			$this->render_notice( 'warning', esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
