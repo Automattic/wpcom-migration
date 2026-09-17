@@ -45,7 +45,7 @@ Both routes require an authenticated user with the `administrator` role; how the
 
 ```sh
 composer lint                     # PHPCS, WordPress Coding Standards
-composer lint:php:compat          # PHPCompatibility, testVersion 7.1-
+composer lint:php:compat          # PHPCompatibility, testVersion 7.4-
 composer test:e2e                 # Playground e2e against build/wpcom-migration
 ```
 
