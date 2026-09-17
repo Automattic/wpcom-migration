@@ -88,6 +88,14 @@ class Settings_Page {
 	private $page_hook = false;
 
 	/**
+	 * The WordPress.com connection section, when the connection bootstrap
+	 * has loaded.
+	 *
+	 * @var \Automattic\WPCOM_Migration\Connect_Page|null
+	 */
+	private $connection_section = null;
+
+	/**
 	 * Registers the screen, its form handlers and its script.
 	 *
 	 * @param string $plugin_file Absolute path of the plugin's main file.
@@ -108,6 +116,15 @@ class Settings_Page {
 	 */
 	public static function page_url() {
 		return admin_url( 'admin.php?page=' . self::PAGE_SLUG );
+	}
+
+	/**
+	 * Attaches the WordPress.com connection section.
+	 *
+	 * @param \Automattic\WPCOM_Migration\Connect_Page $section The section.
+	 */
+	public function set_connection_section( \Automattic\WPCOM_Migration\Connect_Page $section ) {
+		$this->connection_section = $section;
 	}
 
 	/**
@@ -240,11 +257,21 @@ class Settings_Page {
 			return;
 		}
 
-		$state = Exporter::get_state();
+		$state          = Exporter::get_state();
+		$user_connected = null !== $this->connection_section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 
 		$this->render_result_notice();
-		$this->render_status_table( $state );
-		echo '<p class="wpcom-migration-guidance">' . esc_html( self::guidance( $state ) ) . '</p>';
+		if ( null !== $this->connection_section ) {
+			$this->connection_section->render_result_notice();
+		}
+		$this->render_status_table( $state, $user_connected );
+		echo '<p class="wpcom-migration-guidance">' . esc_html( self::guidance( $state, $user_connected ) ) . '</p>';
+
+		if ( null !== $this->connection_section ) {
+			echo '<h2>' . esc_html__( 'WordPress.com connection', 'wpcom-migration' ) . '</h2>';
+			$this->connection_section->render_section();
+		}
+
 		echo '<details class="wpcom-migration-manual">';
 		echo '<summary><strong>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</strong></summary>';
 		$this->render_status_notice( $state );
@@ -260,11 +287,13 @@ class Settings_Page {
 	}
 
 	/**
-	 * The two facts, one row each.
+	 * The facts, one row each: secret, exporter, and the connection when a
+	 * section is attached.
 	 *
-	 * @param array $state Exporter::get_state().
+	 * @param array $state          Exporter::get_state().
+	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
 	 */
-	private function render_status_table( array $state ) {
+	private function render_status_table( array $state, $user_connected = false ) {
 		if ( ! $state['has_secret'] ) {
 			$secret_status = __( 'Not set', 'wpcom-migration' );
 		} elseif ( ! $state['secret_valid'] ) {
@@ -289,6 +318,24 @@ class Settings_Page {
 			array( __( 'Exporter', 'wpcom-migration' ), $exporter_status ),
 		);
 
+		if ( null !== $this->connection_section ) {
+			if ( ! $user_connected ) {
+				$connection_status = __( 'Not connected', 'wpcom-migration' );
+			} else {
+				$user_data = \Automattic\WPCOM_Migration\Connection::connected_wpcom_user();
+				if ( is_array( $user_data ) && ! empty( $user_data['login'] ) ) {
+					$connection_status = sprintf(
+						/* translators: %s: WordPress.com user login. */
+						__( 'Connected as %s', 'wpcom-migration' ),
+						$user_data['login']
+					);
+				} else {
+					$connection_status = __( 'Connected', 'wpcom-migration' );
+				}
+			}
+			$rows[] = array( __( 'WordPress.com connection', 'wpcom-migration' ), $connection_status );
+		}
+
 		echo '<table class="widefat striped wpcom-migration-status" style="max-width:40em"><tbody>';
 		foreach ( $rows as $row ) {
 			echo '<tr><th scope="row">' . esc_html( $row[0] ) . '</th><td>' . esc_html( $row[1] ) . '</td></tr>';
@@ -297,14 +344,27 @@ class Settings_Page {
 	}
 
 	/**
-	 * One sentence that fits the combination of the two facts.
+	 * One sentence that fits the combination of the facts.
 	 *
-	 * @param array $state Exporter::get_state().
+	 * @param array $state          Exporter::get_state().
+	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
 	 * @return string
 	 */
-	public static function guidance( array $state ) {
+	public static function guidance( array $state, $user_connected = false ) {
 		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
 			return __( 'The export secret no longer matches this site. Start the migration again on WordPress.com, or save a new secret by hand below.', 'wpcom-migration' );
+		}
+
+		$secret_ready = $state['has_secret'] && $state['secret_valid'];
+
+		if ( $user_connected ) {
+			if ( $secret_ready && $state['window_open'] ) {
+				return __( 'Connected and ready. The migration runs from WordPress.com.', 'wpcom-migration' );
+			}
+			if ( $secret_ready ) {
+				return __( 'Connected. The exporter is turned off; WordPress.com turns it on when the migration starts.', 'wpcom-migration' );
+			}
+			return __( 'Connected. WordPress.com installs the export secret when the migration starts.', 'wpcom-migration' );
 		}
 
 		if ( $state['has_secret'] && $state['window_open'] ) {

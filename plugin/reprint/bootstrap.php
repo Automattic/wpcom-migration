@@ -34,8 +34,22 @@ add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) )
 register_activation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 
+/**
+ * Holds the screen so the connection bootstrap can attach its section.
+ *
+ * @param Settings_Page|null $page The screen, when setting it.
+ * @return Settings_Page|null
+ */
+function wpcom_migration_settings_page( ?Settings_Page $page = null ) {
+	static $stored = null;
+	if ( null !== $page ) {
+		$stored = $page;
+	}
+	return $stored;
+}
+
 if ( is_admin() ) {
-	new Settings_Page( $wpcom_migration_plugin_file );
+	wpcom_migration_settings_page( new Settings_Page( $wpcom_migration_plugin_file ) );
 }
 
 unset( $wpcom_migration_plugin_file, $wpcom_migration_reprint_autoloader );

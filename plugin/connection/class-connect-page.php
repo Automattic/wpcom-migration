@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin screen for the WordPress.com connection.
+ * The WordPress.com connection section of the Reprint migration screen.
  *
  * Modeled on Reprint\Settings_Page: admin-post handlers, nonces, and notices
  * carried back through query arguments.
@@ -11,23 +11,12 @@
 namespace Automattic\WPCOM_Migration;
 
 /**
- * Renders wp-admin/admin.php?page=wpcom-migration-connect and handles its forms.
+ * WordPress.com connection section of the Reprint migration screen.
+ *
+ * Renders the login button or the connected state and handles the connect
+ * and disconnect forms; the screen it sits on is Reprint\Settings_Page.
  */
 class Connect_Page {
-
-	/**
-	 * Page slug; the screen lives at admin.php?page=<slug>.
-	 *
-	 * @var string
-	 */
-	const PAGE_SLUG = 'wpcom-migration-connect';
-
-	/**
-	 * The BlogVault top-level menu slug this screen hangs under.
-	 *
-	 * @var string
-	 */
-	const PARENT_SLUG = 'wpcom-migration';
 
 	/**
 	 * The admin-post action that starts the connection.
@@ -65,41 +54,25 @@ class Connect_Page {
 	private $plugin_file;
 
 	/**
-	 * Registers the screen and its form handlers.
+	 * Registers the form handlers.
 	 *
 	 * @param string $plugin_file Absolute path of the plugin's main file.
 	 */
 	public function __construct( $plugin_file ) {
 		$this->plugin_file = $plugin_file;
 
-		add_action( 'admin_menu', array( $this, 'add_admin_menu' ), 20 );
 		add_action( 'admin_post_' . self::CONNECT_ACTION, array( $this, 'handle_connect' ) );
 		add_action( 'admin_post_' . self::DISCONNECT_ACTION, array( $this, 'handle_disconnect' ) );
 		add_action( 'admin_page_access_denied', array( $this, 'handle_calypso_retry' ) );
 	}
 
 	/**
-	 * The screen's URL.
+	 * The URL of the screen the section sits on.
 	 *
 	 * @return string
 	 */
 	public static function page_url() {
-		return admin_url( 'admin.php?page=' . self::PAGE_SLUG );
-	}
-
-	/**
-	 * Adds the submenu entry under the BlogVault page. Priority 20 so the
-	 * parent, added at the default 10, exists first.
-	 */
-	public function add_admin_menu() {
-		add_submenu_page(
-			self::PARENT_SLUG,
-			__( 'WordPress.com account', 'wpcom-migration' ),
-			__( 'WordPress.com account', 'wpcom-migration' ),
-			'manage_options',
-			self::PAGE_SLUG,
-			array( $this, 'render_page' )
-		);
+		return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
 	}
 
 	/**
@@ -202,31 +175,14 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the screen.
+	 * Renders the section: the connected state, or the login form.
 	 */
-	public function render_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			return;
-		}
-
-		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'WordPress.com account', 'wpcom-migration' ) . '</h1>';
-
-		if ( is_multisite() ) {
-			$this->render_notice( 'warning', esc_html__( 'The WordPress.com connection is not supported on networks.', 'wpcom-migration' ) );
-			echo '</div>';
-			return;
-		}
-
-		$this->render_result_notice();
-
+	public function render_section() {
 		if ( Connection::is_user_connected() ) {
 			$this->render_connected();
 		} else {
 			$this->render_connect_form();
 		}
-
-		echo '</div>';
 	}
 
 	/**
@@ -318,7 +274,7 @@ class Connect_Page {
 	 * Renders the notice for the result of the last form post, if any. A
 	 * failure shows its error code, never the raw message.
 	 */
-	private function render_result_notice() {
+	public function render_result_notice() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Fixed values select a read-only notice.
 		$result = sanitize_key( wp_unslash( $_GET[ self::NOTICE_QUERY_ARG ] ?? '' ) );
 		$code   = sanitize_key( wp_unslash( $_GET[ self::CODE_QUERY_ARG ] ?? '' ) );

@@ -38,7 +38,10 @@ Connection::init();
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Connection::class, 'disconnect' ) );
 
 if ( is_admin() ) {
-	new Connect_Page( $wpcom_migration_plugin_file );
+	$wpcom_migration_settings_page = wpcom_migration_settings_page();
+	if ( null !== $wpcom_migration_settings_page ) {
+		$wpcom_migration_settings_page->set_connection_section( new Connect_Page( $wpcom_migration_plugin_file ) );
+	}
 }
 
-unset( $wpcom_migration_plugin_file, $wpcom_migration_connection_autoloader );
+unset( $wpcom_migration_plugin_file, $wpcom_migration_connection_autoloader, $wpcom_migration_settings_page );

@@ -15,6 +15,7 @@ use Automattic\Jetpack\Connection\Rest_Authentication;
 use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 // WordPress's fatal handler would swallow the message into a generic error
 // page; print it where run.sh shows the log instead.
@@ -54,6 +55,24 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			if ( null !== Connection::blog_id() || null !== Connection::connected_wpcom_user() ) {
 				throw new RuntimeException( 'A fresh site must have no blog ID or user data.' );
+			}
+			break;
+
+		case 'assert-single-menu-entry':
+			require_once ABSPATH . 'wp-admin/includes/plugin.php';
+			$plugin_file = WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php';
+			$page        = new Settings_Page( $plugin_file );
+			$page->set_connection_section( new Connect_Page( $plugin_file ) );
+			do_action( 'admin_menu' );
+			$entries = isset( $GLOBALS['submenu']['wpcom-migration'] ) ? $GLOBALS['submenu']['wpcom-migration'] : array();
+			$slugs   = array_map(
+				function ( $entry ) {
+					return $entry[2];
+				},
+				$entries
+			);
+			if ( 1 !== count( array_keys( $slugs, Settings_Page::PAGE_SLUG, true ) ) || in_array( 'wpcom-migration-connect', $slugs, true ) ) {
+				throw new RuntimeException( "Step '$step': expected one Reprint migration entry and no account entry, got: " . wp_json_encode( $slugs ) );
 			}
 			break;
 
@@ -174,6 +193,14 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'render-connected-and-enabled':
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Enabled until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connected and ready', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
+			break;
+
 		case 'rest-rotate-secret-blog-token':
 			// A blog token sets no user, so WordPress answers 401, not 403.
 			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_BLOG_TOKEN, 0 );
@@ -198,6 +225,10 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com connection', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Not connected', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Reprint migration', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'WordPress.com account</h1>', $step );
 			break;
 
 		case 'connect-registration-fails':
@@ -279,6 +310,11 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'https://wordpress.com/setup/site-migration?from=' . rawurlencode( home_url() ), $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
+			// Once in the status table, once as the section heading.
+			if ( substr_count( $html, 'Connected as e2e-tester' ) < 2 ) {
+				throw new RuntimeException( "Step '$step': expected 'Connected as e2e-tester' in both the table and the section: " . substr( $html, 0, 400 ) );
+			}
+			wpcom_migration_e2e_expect_contains( $html, 'installs the export secret when the migration starts', $step );
 			break;
 
 		case 'render-connected-without-user-data':
@@ -384,13 +420,18 @@ function wpcom_migration_e2e_calypso_retry() {
 }
 
 /**
- * Renders the connect screen and returns the markup.
+ * Renders the Reprint migration screen with the connection section, as the
+ * bootstraps wire it.
  *
  * @return string
  */
 function wpcom_migration_e2e_render_connect_page() {
+	$plugin_file = WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php';
+	$page        = new Settings_Page( $plugin_file );
+	$page->set_connection_section( new Connect_Page( $plugin_file ) );
+
 	ob_start();
-	( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->render_page();
+	$page->render_page();
 	return ob_get_clean();
 }
 
