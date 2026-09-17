@@ -10,7 +10,7 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 /**
- * Renders wp-admin/admin.php?page=wpcom-migration-reprint and handles its forms.
+ * Renders wp-admin/admin.php?page=wpcom-migration-status and handles its forms.
  *
  * Both forms post to admin-post.php rather than options.php: the Settings API
  * writes the option itself, and Exporter's write veto would discard it.
@@ -22,7 +22,14 @@ class Settings_Page {
 	 *
 	 * @var string
 	 */
-	const PAGE_SLUG = 'wpcom-migration-reprint';
+	const PAGE_SLUG = 'wpcom-migration-status';
+
+	/**
+	 * The BlogVault top-level menu slug this screen hangs under.
+	 *
+	 * @var string
+	 */
+	const PARENT_SLUG = 'wpcom-migration';
 
 	/**
 	 * The admin-post action that saves the secret.
@@ -88,7 +95,7 @@ class Settings_Page {
 	public function __construct( $plugin_file ) {
 		$this->plugin_file = $plugin_file;
 
-		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+		add_action( 'admin_menu', array( $this, 'add_admin_menu' ), 20 );
 		add_action( 'admin_post_' . self::SAVE_SECRET_ACTION, array( $this, 'handle_save_secret' ) );
 		add_action( 'admin_post_' . self::SAVE_ENABLED_ACTION, array( $this, 'handle_save_enabled' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
@@ -104,13 +111,13 @@ class Settings_Page {
 	}
 
 	/**
-	 * Registers the page without a menu entry.
+	 * Adds the menu entry under the plugin's menu.
 	 */
 	public function add_admin_menu() {
 		$this->page_hook = add_submenu_page(
-			'',
-			__( 'Export to WordPress.com', 'wpcom-migration' ),
-			__( 'Export to WordPress.com', 'wpcom-migration' ),
+			self::PARENT_SLUG,
+			__( 'Migration status', 'wpcom-migration' ),
+			__( 'Migration status', 'wpcom-migration' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -225,7 +232,7 @@ class Settings_Page {
 		}
 
 		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Export to WordPress.com', 'wpcom-migration' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Migration status', 'wpcom-migration' ) . '</h1>';
 
 		if ( is_multisite() ) {
 			$this->render_notice( 'warning', esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
@@ -235,9 +242,11 @@ class Settings_Page {
 
 		$state = Exporter::get_state();
 
-		echo '<p>' . esc_html__( 'Allow WordPress.com to download this site\'s database and files.', 'wpcom-migration' ) . '</p>';
-
 		$this->render_result_notice();
+		$this->render_status_table( $state );
+		echo '<p class="wpcom-migration-guidance">' . esc_html( self::guidance( $state ) ) . '</p>';
+		echo '<details class="wpcom-migration-manual">';
+		echo '<summary><strong>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</strong></summary>';
 		$this->render_status_notice( $state );
 		$this->render_secret_form( $state );
 
@@ -246,7 +255,67 @@ class Settings_Page {
 			$this->render_api_url();
 		}
 
+		echo '</details>';
 		echo '</div>';
+	}
+
+	/**
+	 * The two facts, one row each.
+	 *
+	 * @param array $state Exporter::get_state().
+	 */
+	private function render_status_table( array $state ) {
+		if ( ! $state['has_secret'] ) {
+			$secret_status = __( 'Not set', 'wpcom-migration' );
+		} elseif ( ! $state['secret_valid'] ) {
+			$secret_status = __( 'Invalid: the site\'s salts changed', 'wpcom-migration' );
+		} else {
+			$secret_status = __( 'Set', 'wpcom-migration' );
+		}
+
+		if ( $state['window_open'] ) {
+			$expires         = $state['window_expires_at'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+			$exporter_status = sprintf(
+				/* translators: %s: time of day. */
+				__( 'Enabled until %s', 'wpcom-migration' ),
+				date_i18n( get_option( 'time_format' ), $expires )
+			);
+		} else {
+			$exporter_status = __( 'Disabled', 'wpcom-migration' );
+		}
+
+		$rows = array(
+			array( __( 'Export secret', 'wpcom-migration' ), $secret_status ),
+			array( __( 'Exporter', 'wpcom-migration' ), $exporter_status ),
+		);
+
+		echo '<table class="widefat striped wpcom-migration-status" style="max-width:40em"><tbody>';
+		foreach ( $rows as $row ) {
+			echo '<tr><th scope="row">' . esc_html( $row[0] ) . '</th><td>' . esc_html( $row[1] ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+	}
+
+	/**
+	 * One sentence that fits the combination of the two facts.
+	 *
+	 * @param array $state Exporter::get_state().
+	 * @return string
+	 */
+	public static function guidance( array $state ) {
+		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
+			return __( 'The export secret no longer matches this site. Start the migration again on WordPress.com, or save a new secret by hand below.', 'wpcom-migration' );
+		}
+
+		if ( $state['has_secret'] && $state['window_open'] ) {
+			return __( 'WordPress.com has set up the exporter on this site. Nothing to do here; the migration continues from WordPress.com.', 'wpcom-migration' );
+		}
+
+		if ( $state['has_secret'] ) {
+			return __( 'The exporter is set up but turned off. WordPress.com turns it on when the migration starts; you can also enable it by hand below.', 'wpcom-migration' );
+		}
+
+		return __( 'Start the migration on WordPress.com; it sets this site up for you. Or set up the exporter by hand below.', 'wpcom-migration' );
 	}
 
 	/**

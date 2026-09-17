@@ -34,6 +34,11 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Not configured yet', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Export secret', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Exporter', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Not set', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Disabled', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Start the migration on WordPress.com', $step );
 			break;
 
 		case 'save-secret-empty':
@@ -62,6 +67,19 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Exporter disabled', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
 			wpcom_migration_e2e_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			wpcom_migration_e2e_expect_contains( $html, '<td>Set</td>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'turned off', $step );
+			break;
+
+		case 'invalidate-secret':
+			delete_option( Exporter::SECRET_HASH_OPTION );
+			$state = Exporter::get_state();
+			if ( ! $state['has_secret'] || $state['secret_valid'] ) {
+				throw new RuntimeException( 'Deleting the hash should leave the secret set but invalid: ' . wp_json_encode( $state ) );
+			}
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'Invalid: the site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'no longer matches', $step );
 			break;
 
 		case 'enable':
@@ -76,6 +94,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'Exporter enabled until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Enabled until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Nothing to do here', $step );
 			break;
 
 		case 'disable':
@@ -88,6 +108,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			if ( $state['window_open'] ) {
 				throw new RuntimeException( 'Disabling should close the window: ' . wp_json_encode( $state ) );
 			}
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'turned off', $step );
 			break;
 
 		default:
