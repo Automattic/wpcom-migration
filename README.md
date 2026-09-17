@@ -40,7 +40,7 @@ Reprint transfers over https only, so WordPress.com first checks `authentication
 4. exports through `export_url` with Reprint's signed requests;
 5. afterwards revokes the password: `GET /wp-json/wp/v2/users/me/application-passwords/introspect` for its uuid, then `DELETE …/application-passwords/<uuid>`.
 
-Both routes require an authenticated user with the `administrator` role (a network administrator on multisite); how the user authenticated is core's business. No login on the site is needed at any point.
+Both routes require an authenticated user with the `administrator` role; how the user authenticated is core's business. On a network they refuse with 501: the exporter is single-site only. WordPress.com never holds a login on the site; the administrator logs in once to approve the application password.
 
 ## Checks
 

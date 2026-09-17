@@ -2,13 +2,14 @@
 #
 # Boots the built plugin in WordPress Playground once per credential state
 # and checks the export endpoint's answers, then once more to drive the
-# settings screen through its form handlers.
+# settings screen through its form handlers, and once more to provision
+# through the REST routes with application passwords.
 #
 # Usage: tests/e2e/run.sh <built-plugin-dir>
 #   e.g. tests/e2e/run.sh build/wpcom-migration
 #
 # Environment:
-#   E2E_PORT       Port for the Playground server (default 9400).
+#   E2E_PORT         Port for the Playground server (default 9400).
 #   PLAYGROUND_CLI   Command that runs the Playground CLI
 #                    (default: npx --yes @wp-playground/cli@3.1.54).
 #

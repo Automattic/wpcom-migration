@@ -13,6 +13,7 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
+use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Response;
 use WP_REST_Server;
@@ -83,13 +84,17 @@ class REST_Controller extends WP_REST_Controller {
 	 * for passwords a person types, and sites can filter it through
 	 * `random_password`, an extension point a credential should not have.
 	 *
-	 * @return WP_REST_Response The new secret, or a 500.
+	 * @return WP_REST_Response|WP_Error The new secret, or a 500.
 	 */
 	public function rotate_secret() {
 		$secret = bin2hex( random_bytes( 32 ) );
 
 		if ( ! Exporter::store_secret( $secret ) ) {
-			return new WP_REST_Response( array( 'error' => 'Failed to persist the new secret.' ), 500 );
+			return new WP_Error(
+				'wpcom_migration_secret_not_stored',
+				__( 'Failed to persist the new secret.', 'wpcom-migration' ),
+				array( 'status' => 500 )
+			);
 		}
 
 		Exporter::record_event( 'secret_rotated', array( 'user_id' => get_current_user_id() ) );
@@ -107,10 +112,27 @@ class REST_Controller extends WP_REST_Controller {
 	 * Opens the export window without rotating the secret, so a caller that
 	 * already has one can reopen a window that closed.
 	 *
-	 * @return WP_REST_Response The unix time the window opened at.
+	 * @return WP_REST_Response|WP_Error The unix time the window opened at.
 	 */
 	public function enable_export() {
+		$state = Exporter::get_state();
+		if ( ! $state['secret_valid'] ) {
+			return new WP_Error(
+				'wpcom_migration_no_secret',
+				__( 'Save a secret first.', 'wpcom-migration' ),
+				array( 'status' => 409 )
+			);
+		}
+
 		$enabled_at = Exporter::open_export_window();
+
+		if ( ! Exporter::is_export_window_open() ) {
+			return new WP_Error(
+				'wpcom_migration_window_not_opened',
+				__( 'Failed to open the export window.', 'wpcom-migration' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		Exporter::record_event( 'window_opened', array( 'user_id' => get_current_user_id() ) );
 
@@ -128,11 +150,8 @@ class REST_Controller extends WP_REST_Controller {
 	 *
 	 * A role check, not a capability one: this hands out a secret that
 	 * streams the whole database and file tree, and no capability says that.
-	 * `manage_options` is the closest, and plugins grant it to shop managers.
-	 * How the caller authenticated is core's business: an application
-	 * password (WordPress.com's path) or a cookie with a REST nonce.
 	 *
-	 * @return bool
+	 * @return bool|WP_Error
 	 */
 	public function permission_check() {
 		$user = wp_get_current_user();
@@ -140,10 +159,14 @@ class REST_Controller extends WP_REST_Controller {
 			return false;
 		}
 
-		// Network administrator only: a subsite administrator would leave with
-		// every other site's users, content and uploads.
+		// The exporter never serves on a network; refuse here rather than
+		// let both routes answer 200 for nothing.
 		if ( is_multisite() ) {
-			return is_super_admin( $user->ID );
+			return new WP_Error(
+				'wpcom_migration_multisite_unsupported',
+				__( 'The exporter is not supported on networks.', 'wpcom-migration' ),
+				array( 'status' => 501 )
+			);
 		}
 
 		return in_array( 'administrator', $user->roles, true );

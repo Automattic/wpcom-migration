@@ -100,9 +100,16 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_status( $response, 403 );
 		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
 
-		// An administrator rotates: a fresh 64-hex secret and the export URL.
 		$admin_headers = wpcom_migration_e2e_basic_auth_headers( 'admin', WPCOM_MIGRATION_E2E_ADMIN_APP_PASSWORD );
-		$response      = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
+
+		// No secret stored yet: enable refuses rather than open a window
+		// nothing can ever answer.
+		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 409 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_secret' );
+
+		// An administrator rotates: a fresh 64-hex secret and the export URL.
+		$response = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
 		if ( ! isset( $json['secret'] ) || ! preg_match( '/^[0-9a-f]{64}$/', $json['secret'] ) ) {
@@ -131,6 +138,22 @@ switch ( $wpcom_migration_scenario ) {
 
 		// The secret WordPress.com received serves a real export.
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $rotated_secret );
+
+		// Rotating again retires the old secret: a request signed with it is
+		// refused, while the new one still opens the window.
+		$response = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		if ( ! isset( $json['secret'] ) || ! preg_match( '/^[0-9a-f]{64}$/', $json['secret'] ) ) {
+			wpcom_migration_e2e_fail( 'Second rotate did not return a 64-hex secret: ' . $response['body'] );
+		}
+		$new_secret = $json['secret'];
+
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret ) );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403 );
+
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $new_secret );
 		break;
 
 	default:
