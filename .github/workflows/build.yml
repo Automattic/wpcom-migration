@@ -18,7 +18,7 @@ jobs:
     name: Build ZIP
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -28,7 +28,7 @@ jobs:
         run: composer install --no-interaction --no-progress
       - name: Build
         run: bin/build.sh
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wpcom-migration
           path: build/wpcom-migration.zip
@@ -47,7 +47,7 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           coverage: none
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wpcom-migration
       - name: Unzip
@@ -64,7 +64,7 @@ jobs:
     name: PHPCS
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -72,25 +72,26 @@ jobs:
           coverage: none
       - run: composer install --no-interaction --no-progress
       - run: composer lint
+      - run: composer lint:php:compat
 
-  smoke:
-    name: Playground smoke test
+  e2e:
+    name: Playground e2e
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           coverage: none
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: wpcom-migration
           path: build
       - name: Unzip the artifact
         run: unzip -q build/wpcom-migration.zip -d build
-      - name: Run the smoke test against the ZIP contents
-        run: tests/smoke/run.sh build/wpcom-migration
+      - name: Run the e2e scenarios against the ZIP contents
+        run: tests/e2e/run.sh build/wpcom-migration

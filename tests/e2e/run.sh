@@ -2,29 +2,30 @@
 #
 # Boots the built plugin in WordPress Playground once per credential state
 # and checks the export endpoint's answers, then once more to drive the
-# settings screen through its form handlers.
+# settings screen through its form handlers, and once more to provision
+# through the REST routes with application passwords.
 #
-# Usage: tests/smoke/run.sh <built-plugin-dir>
-#   e.g. tests/smoke/run.sh build/wpcom-migration
+# Usage: tests/e2e/run.sh <built-plugin-dir>
+#   e.g. tests/e2e/run.sh build/wpcom-migration
 #
 # Environment:
-#   SMOKE_PORT       Port for the Playground server (default 9400).
+#   E2E_PORT         Port for the Playground server (default 9400).
 #   PLAYGROUND_CLI   Command that runs the Playground CLI
 #                    (default: npx --yes @wp-playground/cli@3.1.54).
 #
 set -euo pipefail
 
 if [ $# -ne 1 ]; then
-    echo "Usage: tests/smoke/run.sh <built-plugin-dir>" >&2
+    echo "Usage: tests/e2e/run.sh <built-plugin-dir>" >&2
     exit 1
 fi
 
 PLUGIN_DIR="$(cd "$1" && pwd)"
-SMOKE_DIR="$(cd "$(dirname "$0")" && pwd)"
-PORT="${SMOKE_PORT:-9400}"
+E2E_DIR="$(cd "$(dirname "$0")" && pwd)"
+PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
-SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted screen)
+SCENARIOS=(open closed secret-hash-deleted enabled-hash-deleted screen provisioning)
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -90,9 +91,9 @@ for scenario in "${SCENARIOS[@]}"; do
     # shellcheck disable=SC2086 # PLAYGROUND_CLI is a command line, split on purpose.
     $PLAYGROUND_CLI server \
         --port="$PORT" \
-        --blueprint="$SMOKE_DIR/blueprint-$scenario.json" \
+        --blueprint="$E2E_DIR/blueprint-$scenario.json" \
         --mount="$PLUGIN_DIR:/wordpress/wp-content/plugins/wpcom-migration" \
-        --mount="$SMOKE_DIR:/wordpress/wp-content/wpcom-migration-smoke" \
+        --mount="$E2E_DIR:/wordpress/wp-content/wpcom-migration-e2e" \
         >"$server_log" 2>&1 &
     server_pid=$!
 
@@ -114,7 +115,7 @@ for scenario in "${SCENARIOS[@]}"; do
         exit 1
     fi
 
-    if ! php "$SMOKE_DIR/request.php" "$BASE_URL" "$PLUGIN_DIR" "$scenario"; then
+    if ! php "$E2E_DIR/request.php" "$BASE_URL" "$PLUGIN_DIR" "$scenario"; then
         echo "Playground log for '$scenario':" >&2
         cat "$server_log" >&2
         exit 1
@@ -124,4 +125,4 @@ for scenario in "${SCENARIOS[@]}"; do
     wait_for_port_free
 done
 
-echo "Smoke test passed."
+echo "E2E passed."
