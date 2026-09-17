@@ -25,7 +25,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		throw new RuntimeException( 'User 1 cannot manage_options.' );
 	}
 
-	$page   = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
+	$page = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
+	$page->set_connection_section( new \Automattic\WPCOM_Migration\Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) );
 	$secret = 'smoke-secret-0123456789abcdef0123456789abcdef';
 
 	switch ( $step ) {
@@ -39,6 +40,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Not set', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Disabled', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Start the migration on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com connection', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Not connected', $step );
 			break;
 
 		case 'save-secret-empty':
@@ -96,6 +99,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Exporter enabled until', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Enabled until', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			break;
 
 		case 'disable':

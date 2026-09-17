@@ -2,17 +2,16 @@
 /**
  * REST routes WordPress.com calls to provision the exporter.
  *
- * WordPress.com holds an application password an administrator approved on
- * core's authorize-application screen, installs the plugin through
- * wp/v2/plugins, then calls these two routes with basic auth. Core's own
- * authentication decides who the caller is; this class only checks that it
- * is an administrator.
+ * Two ways in: core's own authentication (an application password, or a
+ * cookie with a valid REST nonce) or a Jetpack user token. Either way the
+ * caller must be an administrator. A user set by anything else is refused.
  *
  * @package wpcom-migration
  */
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
+use Automattic\Jetpack\Connection\Rest_Authentication;
 use WP_Error;
 use WP_REST_Controller;
 use WP_REST_Response;
@@ -146,7 +145,7 @@ class REST_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * An authenticated site administrator.
+	 * An administrator, authenticated by a Jetpack user token or by core.
 	 *
 	 * A role check, not a capability one: this hands out a secret that
 	 * streams the whole database and file tree, and no capability says that.
@@ -169,6 +168,43 @@ class REST_Controller extends WP_REST_Controller {
 			);
 		}
 
+		// Two ways in, neither weaker than the other: a Jetpack user token
+		// (WordPress.com calling a connected site) or core's own
+		// authentication (an application password, or a cookie with a valid
+		// REST nonce). A user set by anything else — a plugin forcing a
+		// login on every request, say — is refused.
+		if ( ! Rest_Authentication::is_signed_with_user_token() && ! self::is_wordpress_authenticated() ) {
+			return false;
+		}
+
 		return in_array( 'administrator', $user->roles, true );
+	}
+
+	/**
+	 * Whether core, not Jetpack, authenticated the current user: an
+	 * application password validated on this request, or the REST cookie
+	 * nonce, checked the way core's rest_cookie_check_errors() checks it.
+	 *
+	 * @return bool
+	 */
+	private static function is_wordpress_authenticated() {
+		if ( Rest_Authentication::is_signed_with_user_token() || Rest_Authentication::is_signed_with_blog_token() ) {
+			return false;
+		}
+
+		if ( null !== rest_get_authenticated_app_password() ) {
+			return true;
+		}
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- This is the nonce check.
+		$nonce = null;
+		if ( isset( $_REQUEST['_wpnonce'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( $_REQUEST['_wpnonce'] ) );
+		} elseif ( isset( $_SERVER['HTTP_X_WP_NONCE'] ) ) {
+			$nonce = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_WP_NONCE'] ) );
+		}
+		// phpcs:enable
+
+		return null !== $nonce && false !== wp_verify_nonce( $nonce, 'wp_rest' );
 	}
 }
