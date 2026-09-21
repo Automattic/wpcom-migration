@@ -100,6 +100,10 @@
 		},
 		{
 			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'render-broken-connected' );"
+		},
+		{
+			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'rest-rotate-secret-blog-token' );"
 		},
 		{

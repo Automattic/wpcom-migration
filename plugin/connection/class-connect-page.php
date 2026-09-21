@@ -13,8 +13,9 @@ namespace Automattic\WPCOM_Migration;
 /**
  * WordPress.com connection section of the Reprint migration screen.
  *
- * Renders the login button or the connected state and handles the connect
- * and disconnect forms; the screen it sits on is Reprint\Settings_Page.
+ * Handles the connect and disconnect forms and supplies the login button, the
+ * WordPress.com link and the disconnect link that Reprint\Settings_Page
+ * places.
  */
 class Connect_Page {
 
@@ -179,25 +180,20 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the section: the connected state, or the login form.
+	 * Renders the login form: the screen's primary button, or a plain link.
+	 *
+	 * @param bool $primary Whether the submit is the primary button.
 	 */
-	public function render_section() {
-		if ( Connection::is_user_connected() ) {
-			$this->render_connected();
-		} else {
-			$this->render_connect_form();
-		}
-	}
-
-	/**
-	 * Renders the login button and what it allows.
-	 */
-	private function render_connect_form() {
+	public function render_connect_button( $primary ) {
 		?>
-		<p><?php esc_html_e( 'Log in with your WordPress.com account to let WordPress.com read this site and migrate it. Nothing is copied until you start the migration on WordPress.com.', 'wpcom-migration' ); ?></p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
+			<p>
+				<button type="submit" name="wpcom_migration_connect_submit" class="<?php echo $primary ? 'button button-primary' : 'button-link'; ?>">
+					<?php esc_html_e( 'Log in with WordPress.com', 'wpcom-migration' ); ?>
+				</button>
+			</p>
 			<p class="description">
 				<?php
 				printf(
@@ -207,53 +203,54 @@ class Connect_Page {
 				);
 				?>
 			</p>
-			<?php submit_button( __( 'Log in with WordPress.com', 'wpcom-migration' ), 'primary', 'wpcom_migration_connect_submit' ); ?>
 		</form>
 		<?php
 	}
 
 	/**
-	 * Renders the connected state: who, which blog, where next, and the way out.
+	 * Renders the link to WordPress.com: the screen's primary button, or a
+	 * plain link. It starts nothing on this site.
+	 *
+	 * @param bool $primary Whether it is the primary button.
 	 */
-	private function render_connected() {
-		$user_data = Connection::connected_wpcom_user();
-		$blog_id   = Connection::blog_id();
-
-		if ( is_array( $user_data ) && ! empty( $user_data['login'] ) ) {
-			$heading = sprintf(
-				/* translators: %s: WordPress.com user login. */
-				__( 'Connected as %s', 'wpcom-migration' ),
-				$user_data['login']
-			);
-		} else {
-			$heading = __( 'Connected to WordPress.com', 'wpcom-migration' );
-		}
+	public function render_continue_button( $primary ) {
 		?>
-		<h2><?php echo esc_html( $heading ); ?></h2>
-		<?php if ( null !== $blog_id ) : ?>
-			<p>
-				<?php
-				printf(
-					/* translators: %d: WordPress.com blog ID. */
-					esc_html__( 'WordPress.com blog ID: %d', 'wpcom-migration' ),
-					(int) $blog_id
-				);
-				?>
-			</p>
-		<?php endif; ?>
 		<p>
-			<a class="button button-primary" target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
+			<a<?php echo $primary ? ' class="button button-primary"' : ''; ?> target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
 				<?php esc_html_e( 'Continue on WordPress.com', 'wpcom-migration' ); ?>
 			</a>
 		</p>
-		<hr />
+		<?php
+	}
+
+	/**
+	 * Renders the disconnect form as a link, with what disconnecting does.
+	 */
+	public function render_disconnect_link() {
+		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
-			<p class="description"><?php esc_html_e( 'Disconnecting removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?></p>
-			<?php submit_button( __( 'Disconnect', 'wpcom-migration' ), 'secondary', 'wpcom_migration_disconnect_submit' ); ?>
+			<p>
+				<button type="submit" name="wpcom_migration_disconnect_submit" class="button-link button-link-delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
+				<span class="description"><?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?></span>
+			</p>
 		</form>
 		<?php
+	}
+
+	/**
+	 * The WordPress.com login of the connected user, when the package has it.
+	 *
+	 * @return string|null
+	 */
+	public static function connected_login() {
+		$user_data = Connection::connected_wpcom_user();
+		if ( is_array( $user_data ) && ! empty( $user_data['login'] ) ) {
+			return (string) $user_data['login'];
+		}
+
+		return null;
 	}
 
 	/**

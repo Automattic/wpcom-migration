@@ -1,7 +1,7 @@
 <?php
 /**
- * Admin screen for the Reprint exporter: shared secret, export window, and
- * the WordPress.com connection section.
+ * Admin screen for the Reprint exporter: export secret, exporter, and the
+ * WordPress.com connection.
  *
  * Modeled on reprint-server-wp's SettingsPage.
  *
@@ -11,8 +11,8 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 /**
- * Renders wp-admin/admin.php?page=wpcom-migration-status, handles its forms,
- * and hosts the WordPress.com connection section.
+ * Renders wp-admin/admin.php?page=wpcom-migration-status one mode at a time,
+ * handles its forms, and places the WordPress.com connection controls.
  *
  * Both forms post to admin-post.php rather than options.php: the Settings API
  * writes the option itself, and Exporter's write veto would discard it.
@@ -41,7 +41,7 @@ class Settings_Page {
 	const SAVE_SECRET_ACTION = 'wpcom_migration_reprint_save_secret';
 
 	/**
-	 * The admin-post action that opens or closes the window.
+	 * The admin-post action that turns the exporter on or off.
 	 *
 	 * @var string
 	 */
@@ -74,6 +74,48 @@ class Settings_Page {
 	 * @var string
 	 */
 	const SCRIPT_HANDLE = 'wpcom-migration-reprint-settings';
+
+	/**
+	 * The screen is not available: the site is a network.
+	 *
+	 * @var string
+	 */
+	const MODE_BLOCKED = 'blocked';
+
+	/**
+	 * A secret is stored but no longer matches the site's salts.
+	 *
+	 * @var string
+	 */
+	const MODE_BROKEN = 'broken';
+
+	/**
+	 * The secret is valid and the exporter is on.
+	 *
+	 * @var string
+	 */
+	const MODE_READY = 'ready';
+
+	/**
+	 * The user is connected to WordPress.com; the migration has not started.
+	 *
+	 * @var string
+	 */
+	const MODE_CONNECTED_WAITING = 'connected_waiting';
+
+	/**
+	 * WordPress.com installed a secret; the exporter is off; no user connection.
+	 *
+	 * @var string
+	 */
+	const MODE_PROVISIONED_WAITING = 'provisioned_waiting';
+
+	/**
+	 * Nothing set up yet.
+	 *
+	 * @var string
+	 */
+	const MODE_NEEDS_CONNECTING = 'needs_connecting';
 
 	/**
 	 * Absolute path of the plugin's main file.
@@ -191,7 +233,7 @@ class Settings_Page {
 	}
 
 	/**
-	 * Opens or closes the export window and redirects back with a result notice.
+	 * Turns the exporter on or off and redirects back with a result notice.
 	 */
 	public function handle_save_enabled() {
 		$this->authorize( self::SAVE_ENABLED_ACTION );
@@ -243,40 +285,190 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the screen.
+	 * Renders the screen: the mode, then the by-hand section.
 	 */
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Reprint migration', 'wpcom-migration' ) . '</h1>';
-
-		if ( is_multisite() ) {
-			$this->render_notice( 'warning', esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
-			echo '</div>';
-			return;
-		}
-
 		$state          = Exporter::get_state();
 		$user_connected = null !== $this->connection_section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
+		$mode           = self::mode( $state, $user_connected );
+
+		echo '<div class="wrap">';
+		echo '<h1>' . esc_html__( 'Reprint migration', 'wpcom-migration' ) . '</h1>';
 
 		$this->render_result_notice();
 		if ( null !== $this->connection_section ) {
 			$this->connection_section->render_result_notice();
 		}
-		$this->render_status_table( $state, $user_connected );
-		echo '<p class="wpcom-migration-guidance">' . esc_html( self::guidance( $state, $user_connected ) ) . '</p>';
 
-		if ( null !== $this->connection_section ) {
-			echo '<h2>' . esc_html__( 'WordPress.com connection', 'wpcom-migration' ) . '</h2>';
-			$this->connection_section->render_section();
+		$this->render_mode( $mode, $state, $user_connected );
+
+		if ( self::MODE_BLOCKED !== $mode ) {
+			$this->render_manual( $state, $user_connected );
 		}
 
+		echo '</div>';
+	}
+
+	/**
+	 * Which mode the screen is in: the first of the MODE_* cases that fits,
+	 * checked in the order they are declared.
+	 *
+	 * @param array $state          Exporter::get_state().
+	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
+	 * @return string One of the MODE_* constants.
+	 */
+	public static function mode( array $state, $user_connected ) {
+		if ( is_multisite() ) {
+			return self::MODE_BLOCKED;
+		}
+
+		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
+			return self::MODE_BROKEN;
+		}
+
+		if ( $state['secret_valid'] && $state['window_open'] ) {
+			return self::MODE_READY;
+		}
+
+		if ( $user_connected ) {
+			return self::MODE_CONNECTED_WAITING;
+		}
+
+		if ( $state['secret_valid'] ) {
+			return self::MODE_PROVISIONED_WAITING;
+		}
+
+		return self::MODE_NEEDS_CONNECTING;
+	}
+
+	/**
+	 * Renders the mode: a heading, one sentence, at most one primary button,
+	 * and the links that fit. Connection controls render only when a
+	 * section is attached.
+	 *
+	 * @param string $mode           One of the MODE_* constants.
+	 * @param array  $state          Exporter::get_state().
+	 * @param bool   $user_connected Whether the current user is connected to WordPress.com.
+	 */
+	private function render_mode( $mode, array $state, $user_connected ) {
+		$section = $this->connection_section;
+
+		switch ( $mode ) {
+			case self::MODE_BLOCKED:
+				$this->render_heading( __( 'Not available on networks', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The exporter runs on single sites only.', 'wpcom-migration' ) );
+				return;
+
+			case self::MODE_BROKEN:
+				$this->render_heading( __( 'The export secret no longer matches this site', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The site\'s salts changed. Start the migration again on WordPress.com, or save a new secret by hand below.', 'wpcom-migration' ) );
+				if ( null !== $section && $user_connected ) {
+					$section->render_continue_button( true );
+					$section->render_disconnect_link();
+				} elseif ( null !== $section ) {
+					$section->render_connect_button( true );
+				}
+				return;
+
+			case self::MODE_READY:
+				$this->render_heading(
+					sprintf(
+						/* translators: %s: time of day. */
+						__( 'Exporter on until %s', 'wpcom-migration' ),
+						self::window_closes_at( $state )
+					)
+				);
+				$this->render_sentence( __( 'The migration runs from WordPress.com. Each export keeps the exporter on for another hour.', 'wpcom-migration' ) );
+				if ( null !== $section && $user_connected ) {
+					$section->render_continue_button( false );
+					$section->render_disconnect_link();
+				}
+				return;
+
+			case self::MODE_CONNECTED_WAITING:
+				$login = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_login() : null;
+				if ( null !== $login ) {
+					$this->render_heading(
+						sprintf(
+							/* translators: %s: WordPress.com user login. */
+							__( 'Connected as %s', 'wpcom-migration' ),
+							$login
+						)
+					);
+				} else {
+					$this->render_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ) );
+				}
+				$this->render_sentence( __( 'WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ) );
+				if ( null !== $section ) {
+					$section->render_continue_button( true );
+					$section->render_disconnect_link();
+				}
+				return;
+
+			case self::MODE_PROVISIONED_WAITING:
+				$this->render_heading( __( 'Set up by WordPress.com', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The exporter is off until the migration starts. Nothing to do here.', 'wpcom-migration' ) );
+				if ( null !== $section ) {
+					$section->render_connect_button( false );
+				}
+				return;
+
+			case self::MODE_NEEDS_CONNECTING:
+			default:
+				$this->render_heading( __( 'Connect this site to WordPress.com', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'Log in with your WordPress.com account so WordPress.com can read this site and migrate it. Nothing is copied until you start the migration there.', 'wpcom-migration' ) );
+				if ( null !== $section ) {
+					$section->render_connect_button( true );
+				}
+				return;
+		}
+	}
+
+	/**
+	 * Renders the mode heading.
+	 *
+	 * @param string $text Plain text.
+	 */
+	private function render_heading( $text ) {
+		echo '<h2 class="wpcom-migration-mode">' . esc_html( $text ) . '</h2>';
+	}
+
+	/**
+	 * Renders the mode's one sentence.
+	 *
+	 * @param string $text Plain text.
+	 */
+	private function render_sentence( $text ) {
+		echo '<p class="wpcom-migration-guidance">' . esc_html( $text ) . '</p>';
+	}
+
+	/**
+	 * The time of day the exporter turns itself off, in the site's format.
+	 *
+	 * @param array $state Exporter::get_state(), with the window open.
+	 * @return string
+	 */
+	private static function window_closes_at( array $state ) {
+		$expires = $state['window_expires_at'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
+		return date_i18n( get_option( 'time_format' ), $expires );
+	}
+
+	/**
+	 * Renders the collapsed by-hand section: the secret form; the exporter
+	 * toggle and export URL once the secret is valid; the blog ID when
+	 * connected.
+	 *
+	 * @param array $state          Exporter::get_state().
+	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
+	 */
+	private function render_manual( array $state, $user_connected ) {
 		echo '<details class="wpcom-migration-manual">';
 		echo '<summary><strong>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</strong></summary>';
-		$this->render_status_notice( $state );
+		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 		$this->render_secret_form( $state );
 
 		if ( $state['secret_valid'] ) {
@@ -284,145 +476,17 @@ class Settings_Page {
 			$this->render_api_url();
 		}
 
+		$blog_id = $user_connected ? \Automattic\WPCOM_Migration\Connection::blog_id() : null;
+		if ( null !== $blog_id ) {
+			echo '<hr />';
+			echo '<p>' . sprintf(
+				/* translators: %d: WordPress.com blog ID. */
+				esc_html__( 'WordPress.com blog ID: %d', 'wpcom-migration' ),
+				(int) $blog_id
+			) . '</p>';
+		}
+
 		echo '</details>';
-		echo '</div>';
-	}
-
-	/**
-	 * The facts, one row each: secret, exporter, and the connection when a
-	 * section is attached.
-	 *
-	 * @param array $state          Exporter::get_state().
-	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
-	 */
-	private function render_status_table( array $state, $user_connected = false ) {
-		if ( ! $state['has_secret'] ) {
-			$secret_status = __( 'Not set', 'wpcom-migration' );
-		} elseif ( ! $state['secret_valid'] ) {
-			$secret_status = __( 'Invalid: the site\'s salts changed', 'wpcom-migration' );
-		} else {
-			$secret_status = __( 'Set', 'wpcom-migration' );
-		}
-
-		if ( $state['window_open'] ) {
-			$expires         = $state['window_expires_at'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
-			$exporter_status = sprintf(
-				/* translators: %s: time of day. */
-				__( 'Enabled until %s', 'wpcom-migration' ),
-				date_i18n( get_option( 'time_format' ), $expires )
-			);
-		} else {
-			$exporter_status = __( 'Disabled', 'wpcom-migration' );
-		}
-
-		$rows = array(
-			array( __( 'Export secret', 'wpcom-migration' ), $secret_status ),
-			array( __( 'Exporter', 'wpcom-migration' ), $exporter_status ),
-		);
-
-		if ( null !== $this->connection_section ) {
-			if ( ! $user_connected ) {
-				$connection_status = __( 'Not connected', 'wpcom-migration' );
-			} else {
-				$user_data = \Automattic\WPCOM_Migration\Connection::connected_wpcom_user();
-				if ( is_array( $user_data ) && ! empty( $user_data['login'] ) ) {
-					$connection_status = sprintf(
-						/* translators: %s: WordPress.com user login. */
-						__( 'Connected as %s', 'wpcom-migration' ),
-						$user_data['login']
-					);
-				} else {
-					$connection_status = __( 'Connected', 'wpcom-migration' );
-				}
-			}
-			$rows[] = array( __( 'WordPress.com connection', 'wpcom-migration' ), $connection_status );
-		}
-
-		echo '<table class="widefat striped wpcom-migration-status" style="max-width:40em"><tbody>';
-		foreach ( $rows as $row ) {
-			echo '<tr><th scope="row">' . esc_html( $row[0] ) . '</th><td>' . esc_html( $row[1] ) . '</td></tr>';
-		}
-		echo '</tbody></table>';
-	}
-
-	/**
-	 * One sentence that fits the combination of the facts.
-	 *
-	 * @param array $state          Exporter::get_state().
-	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
-	 * @return string
-	 */
-	public static function guidance( array $state, $user_connected = false ) {
-		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
-			return __( 'The export secret no longer matches this site. Start the migration again on WordPress.com, or save a new secret by hand below.', 'wpcom-migration' );
-		}
-
-		$secret_ready = $state['has_secret'] && $state['secret_valid'];
-
-		if ( $user_connected ) {
-			if ( $secret_ready && $state['window_open'] ) {
-				return __( 'Connected and ready. The migration runs from WordPress.com.', 'wpcom-migration' );
-			}
-			if ( $secret_ready ) {
-				return __( 'Connected. The exporter is turned off; WordPress.com turns it on when the migration starts.', 'wpcom-migration' );
-			}
-			return __( 'Connected. WordPress.com installs the export secret when the migration starts.', 'wpcom-migration' );
-		}
-
-		if ( $state['has_secret'] && $state['window_open'] ) {
-			return __( 'WordPress.com has set up the exporter on this site. Nothing to do here; the migration continues from WordPress.com.', 'wpcom-migration' );
-		}
-
-		if ( $state['has_secret'] ) {
-			return __( 'The exporter is set up but turned off. WordPress.com turns it on when the migration starts; you can also enable it by hand below.', 'wpcom-migration' );
-		}
-
-		return __( 'Start the migration on WordPress.com; it sets this site up for you. Or set up the exporter by hand below.', 'wpcom-migration' );
-	}
-
-	/**
-	 * Renders the notice describing the current state.
-	 *
-	 * @param array $state Exporter::get_state().
-	 */
-	private function render_status_notice( array $state ) {
-		if ( ! $state['has_secret'] ) {
-			$this->render_notice(
-				'warning',
-				'<strong>' . esc_html__( 'Not configured yet.', 'wpcom-migration' ) . '</strong> '
-				. esc_html__( 'Enter the shared secret to get started.', 'wpcom-migration' )
-			);
-			return;
-		}
-
-		if ( ! $state['secret_valid'] ) {
-			$this->render_notice(
-				'error',
-				'<strong>' . esc_html__( 'Secret invalidated.', 'wpcom-migration' ) . '</strong> '
-				. esc_html__( 'The site\'s salts changed. Save a new secret.', 'wpcom-migration' )
-			);
-			return;
-		}
-
-		if ( $state['window_open'] ) {
-			$expires = $state['window_expires_at'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
-			$this->render_notice(
-				'info',
-				'<strong>' . sprintf(
-					/* translators: %s: time of day. */
-					esc_html__( 'Exporter enabled until %s.', 'wpcom-migration' ),
-					esc_html( date_i18n( get_option( 'time_format' ), $expires ) )
-				) . '</strong> '
-				. esc_html__( 'Each export request keeps it open for another hour.', 'wpcom-migration' )
-			);
-			return;
-		}
-
-		$this->render_notice(
-			'info',
-			'<strong>' . esc_html__( 'Exporter disabled.', 'wpcom-migration' ) . '</strong> '
-			. esc_html__( 'Enable it below to allow exports for the next hour.', 'wpcom-migration' )
-		);
 	}
 
 	/**
@@ -433,12 +497,12 @@ class Settings_Page {
 	private function render_secret_form( array $state ) {
 		$stored_secret = $state['secret_valid'] ? (string) get_option( Exporter::SECRET_OPTION, '' ) : '';
 		?>
-		<h2><?php esc_html_e( 'Shared secret', 'wpcom-migration' ); ?></h2>
+		<h2><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></h2>
 		<p><?php esc_html_e( 'Paste the secret supplied by WordPress.com.', 'wpcom-migration' ); ?></p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_SECRET_ACTION ); ?>" />
 			<?php wp_nonce_field( self::SAVE_SECRET_ACTION ); ?>
-			<label class="screen-reader-text" for="wpcom-migration-reprint-secret"><?php esc_html_e( 'Shared secret', 'wpcom-migration' ); ?></label>
+			<label class="screen-reader-text" for="wpcom-migration-reprint-secret"><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></label>
 			<input type="password"
 				class="regular-text code"
 				id="wpcom-migration-reprint-secret"
@@ -454,7 +518,7 @@ class Settings_Page {
 				data-hide-label="<?php esc_attr_e( 'Hide secret', 'wpcom-migration' ); ?>">
 				<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
 			</button>
-			<?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_secret_submit' ); ?>
+			<?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_secret_submit' ); ?>
 		</form>
 		<?php
 	}
@@ -467,7 +531,7 @@ class Settings_Page {
 	private function render_enable_form( array $state ) {
 		?>
 		<hr />
-		<h2><?php esc_html_e( 'Export window', 'wpcom-migration' ); ?></h2>
+		<h2><?php esc_html_e( 'Exporter', 'wpcom-migration' ); ?></h2>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ENABLED_ACTION ); ?>" />
 			<?php wp_nonce_field( self::SAVE_ENABLED_ACTION ); ?>
@@ -475,9 +539,9 @@ class Settings_Page {
 				<input type="checkbox"
 					name="<?php echo esc_attr( self::ENABLED_FIELD ); ?>"
 					value="1"<?php checked( $state['window_open'] ); ?> />
-				<?php esc_html_e( 'Enable the exporter', 'wpcom-migration' ); ?>
+				<?php esc_html_e( 'Turn the exporter on', 'wpcom-migration' ); ?>
 			</label>
-			<p class="description"><?php esc_html_e( 'While enabled, anyone with the shared secret can download this site\'s database and files. It turns itself off an hour after the last export request.', 'wpcom-migration' ); ?></p>
+			<p class="description"><?php esc_html_e( 'While on, anyone with the export secret can download this site\'s database and files. It turns itself off an hour after the last export.', 'wpcom-migration' ); ?></p>
 			<?php submit_button( __( 'Save', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_enabled_submit' ); ?>
 		</form>
 		<?php
@@ -489,8 +553,8 @@ class Settings_Page {
 	private function render_api_url() {
 		?>
 		<hr />
-		<h2><?php esc_html_e( 'Remote API URL', 'wpcom-migration' ); ?></h2>
-		<p><?php esc_html_e( 'Use this URL when WordPress.com asks for the remote Reprint API URL.', 'wpcom-migration' ); ?></p>
+		<h2><?php esc_html_e( 'Export URL', 'wpcom-migration' ); ?></h2>
+		<p><?php esc_html_e( 'Use this URL when WordPress.com asks for the export URL.', 'wpcom-migration' ); ?></p>
 		<input type="text"
 			class="regular-text code"
 			id="wpcom-migration-reprint-api-url"
@@ -498,7 +562,7 @@ class Settings_Page {
 			readonly />
 		<button type="button"
 			class="button wpcom-migration-reprint-copy-url"
-			data-copied-message="<?php esc_attr_e( 'Remote API URL copied.', 'wpcom-migration' ); ?>">
+			data-copied-message="<?php esc_attr_e( 'Export URL copied.', 'wpcom-migration' ); ?>">
 			<?php esc_html_e( 'Copy', 'wpcom-migration' ); ?>
 		</button>
 		<?php
@@ -514,9 +578,9 @@ class Settings_Page {
 		$notices = array(
 			'saved'           => array( 'success', __( 'Secret saved.', 'wpcom-migration' ) ),
 			'unchanged'       => array( 'success', __( 'The secret was already up to date.', 'wpcom-migration' ) ),
-			'enabled'         => array( 'success', __( 'Exporter enabled for the next hour.', 'wpcom-migration' ) ),
-			'disabled'        => array( 'success', __( 'Exporter disabled.', 'wpcom-migration' ) ),
-			'not_configured'  => array( 'error', __( 'Enter a shared secret first.', 'wpcom-migration' ) ),
+			'enabled'         => array( 'success', __( 'Exporter on for the next hour.', 'wpcom-migration' ) ),
+			'disabled'        => array( 'success', __( 'Exporter off.', 'wpcom-migration' ) ),
+			'not_configured'  => array( 'error', __( 'Enter an export secret first.', 'wpcom-migration' ) ),
 			'storage_failure' => array( 'error', __( 'The secret could not be saved.', 'wpcom-migration' ) ),
 		);
 
