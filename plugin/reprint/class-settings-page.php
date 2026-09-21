@@ -76,6 +76,48 @@ class Settings_Page {
 	const SCRIPT_HANDLE = 'wpcom-migration-reprint-settings';
 
 	/**
+	 * The screen is not available: the site is a network.
+	 *
+	 * @var string
+	 */
+	const MODE_BLOCKED = 'blocked';
+
+	/**
+	 * A secret is stored but no longer matches the site's salts.
+	 *
+	 * @var string
+	 */
+	const MODE_BROKEN = 'broken';
+
+	/**
+	 * The secret is valid and the exporter is on.
+	 *
+	 * @var string
+	 */
+	const MODE_READY = 'ready';
+
+	/**
+	 * The user is connected to WordPress.com; the migration has not started.
+	 *
+	 * @var string
+	 */
+	const MODE_CONNECTED_WAITING = 'connected_waiting';
+
+	/**
+	 * WordPress.com installed a secret; the exporter is off; no user connection.
+	 *
+	 * @var string
+	 */
+	const MODE_PROVISIONED_WAITING = 'provisioned_waiting';
+
+	/**
+	 * Nothing set up yet.
+	 *
+	 * @var string
+	 */
+	const MODE_NEEDS_CONNECTING = 'needs_connecting';
+
+	/**
 	 * Absolute path of the plugin's main file.
 	 *
 	 * @var string
@@ -343,6 +385,38 @@ class Settings_Page {
 			echo '<tr><th scope="row">' . esc_html( $row[0] ) . '</th><td>' . esc_html( $row[1] ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
+	}
+
+	/**
+	 * Which mode the screen is in: the first of the MODE_* cases that fits,
+	 * checked in the order they are declared.
+	 *
+	 * @param array $state          Exporter::get_state().
+	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
+	 * @return string One of the MODE_* constants.
+	 */
+	public static function mode( array $state, $user_connected ) {
+		if ( is_multisite() ) {
+			return self::MODE_BLOCKED;
+		}
+
+		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
+			return self::MODE_BROKEN;
+		}
+
+		if ( $state['secret_valid'] && $state['window_open'] ) {
+			return self::MODE_READY;
+		}
+
+		if ( $user_connected ) {
+			return self::MODE_CONNECTED_WAITING;
+		}
+
+		if ( $state['secret_valid'] ) {
+			return self::MODE_PROVISIONED_WAITING;
+		}
+
+		return self::MODE_NEEDS_CONNECTING;
 	}
 
 	/**

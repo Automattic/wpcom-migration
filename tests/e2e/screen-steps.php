@@ -31,6 +31,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 	switch ( $step ) {
 		case 'render-unconfigured':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'Not configured yet', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
@@ -62,6 +63,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'assert-secret-saved':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$state = Exporter::get_state();
 			if ( ! $state['secret_valid'] || $state['window_open'] ) {
 				throw new RuntimeException( 'Saving the secret should store a valid secret and leave the window closed: ' . wp_json_encode( $state ) );
@@ -80,6 +82,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			if ( ! $state['has_secret'] || $state['secret_valid'] ) {
 				throw new RuntimeException( 'Deleting the hash should leave the secret set but invalid: ' . wp_json_encode( $state ) );
 			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'Invalid: the site', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'no longer matches', $step );
@@ -91,6 +94,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'assert-enabled':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$state = Exporter::get_state();
 			if ( ! $state['window_open'] ) {
 				throw new RuntimeException( 'Enabling should open the window: ' . wp_json_encode( $state ) );
@@ -108,6 +112,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'assert-disabled':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$state = Exporter::get_state();
 			if ( $state['window_open'] ) {
 				throw new RuntimeException( 'Disabling should close the window: ' . wp_json_encode( $state ) );
@@ -180,5 +185,20 @@ function wpcom_migration_e2e_expect_contains( $html, $needle, $step ) {
 function wpcom_migration_e2e_expect_not_contains( $html, $needle, $step ) {
 	if ( false !== strpos( $html, $needle ) ) {
 		throw new RuntimeException( "Step '$step': expected not to find '$needle' in: " . substr( $html, 0, 300 ) );
+	}
+}
+
+/**
+ * Fails unless the screen's mode is the one expected.
+ *
+ * @param string $expected One of Settings_Page::MODE_*.
+ * @param string $step     Name of the step, for the error message.
+ * @throws RuntimeException When the mode differs.
+ */
+function wpcom_migration_e2e_expect_mode( $expected, $step ) {
+	$user_connected = class_exists( '\Automattic\WPCOM_Migration\Connection' ) && \Automattic\WPCOM_Migration\Connection::is_user_connected();
+	$mode           = Settings_Page::mode( Exporter::get_state(), $user_connected );
+	if ( $expected !== $mode ) {
+		throw new RuntimeException( "Step '$step': expected mode '$expected', got '$mode'." );
 	}
 }

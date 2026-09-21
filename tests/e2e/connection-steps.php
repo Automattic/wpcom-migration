@@ -235,6 +235,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected-and-enabled':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Enabled until', $step );
@@ -264,6 +265,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-not-connected':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
@@ -347,6 +349,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected':
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
 			wpcom_migration_e2e_expect_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
@@ -531,6 +534,22 @@ if ( ! function_exists( 'wpcom_migration_e2e_expect_not_contains' ) ) {
 	function wpcom_migration_e2e_expect_not_contains( $html, $needle, $step ) {
 		if ( false !== strpos( $html, $needle ) ) {
 			throw new RuntimeException( "Step '$step': expected not to find '$needle' in: " . substr( $html, 0, 400 ) );
+		}
+	}
+}
+
+if ( ! function_exists( 'wpcom_migration_e2e_expect_mode' ) ) {
+	/**
+	 * Fails unless the screen's mode is the one expected.
+	 *
+	 * @param string $expected One of Settings_Page::MODE_*.
+	 * @param string $step     Name of the step, for the error message.
+	 * @throws RuntimeException When the mode differs.
+	 */
+	function wpcom_migration_e2e_expect_mode( $expected, $step ) {
+		$mode = Settings_Page::mode( Exporter::get_state(), Connection::is_user_connected() );
+		if ( $expected !== $mode ) {
+			throw new RuntimeException( "Step '$step': expected mode '$expected', got '$mode'." );
 		}
 	}
 }
