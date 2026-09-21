@@ -4,13 +4,16 @@
     "license": "GPL-2.0-or-later",
     "version": "dev-trunk",
     "require": {
-        "php": ">=7.1",
+        "php": ">=7.4",
         "automattic/jetpack-autoloader": "^6",
+        "automattic/jetpack-config": "^4.0",
+        "automattic/jetpack-connection": "^9.1",
         "wp-php-toolkit/reprint-server": "0.10.8"
     },
     "autoload": {
         "classmap": [
-            "reprint/"
+            "reprint/",
+            "connection/"
         ]
     },
     "config": {

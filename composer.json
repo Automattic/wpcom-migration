@@ -6,7 +6,6 @@
     "require-dev": {
         "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
         "phpcompatibility/php-compatibility": "^10.0@alpha",
-        "rector/rector": "^2.6",
         "wp-coding-standards/wpcs": "^3.1"
     },
     "config": {
@@ -18,7 +17,7 @@
     "scripts": {
         "build": "bin/build.sh",
         "lint": "phpcs",
-        "lint:php:compat": "phpcs --standard=PHPCompatibility --runtime-set testVersion 7.1- -ps plugin/reprint bin tests",
+        "lint:php:compat": "phpcs --standard=PHPCompatibility --runtime-set testVersion 7.4- -ps plugin/reprint plugin/connection bin tests",
         "test:e2e": "tests/e2e/run.sh build/wpcom-migration"
     }
 }
