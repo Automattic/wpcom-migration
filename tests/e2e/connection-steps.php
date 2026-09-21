@@ -504,9 +504,8 @@ function wpcom_migration_e2e_render_connect_page() {
 	return ob_get_clean();
 }
 
-// screen-steps.php defines the three helpers below with the same bodies. One
-// blueprint loads one file, so they never meet; the guards cover a future
-// combined load.
+// screen-steps.php defines the helpers below too. One blueprint loads one
+// file, so they never meet; the guards cover a future combined load.
 if ( ! function_exists( 'wpcom_migration_e2e_post' ) ) {
 	/**
 	 * Fills in a nonce-bearing POST request for an admin-post action.
