@@ -26,7 +26,18 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The Reprint migration screen
 
-`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). A table shows three facts — export secret, exporter window, WordPress.com connection — and one line of advice for their combination: a site WordPress.com provisioned with an application password reads "nothing to do here"; a connected site with the window open reads "connected and ready"; a fresh site reads "start on WordPress.com". Below the table: *Log in with WordPress.com* (or the connected account, blog ID, a *Continue on WordPress.com* link — filter `wpcom_migration_continue_url` — and *Disconnect*), then a collapsed *Set up by hand* section with the secret form, the enable toggle and the export URL. Deactivating the plugin disconnects and discards the secret and window.
+`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time — a heading, one sentence, at most one button, and the links that fit:
+
+| Mode | When | Shows |
+|---|---|---|
+| Not available on networks | Multisite | Nothing |
+| The export secret no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
+| Exporter on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
+| Connected as *login* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
+| Set up by WordPress.com | Provisioned with an application password | A *Log in with WordPress.com* link |
+| Connect this site to WordPress.com | Fresh site | *Log in with WordPress.com* |
+
+`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`. Under every mode but the first, a collapsed *Set up by hand* section holds the export secret form, the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 

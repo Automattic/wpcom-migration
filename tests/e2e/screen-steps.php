@@ -86,6 +86,12 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
 			wpcom_migration_e2e_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter disabled', $step );
+			wpcom_migration_e2e_expect_contains( $html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Turn the exporter on', $step );
+			wpcom_migration_e2e_expect_contains( $html, '<h2>Export URL</h2>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Shared secret', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Export window', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Remote API URL', $step );
 			break;
 
 		case 'invalidate-secret':

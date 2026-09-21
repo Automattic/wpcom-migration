@@ -1,7 +1,7 @@
 <?php
 /**
- * Admin screen for the Reprint exporter: shared secret, export window, and
- * the WordPress.com connection section.
+ * Admin screen for the Reprint exporter: export secret, exporter, and the
+ * WordPress.com connection.
  *
  * Modeled on reprint-server-wp's SettingsPage.
  *
@@ -41,7 +41,7 @@ class Settings_Page {
 	const SAVE_SECRET_ACTION = 'wpcom_migration_reprint_save_secret';
 
 	/**
-	 * The admin-post action that opens or closes the window.
+	 * The admin-post action that turns the exporter on or off.
 	 *
 	 * @var string
 	 */
@@ -233,7 +233,7 @@ class Settings_Page {
 	}
 
 	/**
-	 * Opens or closes the export window and redirects back with a result notice.
+	 * Turns the exporter on or off and redirects back with a result notice.
 	 */
 	public function handle_save_enabled() {
 		$this->authorize( self::SAVE_ENABLED_ACTION );
@@ -497,12 +497,12 @@ class Settings_Page {
 	private function render_secret_form( array $state ) {
 		$stored_secret = $state['secret_valid'] ? (string) get_option( Exporter::SECRET_OPTION, '' ) : '';
 		?>
-		<h2><?php esc_html_e( 'Shared secret', 'wpcom-migration' ); ?></h2>
+		<h2><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></h2>
 		<p><?php esc_html_e( 'Paste the secret supplied by WordPress.com.', 'wpcom-migration' ); ?></p>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_SECRET_ACTION ); ?>" />
 			<?php wp_nonce_field( self::SAVE_SECRET_ACTION ); ?>
-			<label class="screen-reader-text" for="wpcom-migration-reprint-secret"><?php esc_html_e( 'Shared secret', 'wpcom-migration' ); ?></label>
+			<label class="screen-reader-text" for="wpcom-migration-reprint-secret"><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></label>
 			<input type="password"
 				class="regular-text code"
 				id="wpcom-migration-reprint-secret"
@@ -531,7 +531,7 @@ class Settings_Page {
 	private function render_enable_form( array $state ) {
 		?>
 		<hr />
-		<h2><?php esc_html_e( 'Export window', 'wpcom-migration' ); ?></h2>
+		<h2><?php esc_html_e( 'Exporter', 'wpcom-migration' ); ?></h2>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_ENABLED_ACTION ); ?>" />
 			<?php wp_nonce_field( self::SAVE_ENABLED_ACTION ); ?>
@@ -539,9 +539,9 @@ class Settings_Page {
 				<input type="checkbox"
 					name="<?php echo esc_attr( self::ENABLED_FIELD ); ?>"
 					value="1"<?php checked( $state['window_open'] ); ?> />
-				<?php esc_html_e( 'Enable the exporter', 'wpcom-migration' ); ?>
+				<?php esc_html_e( 'Turn the exporter on', 'wpcom-migration' ); ?>
 			</label>
-			<p class="description"><?php esc_html_e( 'While enabled, anyone with the shared secret can download this site\'s database and files. It turns itself off an hour after the last export request.', 'wpcom-migration' ); ?></p>
+			<p class="description"><?php esc_html_e( 'While on, anyone with the export secret can download this site\'s database and files. It turns itself off an hour after the last export.', 'wpcom-migration' ); ?></p>
 			<?php submit_button( __( 'Save', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_enabled_submit' ); ?>
 		</form>
 		<?php
@@ -553,8 +553,8 @@ class Settings_Page {
 	private function render_api_url() {
 		?>
 		<hr />
-		<h2><?php esc_html_e( 'Remote API URL', 'wpcom-migration' ); ?></h2>
-		<p><?php esc_html_e( 'Use this URL when WordPress.com asks for the remote Reprint API URL.', 'wpcom-migration' ); ?></p>
+		<h2><?php esc_html_e( 'Export URL', 'wpcom-migration' ); ?></h2>
+		<p><?php esc_html_e( 'Use this URL when WordPress.com asks for the export URL.', 'wpcom-migration' ); ?></p>
 		<input type="text"
 			class="regular-text code"
 			id="wpcom-migration-reprint-api-url"
@@ -562,7 +562,7 @@ class Settings_Page {
 			readonly />
 		<button type="button"
 			class="button wpcom-migration-reprint-copy-url"
-			data-copied-message="<?php esc_attr_e( 'Remote API URL copied.', 'wpcom-migration' ); ?>">
+			data-copied-message="<?php esc_attr_e( 'Export URL copied.', 'wpcom-migration' ); ?>">
 			<?php esc_html_e( 'Copy', 'wpcom-migration' ); ?>
 		</button>
 		<?php
@@ -578,9 +578,9 @@ class Settings_Page {
 		$notices = array(
 			'saved'           => array( 'success', __( 'Secret saved.', 'wpcom-migration' ) ),
 			'unchanged'       => array( 'success', __( 'The secret was already up to date.', 'wpcom-migration' ) ),
-			'enabled'         => array( 'success', __( 'Exporter enabled for the next hour.', 'wpcom-migration' ) ),
-			'disabled'        => array( 'success', __( 'Exporter disabled.', 'wpcom-migration' ) ),
-			'not_configured'  => array( 'error', __( 'Enter a shared secret first.', 'wpcom-migration' ) ),
+			'enabled'         => array( 'success', __( 'Exporter on for the next hour.', 'wpcom-migration' ) ),
+			'disabled'        => array( 'success', __( 'Exporter off.', 'wpcom-migration' ) ),
+			'not_configured'  => array( 'error', __( 'Enter an export secret first.', 'wpcom-migration' ) ),
 			'storage_failure' => array( 'error', __( 'The secret could not be saved.', 'wpcom-migration' ) ),
 		);
 
