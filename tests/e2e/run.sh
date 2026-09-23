@@ -5,6 +5,9 @@
 # settings screen through its form handlers, and once more to provision
 # through the REST routes with application passwords.
 #
+# The multisite scenario runs its blueprint without a server: Playground
+# refuses to enable multisite on a custom port, and its steps need no HTTP.
+#
 # Usage: tests/e2e/run.sh <built-plugin-dir>
 #   e.g. tests/e2e/run.sh build/wpcom-migration
 #
@@ -28,7 +31,7 @@ PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
 # shellcheck disable=SC2206 # A space-separated scenario list, split on purpose.
-SCENARIOS=(${E2E_SCENARIOS:-open closed secret-hash-deleted enabled-hash-deleted screen provisioning connection menu})
+SCENARIOS=(${E2E_SCENARIOS:-open closed secret-hash-deleted enabled-hash-deleted screen provisioning connection menu multisite})
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -90,6 +93,24 @@ wait_for_port_free
 for scenario in "${SCENARIOS[@]}"; do
     echo "== $scenario"
     server_log="$(mktemp)"
+
+    if [ "$scenario" = "multisite" ]; then
+        # shellcheck disable=SC2086 # PLAYGROUND_CLI is a command line, split on purpose.
+        if ! $PLAYGROUND_CLI run-blueprint \
+            --site-url=http://localhost \
+            --blueprint="$E2E_DIR/blueprint-$scenario.json" \
+            --mount="$PLUGIN_DIR:/wordpress/wp-content/plugins/wpcom-migration" \
+            --mount="$E2E_DIR:/wordpress/wp-content/wpcom-migration-e2e" \
+            >"$server_log" 2>&1; then
+            echo "Playground log for '$scenario':" >&2
+            cat "$server_log" >&2
+            exit 1
+        fi
+        rm -f "$server_log"
+        server_log=""
+        echo "Scenario '$scenario' passed."
+        continue
+    fi
 
     # shellcheck disable=SC2086 # PLAYGROUND_CLI is a command line, split on purpose.
     $PLAYGROUND_CLI server \

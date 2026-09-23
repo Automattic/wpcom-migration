@@ -83,7 +83,7 @@ class Settings_Page {
 	private $plugin_file;
 
 	/**
-	 * Hook suffix returned by add_submenu_page().
+	 * Hook suffix returned by add_menu_page().
 	 *
 	 * @var string|false
 	 */
@@ -129,22 +129,11 @@ class Settings_Page {
 	}
 
 	/**
-	 * Adds the plugin's one sidebar entry, unless the old screen's brand
-	 * has asked for no menu at all.
+	 * Registers the screen as the plugin's one sidebar entry, then takes the
+	 * row back out on a network or when the old screen's brand has asked for
+	 * no menu. The screen stays reachable at its URL either way.
 	 */
 	public function add_admin_menu() {
-		/**
-		 * Filters whether the plugin shows a sidebar entry.
-		 *
-		 * The old BlogVault screen answers false when the plugin is
-		 * whitelabelled to hide. Delete the filter with that screen.
-		 *
-		 * @param bool $show Whether to register the menu entry.
-		 */
-		if ( ! apply_filters( 'wpcom_migration_show_menu', true ) ) {
-			return;
-		}
-
 		$this->page_hook = add_menu_page(
 			__( 'Migrate to WordPress.com', 'wpcom-migration' ),
 			__( 'Migrate to WordPress.com', 'wpcom-migration' ),
@@ -153,6 +142,33 @@ class Settings_Page {
 			array( $this, 'render_page' ),
 			'dashicons-wordpress-alt'
 		);
+
+		/**
+		 * Filters whether the screen gets a sidebar row. The screen stays
+		 * reachable at its URL either way.
+		 *
+		 * The old BlogVault screen answers false when the plugin is
+		 * whitelabelled to hide. Delete the filter with that screen.
+		 *
+		 * @param bool $show Whether the screen gets a sidebar row.
+		 */
+		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() ) {
+			return;
+		}
+
+		remove_menu_page( self::PAGE_SLUG );
+		add_action( 'load-' . $this->page_hook, array( $this, 'set_title' ) );
+	}
+
+	/**
+	 * Sets the screen's <title>, which core otherwise looks up in the
+	 * sidebar rows.
+	 */
+	public function set_title() {
+		global $title;
+
+		// phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- admin-header.php prints this global.
+		$title = __( 'Migrate to WordPress.com', 'wpcom-migration' );
 	}
 
 	/**

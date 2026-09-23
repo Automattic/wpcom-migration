@@ -12,6 +12,15 @@
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
+// WordPress's fatal handler would swallow the message into a generic error
+// page; print it where run.sh shows the log instead.
+set_exception_handler(
+	function ( $exception ) {
+		file_put_contents( 'php://stderr', get_class( $exception ) . ': ' . $exception->getMessage() . "\n" );
+		exit( 1 );
+	}
+);
+
 /**
  * Runs one menu step.
  *
@@ -33,12 +42,18 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		add_filter( 'wpcom_migration_show_menu', '__return_false', 99 );
 	}
 
+	if ( 'whitelabelled' === $step ) {
+		// The brand option WPCOMInfo::getBrandInfo() reads; menu() then
+		// registers no old screen and asks the Reprint screen to hide.
+		update_option( 'wpcombrand', array( 'hide_from_menu' => true ) );
+	}
+
 	$slugs = array();
 
-	// 'screens-reachable' drives admin_menu itself, once per slug, with
-	// $pagenow and $plugin_page set the way admin.php sets them; the shared
-	// fire above would just be redone with the wrong globals.
-	if ( 'screens-reachable' !== $step ) {
+	// These steps drive admin_menu themselves, with $pagenow and
+	// $plugin_page set the way admin.php sets them; the shared fire below
+	// would just be redone with the wrong globals.
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title' ), true ) ) {
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
@@ -46,7 +61,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		$GLOBALS['_parent_pages']     = array();
 		// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 
-		do_action( 'admin_menu', '' );
+		do_action( wpcom_migration_e2e_menu_hook( $step ), '' );
 
 		$slugs = wpcom_migration_e2e_menu_slugs();
 	}
@@ -68,38 +83,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			break;
 
 		case 'screens-reachable':
-			// What admin.php enforces before it renders a page: refuse with a
-			// 403 unless the page is both authorized and hooked. This is the
-			// path the 'manual-screen-registered' step below doesn't cover,
-			// because it looks the parent up by passing it in directly instead
-			// of letting core discover it from $submenu the way admin.php does.
-			foreach ( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) as $slug ) {
-				// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own globals; this test sets them the way admin.php does.
-				$GLOBALS['pagenow']            = 'admin.php';
-				$GLOBALS['plugin_page']        = $slug;
-				$GLOBALS['parent_file']        = null;
-				$GLOBALS['menu']               = array();
-				$GLOBALS['submenu']            = array();
-				$GLOBALS['_registered_pages']  = array();
-				$GLOBALS['_parent_pages']      = array();
-				$GLOBALS['_wp_menu_nopriv']    = array();
-				$GLOBALS['_wp_submenu_nopriv'] = array();
-				// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-
-				do_action( 'admin_menu', '' );
-
-				// admin.php checks both of these before it fires
-				// admin_enqueue_scripts, while still requiring
-				// wp-admin/includes/menu.php. wp-admin/includes/menu.php
-				// refuses with a 403 when this is false.
-				if ( ! user_can_access_admin_page() ) {
-					throw new RuntimeException( "admin.php?page=$slug would be refused with a 403." );
-				}
-				// admin.php renders the page through this hook.
-				if ( ! get_plugin_page_hook( $slug, 'admin.php' ) ) {
-					throw new RuntimeException( "admin.php?page=$slug has no render hook." );
-				}
-			}
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			break;
 
 		case 'old-screen-still-reachable':
@@ -129,6 +113,29 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			if ( array() !== $slugs ) {
 				throw new RuntimeException( 'wpcom_migration_show_menu=false should leave no sidebar row, got: ' . wp_json_encode( $slugs ) );
 			}
+			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up by hand', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
+			break;
+
+		case 'whitelabelled':
+			try {
+				if ( array() !== $slugs ) {
+					throw new RuntimeException( 'A brand with hide_from_menu should leave no sidebar row, got: ' . wp_json_encode( $slugs ) );
+				}
+				if ( false !== apply_filters( 'wpcom_migration_show_menu', true ) ) {
+					throw new RuntimeException( 'A brand with hide_from_menu should turn wpcom_migration_show_menu off.' );
+				}
+				// The brand drops the old screen entirely, as it always has.
+				wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
+			} finally {
+				delete_option( 'wpcombrand' );
+			}
+			break;
+
+		case 'old-screen-title':
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			wpcom_migration_e2e_assert_title( 'wpcom-migration', $admin->bvinfo->getBrandName() );
 			break;
 
 		case 'settings-link':
@@ -169,6 +176,36 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
+		case 'multisite-subsite':
+			// The plugin's entry points on a network lead to the old screen
+			// in the network admin; a subsite has no row, since the Reprint
+			// screen can't migrate a network.
+			do_action( 'admin_enqueue_scripts', '' );
+
+			if ( array() !== $slugs ) {
+				throw new RuntimeException( 'A subsite of a network should have no plugin row, got: ' . wp_json_encode( $slugs ) );
+			}
+
+			$admin    = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$expected = network_admin_url( 'admin.php?page=wpcom-migration' );
+			if ( $expected !== $admin->migrationScreenUrl() ) {
+				throw new RuntimeException( 'On a network the plugin should send users to ' . $expected . ', got: ' . $admin->migrationScreenUrl() );
+			}
+
+			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
+			break;
+
+		case 'multisite-network':
+			if ( array( 'wpcom-migration' ) !== $slugs ) {
+				throw new RuntimeException( 'The network admin should keep the old screen\'s row, got: ' . wp_json_encode( $slugs ) );
+			}
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			wpcom_migration_e2e_assert_title( 'wpcom-migration', $admin->bvinfo->getBrandName(), 'network_admin_menu' );
+			wpcom_migration_e2e_assert_screens_reachable( array( 'wpcom-migration' ), 'network_admin_menu' );
+			break;
+
 		default:
 			throw new RuntimeException( 'Unknown menu step: ' . $step );
 	}
@@ -187,4 +224,92 @@ function wpcom_migration_e2e_menu_slugs() {
 	sort( $slugs );
 
 	return $slugs;
+}
+
+/**
+ * Asserts each admin.php?page=<slug> would render: authorized and hooked,
+ * as admin.php checks before it lets the request in.
+ *
+ * Drives admin_menu itself, once per slug, with $pagenow and $plugin_page
+ * set the way admin.php sets them. This is the path the
+ * 'manual-screen-registered' step doesn't cover, because that looks the
+ * parent up by passing it in directly instead of letting core discover it
+ * from $submenu the way admin.php does.
+ *
+ * @param array  $page_slugs Page slugs.
+ * @param string $menu_hook  admin_menu, or network_admin_menu for the network admin.
+ * @throws RuntimeException When a page would be refused or render nothing.
+ */
+function wpcom_migration_e2e_assert_screens_reachable( array $page_slugs, $menu_hook = 'admin_menu' ) {
+	foreach ( $page_slugs as $slug ) {
+		wpcom_migration_e2e_fire_admin_menu_for( $slug, $menu_hook );
+
+		// wp-admin/includes/menu.php refuses with a 403 when this is false.
+		if ( ! user_can_access_admin_page() ) {
+			throw new RuntimeException( "admin.php?page=$slug would be refused with a 403." );
+		}
+		// admin.php renders the page through this hook.
+		if ( ! get_plugin_page_hook( $slug, 'admin.php' ) ) {
+			throw new RuntimeException( "admin.php?page=$slug has no render hook." );
+		}
+	}
+}
+
+/**
+ * Asserts the <title> admin-header.php would print for admin.php?page=<slug>:
+ * admin.php fires load-<hook> and then admin-header.php asks
+ * get_admin_page_title().
+ *
+ * @param string $slug      Page slug.
+ * @param string $expected  Expected title.
+ * @param string $menu_hook admin_menu, or network_admin_menu for the network admin.
+ * @throws RuntimeException When the title differs.
+ */
+function wpcom_migration_e2e_assert_title( $slug, $expected, $menu_hook = 'admin_menu' ) {
+	wpcom_migration_e2e_fire_admin_menu_for( $slug, $menu_hook );
+
+	$hook = get_plugin_page_hook( $slug, 'admin.php' );
+	if ( ! $hook ) {
+		throw new RuntimeException( "admin.php?page=$slug has no render hook." );
+	}
+	do_action( "load-{$hook}" ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Core's own dynamic hook.
+
+	$title = get_admin_page_title();
+	if ( $expected !== $title ) {
+		throw new RuntimeException( "admin.php?page=$slug would have the title " . wp_json_encode( $title ) . ', expected ' . wp_json_encode( $expected ) . '.' );
+	}
+}
+
+/**
+ * Resets core's menu globals and fires the menu hook as admin.php does for
+ * admin.php?page=<slug>.
+ *
+ * @param string $slug      Page slug.
+ * @param string $menu_hook admin_menu, or network_admin_menu for the network admin.
+ */
+function wpcom_migration_e2e_fire_admin_menu_for( $slug, $menu_hook = 'admin_menu' ) {
+	// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own globals; this test sets them the way admin.php does.
+	$GLOBALS['pagenow']            = 'admin.php';
+	$GLOBALS['plugin_page']        = $slug;
+	$GLOBALS['parent_file']        = null;
+	$GLOBALS['title']              = null;
+	$GLOBALS['menu']               = array();
+	$GLOBALS['submenu']            = array();
+	$GLOBALS['_registered_pages']  = array();
+	$GLOBALS['_parent_pages']      = array();
+	$GLOBALS['_wp_menu_nopriv']    = array();
+	$GLOBALS['_wp_submenu_nopriv'] = array();
+	// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+
+	do_action( $menu_hook, '' );
+}
+
+/**
+ * The menu hook a step's admin screen fires.
+ *
+ * @param string $step Step name.
+ * @return string
+ */
+function wpcom_migration_e2e_menu_hook( $step ) {
+	return 'multisite-network' === $step ? 'network_admin_menu' : 'admin_menu';
 }
