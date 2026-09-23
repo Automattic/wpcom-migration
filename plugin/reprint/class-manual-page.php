@@ -340,7 +340,7 @@ class Manual_Page {
 				data-hide-label="<?php esc_attr_e( 'Hide secret', 'wpcom-migration' ); ?>">
 				<span class="dashicons dashicons-visibility" aria-hidden="true"></span>
 			</button>
-			<?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_secret_submit' ); ?>
+			<p><?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_secret_submit', false ); ?></p>
 		</form>
 		<?php
 		if ( $state['has_secret'] ) {
@@ -381,7 +381,7 @@ class Manual_Page {
 				<?php esc_html_e( 'Turn the exporter on', 'wpcom-migration' ); ?>
 			</label>
 			<p class="description"><?php esc_html_e( 'While on, anyone with the export secret can download this site\'s database and files. It turns itself off an hour after the last export.', 'wpcom-migration' ); ?></p>
-			<?php submit_button( __( 'Save', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_enabled_submit' ); ?>
+			<p><?php submit_button( __( 'Save', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_enabled_submit', false ); ?></p>
 		</form>
 		<?php
 	}
