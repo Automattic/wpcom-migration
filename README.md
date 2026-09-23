@@ -5,11 +5,11 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
 
@@ -26,18 +26,26 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The Reprint migration screen
 
-`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time — a heading, one sentence, at most one button, and the links that fit:
+`wp-admin/admin.php?page=wpcom-migration-status` (the plugin's one menu entry; `manage_options` to view; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). It carries the old main screen's design: the WordPress mark, a serif heading and one centred column. The screen shows one mode at a time — one sentence saying where the site stands, at most one button, and the links that fit:
 
 | Mode | When | Shows |
 |---|---|---|
-| Not available on networks | Multisite | Nothing |
+| The exporter runs on single sites only | Multisite | Nothing |
 | The export secret no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
-| Exporter on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
-| Connected as *login* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
-| Set up by WordPress.com | Provisioned with an application password | A *Log in with WordPress.com* link |
-| Connect this site to WordPress.com | Fresh site | *Log in with WordPress.com* |
+| The exporter is on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
+| Connected as *email* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
+| This site is set up and ready | Provisioned with an application password | A *Log in with WordPress.com* link |
+| Log in with your WordPress.com account | Fresh site | *Log in with WordPress.com* |
 
-`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`. Under every mode but the first, a collapsed *Set up by hand* section holds the export secret form, the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
+`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`.
+
+The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no longer in the sidebar. It stays reachable at its URL.
+
+On a network the old screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row. A brand whitelabelled with `hide` or `hide_from_menu` takes away the Reprint screen's row too; the screen stays reachable at its URL.
+
+## Setting up Reprint manually
+
+`wp-admin/admin.php?page=wpcom-migration-manual` (`manage_options`, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 

@@ -198,7 +198,8 @@ class Exporter {
 	 * Discards any stored export credentials.
 	 *
 	 * Runs on plugin activation and deactivation, clearing whatever was
-	 * written while protect_options() was not in place.
+	 * written while protect_options() was not in place; on disconnect; and
+	 * from the by-hand screen's Remove secret button.
 	 */
 	public static function discard_credentials() {
 		$had_any = false;

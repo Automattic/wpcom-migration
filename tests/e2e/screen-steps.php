@@ -9,6 +9,7 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 /**
@@ -27,36 +28,47 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 	$page = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 	$page->set_connection_section( new \Automattic\WPCOM_Migration\Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) );
+	$manual = new Manual_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 	$secret = 'smoke-secret-0123456789abcdef0123456789abcdef';
 
 	switch ( $step ) {
 		case 'render-unconfigured':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by hand', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Set up Reprint manually', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-status', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'WordPress.com connection</h2>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Not configured yet', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-header"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-container"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com copies your posts, pages, media and settings', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<div class="wrap">', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Reprint migration</h1>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'button-primary', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Powered by', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-sidebar', $step );
 			break;
 
 		case 'render-unconfigured-without-section':
 			// No connection bootstrap: the mode renders without its controls.
 			$bare = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 			$html = wpcom_migration_e2e_render( $bare );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			break;
 
 		case 'save-secret-empty':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => '' ) );
-			$page->handle_save_secret(); // Redirects and exits.
+			wpcom_migration_e2e_post( Manual_Page::SAVE_SECRET_ACTION, array( Manual_Page::SECRET_FIELD => '' ) );
+			$manual->handle_save_secret(); // Redirects and exits.
 			break;
 
 		case 'assert-unconfigured':
@@ -67,8 +79,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'save-secret':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => $secret ) );
-			$page->handle_save_secret();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_SECRET_ACTION, array( Manual_Page::SECRET_FIELD => $secret ) );
+			$manual->handle_save_secret();
 			break;
 
 		case 'assert-secret-saved':
@@ -78,20 +90,29 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_contains( $html, '<strong>This site is set up and ready.</strong>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
 			// The login stays, demoted to a link.
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
-			wpcom_migration_e2e_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter disabled', $step );
-			wpcom_migration_e2e_expect_contains( $html, '<h2>Export secret</h2>', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Turn the exporter on', $step );
-			wpcom_migration_e2e_expect_contains( $html, '<h2>Export URL</h2>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Shared secret', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Export window', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Remote API URL', $step );
+
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h1>Set up Reprint manually</h1>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-api-url"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export URL</h2>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove secret', $step );
 			break;
 
 		case 'invalidate-secret':
@@ -102,15 +123,16 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'no longer matches', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Invalid: the site', $step );
 			break;
 
 		case 'enable':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array( Settings_Page::ENABLED_FIELD => '1' ) );
-			$page->handle_save_enabled();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array( Manual_Page::ENABLED_FIELD => '1' ) );
+			$manual->handle_save_enabled();
 			break;
 
 		case 'assert-enabled':
@@ -120,16 +142,17 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Exporter on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'The exporter is on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'each export keeps it on for another hour', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'This site is set up and ready', $step );
 			break;
 
 		case 'disable':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array() );
-			$page->handle_save_enabled();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array() );
+			$manual->handle_save_enabled();
 			break;
 
 		case 'assert-disabled':
@@ -139,8 +162,34 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This site is set up and ready', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'The exporter is on until', $step );
+			break;
+
+		case 'discard-secret':
+			wpcom_migration_e2e_post( Manual_Page::DISCARD_SECRET_ACTION, array() );
+			$manual->handle_discard_secret();
+			break;
+
+		case 'assert-secret-discarded':
+			$state = Exporter::get_state();
+			if ( $state['has_secret'] || $state['window_open'] ) {
+				throw new RuntimeException( 'Removing the secret should delete it and close the window: ' . wp_json_encode( $state ) );
+			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
+			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'discarded';
+			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Secret removed.', $step );
+			if ( strpos( $manual_html, 'Secret removed.' ) > strpos( $manual_html, '<h1>' ) ) {
+				throw new RuntimeException( "Step '$step': the notice should sit above the page heading." );
+			}
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
+			break;
+
+		case 'assert-no-mode-headings':
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-mode', $step );
 			break;
 
 		default:
@@ -155,6 +204,18 @@ function wpcom_migration_e2e_screen_step( $step ) {
  * @return string
  */
 function wpcom_migration_e2e_render( Settings_Page $page ) {
+	ob_start();
+	$page->render_page();
+	return ob_get_clean();
+}
+
+/**
+ * Renders the by-hand screen and returns the markup.
+ *
+ * @param Manual_Page $page The screen.
+ * @return string
+ */
+function wpcom_migration_e2e_render_manual( Manual_Page $page ) {
 	ob_start();
 	$page->render_page();
 	return ob_get_clean();
@@ -226,15 +287,16 @@ function wpcom_migration_e2e_expect_mode( $expected, $step ) {
 }
 
 /**
- * Fails unless the markup holds exactly the expected number of primary buttons.
+ * Fails unless the markup holds exactly the expected number of primary
+ * buttons. The screen's primary is the branded button, not wp-admin's.
  *
  * @param string $html     Rendered markup.
- * @param int    $expected Expected count of 'button-primary'.
+ * @param int    $expected Expected count of 'wpcom-migration-button'.
  * @param string $step     Name of the step, for the error message.
  * @throws RuntimeException When the count differs.
  */
 function wpcom_migration_e2e_expect_primary_count( $html, $expected, $step ) {
-	$count = substr_count( $html, 'button-primary' );
+	$count = substr_count( $html, 'wpcom-migration-button' );
 	if ( $expected !== $count ) {
 		throw new RuntimeException( "Step '$step': expected $expected primary button(s), found $count." );
 	}

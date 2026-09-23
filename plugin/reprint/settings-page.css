@@ -1,0 +1,124 @@
+/*
+ * The Reprint migration screen: the old main screen's design, one column.
+ *
+ * variables.css supplies the palette, fonts.css the Recoleta face. The old
+ * screen's style.css is deliberately not a dependency — it is that screen's
+ * furniture and goes when the screen does.
+ */
+
+body {
+	background: #fff;
+}
+
+/* The margins wp-admin gives notices inside .wrap. */
+.wpcom-migration-notices {
+	margin: 12px 0;
+}
+
+.wpcom-migration-notices:empty {
+	display: none;
+}
+
+.wpcom-migration-header {
+	display: flex;
+	padding: 20px;
+}
+
+.wpcom-migration-header__wpcom-logo span {
+	width: 24px;
+	height: 24px;
+	font-size: 24px;
+}
+
+.wpcom-migration-container {
+	box-sizing: border-box;
+	max-width: 476px;
+	margin: 0 auto;
+	padding: 40px 20px;
+	font-size: 14px;
+	color: var( --wpcom-migration-gray-70 );
+	text-underline-offset: 4px;
+}
+
+.wpcom-migration-container h1 {
+	margin: 0;
+	color: var( --wpcom-migration-gray-100 );
+	font-family: var( --wpcom-migration-heading-font-family );
+	font-size: 34px;
+	font-weight: normal;
+	line-height: 1.2;
+}
+
+.wpcom-migration-container p {
+	margin: 8px 0;
+	font-size: inherit;
+}
+
+.wpcom-migration-container a:not( .wpcom-migration-button ) {
+	color: var( --wpcom-migration-primary-bg );
+}
+
+.wpcom-migration-container a:hover {
+	color: var( --wpcom-migration-link-hover-color );
+	text-decoration: none;
+}
+
+.wpcom-migration-guidance {
+	margin-top: 24px;
+}
+
+.wpcom-migration-button {
+	display: inline-block;
+	margin: 4px 0;
+	padding: 12px 24px;
+	border: 0;
+	border-radius: 4px;
+	color: var( --wpcom-migration-white );
+	background: var( --wpcom-migration-primary-bg );
+	font-size: 14px;
+	line-height: 1.4;
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.wpcom-migration-container a.wpcom-migration-button:hover,
+.wpcom-migration-button:hover,
+.wpcom-migration-button:focus {
+	color: var( --wpcom-migration-white );
+	background: var( --wpcom-migration-button-hover-color );
+}
+
+.wpcom-migration-link {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var( --wpcom-migration-primary-bg );
+	font-size: inherit;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+.wpcom-migration-link--delete {
+	color: #b32d2e;
+}
+
+.wpcom-migration-description {
+	color: var( --wpcom-migration-gray-50 );
+	font-size: 12px;
+	line-height: 20px;
+}
+
+/* Fix main content having extra padding on mobile. */
+.toplevel_page_wpcom-migration-status.auto-fold #wpcontent {
+	padding-left: 0;
+}
+
+@media ( min-width: 961px ) {
+	.wpcom-migration-container {
+		padding-top: 100px;
+	}
+
+	.wpcom-migration-container h1 {
+		font-size: 44px;
+	}
+}
