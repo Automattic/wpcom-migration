@@ -81,6 +81,44 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
+		case 'settings-link':
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$links = $admin->settingsLink( array(), 'wpcom-migration/wpcom_migration.php' );
+
+			if ( 1 !== count( $links ) ) {
+				throw new RuntimeException( 'Expected exactly one Settings link, got: ' . wp_json_encode( $links ) );
+			}
+			if ( false === strpos( $links[0], 'page=' . Settings_Page::PAGE_SLUG ) ) {
+				throw new RuntimeException( 'The Settings link does not point at the Reprint screen: ' . $links[0] );
+			}
+			break;
+
+		case 'activation-redirect':
+			$captured = null;
+			add_filter(
+				'wp_redirect',
+				function ( $location ) use ( &$captured ) {
+					$captured = $location;
+
+					// An empty location makes wp_redirect() return false
+					// before it sends a header.
+					return '';
+				}
+			);
+
+			update_option( 'wpcomredirect', 'yes' );
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+
+			if ( null === $captured ) {
+				throw new RuntimeException( 'Activating did not redirect at all.' );
+			}
+			if ( false === strpos( $captured, 'page=' . Settings_Page::PAGE_SLUG ) ) {
+				throw new RuntimeException( 'The activation redirect does not land on the Reprint screen: ' . $captured );
+			}
+			break;
+
 		default:
 			throw new RuntimeException( 'Unknown menu step: ' . $step );
 	}

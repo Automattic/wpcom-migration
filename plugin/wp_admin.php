@@ -23,6 +23,21 @@ class WPCOMWPAdmin {
 		}
 	}
 
+	/**
+	 * Where the plugin's own entry points send the user. The Reprint screen
+	 * when it is loaded; the old screen in a source checkout without
+	 * plugin/vendor/, where the Reprint classes are absent.
+	 *
+	 * Not mainUrl(): siteInfoTags() posts that to the app as `adminurl`,
+	 * where it still describes the old screen.
+	 */
+	public function migrationScreenUrl() {
+		if (class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page')) {
+			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
+		}
+		return $this->mainUrl();
+	}
+
 	function removeAdminNotices() {
 		if (WPCOMHelper::getRawParam('REQUEST', 'page') === $this->bvinfo->plugname) {
 			remove_all_actions('admin_notices');
@@ -37,7 +52,7 @@ class WPCOMWPAdmin {
 		if ($this->bvinfo->isActivateRedirectSet()) {
 			$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
 			if (!wp_doing_ajax()) {
-				wp_redirect($this->mainUrl());
+				wp_redirect($this->migrationScreenUrl());
 			}
 		}
 	}
@@ -81,7 +96,7 @@ class WPCOMWPAdmin {
 	public function settingsLink($links, $file) {
 		if ( $file == plugin_basename( dirname(__FILE__).'/wpcom_migration.php' ) ) {
 			// phpcs:ignore WordPress.WP.I18n.MissingArgDomain
-			$links[] = '<a href="'.$this->mainUrl().'">'.__( 'Settings' ).'</a>';
+			$links[] = '<a href="'.$this->migrationScreenUrl().'">'.__( 'Settings' ).'</a>';
 		}
 		return $links;
 	}
