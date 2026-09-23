@@ -75,6 +75,13 @@ class Manual_Page {
 	const SCRIPT_HANDLE = 'wpcom-migration-reprint-manual';
 
 	/**
+	 * Style handle for the screen's inline styles.
+	 *
+	 * @var string
+	 */
+	const STYLE_HANDLE = 'wpcom-migration-reprint-manual';
+
+	/**
 	 * Absolute path of the plugin's main file.
 	 *
 	 * @var string
@@ -145,7 +152,7 @@ class Manual_Page {
 	}
 
 	/**
-	 * Enqueues the screen's script on the screen only.
+	 * Enqueues the screen's script and styles on the screen only.
 	 *
 	 * @param string $hook_suffix The current admin page.
 	 */
@@ -155,14 +162,20 @@ class Manual_Page {
 		}
 
 		$plugin_data = get_file_data( $this->plugin_file, array( 'Version' => 'Version' ) );
+		$version     = '' !== $plugin_data['Version'] ? $plugin_data['Version'] : false;
 
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			plugins_url( 'reprint/manual-page.js', $this->plugin_file ),
 			array( 'wp-a11y' ),
-			'' !== $plugin_data['Version'] ? $plugin_data['Version'] : false,
+			$version,
 			true
 		);
+
+		// Descriptions get a paragraph's margin, not wp-admin's tighter one.
+		wp_register_style( self::STYLE_HANDLE, false, array(), $version );
+		wp_enqueue_style( self::STYLE_HANDLE );
+		wp_add_inline_style( self::STYLE_HANDLE, '.wpcom-migration-manual p.description { margin: 1em 0; }' );
 	}
 
 	/**
@@ -271,7 +284,7 @@ class Manual_Page {
 
 		$state = Exporter::get_state();
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap wpcom-migration-manual">';
 		echo '<h1>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 
@@ -343,7 +356,7 @@ class Manual_Page {
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCARD_SECRET_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCARD_SECRET_ACTION ); ?>
-			<?php submit_button( __( 'Remove secret', 'wpcom-migration' ), 'delete', 'wpcom_migration_reprint_discard_secret_submit', false ); ?>
+			<button type="submit" name="wpcom_migration_reprint_discard_secret_submit" class="button-link"><?php esc_html_e( 'Remove secret', 'wpcom-migration' ); ?></button>
 			<p class="description"><?php esc_html_e( 'Also turns the exporter off. WordPress.com can no longer export this site until a new secret is saved.', 'wpcom-migration' ); ?></p>
 		</form>
 		<?php
