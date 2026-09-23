@@ -15,6 +15,7 @@ use Automattic\Jetpack\Connection\Rest_Authentication;
 use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 // WordPress's fatal handler would swallow the message into a generic error
@@ -384,8 +385,12 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'button-link-delete', $step );
-			wpcom_migration_e2e_expect_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
+
+			// The blog ID lives on the by-hand screen now.
+			$manual_html = wpcom_migration_e2e_render_manual_page();
+			wpcom_migration_e2e_expect_contains( $manual_html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			break;
 
 		case 'render-connected-without-user-data':
@@ -501,6 +506,19 @@ function wpcom_migration_e2e_render_connect_page() {
 	$plugin_file = WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php';
 	$page        = new Settings_Page( $plugin_file );
 	$page->set_connection_section( new Connect_Page( $plugin_file ) );
+
+	ob_start();
+	$page->render_page();
+	return ob_get_clean();
+}
+
+/**
+ * Renders the by-hand screen and returns the markup.
+ *
+ * @return string
+ */
+function wpcom_migration_e2e_render_manual_page() {
+	$page = new Manual_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 
 	ob_start();
 	$page->render_page();

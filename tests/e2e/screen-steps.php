@@ -9,6 +9,7 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 /**
@@ -27,6 +28,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 	$page = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 	$page->set_connection_section( new \Automattic\WPCOM_Migration\Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) );
+	$manual = new Manual_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 	$secret = 'smoke-secret-0123456789abcdef0123456789abcdef';
 
 	switch ( $step ) {
@@ -36,8 +38,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by hand', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by hand', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-status', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'WordPress.com connection</h2>', $step );
@@ -51,12 +53,12 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			break;
 
 		case 'save-secret-empty':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => '' ) );
-			$page->handle_save_secret(); // Redirects and exits.
+			wpcom_migration_e2e_post( Manual_Page::SAVE_SECRET_ACTION, array( Manual_Page::SECRET_FIELD => '' ) );
+			$manual->handle_save_secret(); // Redirects and exits.
 			break;
 
 		case 'assert-unconfigured':
@@ -67,8 +69,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'save-secret':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_SECRET_ACTION, array( Settings_Page::SECRET_FIELD => $secret ) );
-			$page->handle_save_secret();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_SECRET_ACTION, array( Manual_Page::SECRET_FIELD => $secret ) );
+			$manual->handle_save_secret();
 			break;
 
 		case 'assert-secret-saved':
@@ -83,15 +85,22 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			// The login stays, demoted to a link.
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
-			wpcom_migration_e2e_expect_contains( $html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter disabled', $step );
-			wpcom_migration_e2e_expect_contains( $html, '<h2>Export secret</h2>', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Turn the exporter on', $step );
-			wpcom_migration_e2e_expect_contains( $html, '<h2>Export URL</h2>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Shared secret', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Export window', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Remote API URL', $step );
+
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h1>Set up by hand</h1>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-api-url"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export URL</h2>', $step );
 			break;
 
 		case 'invalidate-secret':
@@ -109,8 +118,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'enable':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array( Settings_Page::ENABLED_FIELD => '1' ) );
-			$page->handle_save_enabled();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array( Manual_Page::ENABLED_FIELD => '1' ) );
+			$manual->handle_save_enabled();
 			break;
 
 		case 'assert-enabled':
@@ -128,8 +137,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			break;
 
 		case 'disable':
-			wpcom_migration_e2e_post( Settings_Page::SAVE_ENABLED_ACTION, array() );
-			$page->handle_save_enabled();
+			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array() );
+			$manual->handle_save_enabled();
 			break;
 
 		case 'assert-disabled':
@@ -155,6 +164,18 @@ function wpcom_migration_e2e_screen_step( $step ) {
  * @return string
  */
 function wpcom_migration_e2e_render( Settings_Page $page ) {
+	ob_start();
+	$page->render_page();
+	return ob_get_clean();
+}
+
+/**
+ * Renders the by-hand screen and returns the markup.
+ *
+ * @param Manual_Page $page The screen.
+ * @return string
+ */
+function wpcom_migration_e2e_render_manual( Manual_Page $page ) {
 	ob_start();
 	$page->render_page();
 	return ob_get_clean();

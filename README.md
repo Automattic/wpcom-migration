@@ -5,7 +5,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
@@ -37,7 +37,13 @@ To activate a source checkout directly (without a build), run `composer install 
 | Set up by WordPress.com | Provisioned with an application password | A *Log in with WordPress.com* link |
 | Connect this site to WordPress.com | Fresh site | *Log in with WordPress.com* |
 
-`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`. Under every mode but the first, a collapsed *Set up by hand* section holds the export secret form, the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
+`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`.
+
+The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no longer in the sidebar. It stays reachable at its URL.
+
+## Setting up by hand
+
+`wp-admin/admin.php?page=wpcom-migration-manual` (`manage_options`, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 

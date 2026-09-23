@@ -6,6 +6,7 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\REST_Controller;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
@@ -50,6 +51,7 @@ function wpcom_migration_settings_page( ?Settings_Page $page = null ) {
 
 if ( is_admin() ) {
 	wpcom_migration_settings_page( new Settings_Page( $wpcom_migration_plugin_file ) );
+	new Manual_Page( $wpcom_migration_plugin_file );
 }
 
 unset( $wpcom_migration_plugin_file, $wpcom_migration_reprint_autoloader );
