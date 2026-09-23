@@ -377,9 +377,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-connected':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e@example.com', $step );
-			if ( 1 !== substr_count( $html, 'Connected as e2e@example.com' ) ) {
-				throw new RuntimeException( "Step '$step': expected 'Connected as e2e@example.com' exactly once: " . substr( $html, 0, 400 ) );
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as <strong>e2e@example.com</strong>', $step );
+			if ( 1 !== substr_count( $html, 'Connected as <strong>e2e@example.com</strong>' ) ) {
+				throw new RuntimeException( "Step '$step': expected 'Connected as <strong>e2e@example.com</strong>' exactly once: " . substr( $html, 0, 400 ) );
 			}
 			wpcom_migration_e2e_expect_contains( $html, 'sets up the exporter when the migration starts', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );

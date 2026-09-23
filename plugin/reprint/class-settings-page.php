@@ -329,11 +329,11 @@ class Settings_Page {
 			case self::MODE_CONNECTED_WAITING:
 				$email = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_email() : null;
 				if ( null !== $email ) {
-					$this->render_sentence(
+					$this->render_sentence_html(
 						sprintf(
-							/* translators: %s: WordPress.com account email address. */
-							__( 'Connected as %s. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ),
-							$email
+							/* translators: %s: WordPress.com account email address, in bold. */
+							esc_html__( 'Connected as %s. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ),
+							'<strong>' . esc_html( $email ) . '</strong>'
 						)
 					);
 				} else {
@@ -368,7 +368,16 @@ class Settings_Page {
 	 * @param string $text Plain text.
 	 */
 	private function render_sentence( $text ) {
-		echo '<p class="wpcom-migration-guidance">' . esc_html( $text ) . '</p>';
+		$this->render_sentence_html( esc_html( $text ) );
+	}
+
+	/**
+	 * Renders the mode's one sentence from markup the caller has escaped.
+	 *
+	 * @param string $html Escaped HTML.
+	 */
+	private function render_sentence_html( $html ) {
+		echo '<p class="wpcom-migration-guidance">' . $html . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by the caller.
 	}
 
 	/**
