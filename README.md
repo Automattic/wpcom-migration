@@ -33,7 +33,7 @@ To activate a source checkout directly (without a build), run `composer install 
 | The exporter runs on single sites only | Multisite | Nothing |
 | The export secret no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
 | The exporter is on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
-| Connected as *login* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
+| Connected as *email* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
 | This site is set up and ready | Provisioned with an application password | A *Log in with WordPress.com* link |
 | Log in with your WordPress.com account | Fresh site | *Log in with WordPress.com* |
 

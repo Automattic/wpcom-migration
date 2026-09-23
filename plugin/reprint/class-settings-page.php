@@ -327,13 +327,13 @@ class Settings_Page {
 				return;
 
 			case self::MODE_CONNECTED_WAITING:
-				$login = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_login() : null;
-				if ( null !== $login ) {
+				$email = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_email() : null;
+				if ( null !== $email ) {
 					$this->render_sentence(
 						sprintf(
-							/* translators: %s: WordPress.com user login. */
+							/* translators: %s: WordPress.com account email address. */
 							__( 'Connected as %s. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ),
-							$login
+							$email
 						)
 					);
 				} else {

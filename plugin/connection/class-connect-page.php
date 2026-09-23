@@ -240,14 +240,15 @@ class Connect_Page {
 	}
 
 	/**
-	 * The WordPress.com login of the connected user, when the package has it.
+	 * The WordPress.com email address of the connected user, when the package
+	 * has it.
 	 *
 	 * @return string|null
 	 */
-	public static function connected_login() {
+	public static function connected_email() {
 		$user_data = Connection::connected_wpcom_user();
-		if ( is_array( $user_data ) && ! empty( $user_data['login'] ) ) {
-			return (string) $user_data['login'];
+		if ( is_array( $user_data ) && ! empty( $user_data['email'] ) ) {
+			return (string) $user_data['email'];
 		}
 
 		return null;
