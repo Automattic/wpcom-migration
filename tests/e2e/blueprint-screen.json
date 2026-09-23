@@ -60,6 +60,22 @@
 		},
 		{
 			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'discard-secret' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-secret-discarded' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'save-secret' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
+		},
+		{
+			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-no-mode-headings' );"
 		}
 	]

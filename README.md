@@ -45,7 +45,7 @@ On a network the old screen keeps its row in the network admin, and the *Setting
 
 ## Setting up by hand
 
-`wp-admin/admin.php?page=wpcom-migration-manual` (`manage_options`, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
+`wp-admin/admin.php?page=wpcom-migration-manual` (`manage_options`, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 

@@ -40,6 +40,13 @@ class Manual_Page {
 	const SAVE_ENABLED_ACTION = 'wpcom_migration_reprint_save_enabled';
 
 	/**
+	 * The admin-post action that removes the secret and turns the exporter off.
+	 *
+	 * @var string
+	 */
+	const DISCARD_SECRET_ACTION = 'wpcom_migration_reprint_discard_secret';
+
+	/**
 	 * Query argument carrying the result of a form post back to the screen.
 	 *
 	 * @var string
@@ -92,6 +99,7 @@ class Manual_Page {
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ), 21 );
 		add_action( 'admin_post_' . self::SAVE_SECRET_ACTION, array( $this, 'handle_save_secret' ) );
 		add_action( 'admin_post_' . self::SAVE_ENABLED_ACTION, array( $this, 'handle_save_enabled' ) );
+		add_action( 'admin_post_' . self::DISCARD_SECRET_ACTION, array( $this, 'handle_discard_secret' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		// Priority 1: before the Command Palette (priority 10) lists $submenu.
 		add_action( 'admin_enqueue_scripts', array( $this, 'hide_submenu' ), 1 );
@@ -207,6 +215,17 @@ class Manual_Page {
 	}
 
 	/**
+	 * Removes the secret, turns the exporter off, and redirects back with a
+	 * result notice.
+	 */
+	public function handle_discard_secret() {
+		$this->authorize( self::DISCARD_SECRET_ACTION );
+
+		Exporter::discard_credentials();
+		$this->redirect_with_notice( 'discarded' );
+	}
+
+	/**
 	 * Stops a form post that is not a nonce-carrying administrator request on
 	 * a single site.
 	 *
@@ -228,7 +247,7 @@ class Manual_Page {
 	 * Redirects back to the screen with a result code and exits.
 	 *
 	 * @param string $result One of saved, unchanged, enabled, disabled,
-	 *                       not_configured, storage_failure.
+	 *                       discarded, not_configured, storage_failure.
 	 */
 	private function redirect_with_notice( $result ) {
 		wp_safe_redirect( add_query_arg( self::NOTICE_QUERY_ARG, $result, self::page_url() ) );
@@ -311,6 +330,23 @@ class Manual_Page {
 			<?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_secret_submit' ); ?>
 		</form>
 		<?php
+		if ( $state['has_secret'] ) {
+			$this->render_discard_form();
+		}
+	}
+
+	/**
+	 * Renders the form that removes the secret.
+	 */
+	private function render_discard_form() {
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCARD_SECRET_ACTION ); ?>" />
+			<?php wp_nonce_field( self::DISCARD_SECRET_ACTION ); ?>
+			<?php submit_button( __( 'Remove secret', 'wpcom-migration' ), 'delete', 'wpcom_migration_reprint_discard_secret_submit', false ); ?>
+			<p class="description"><?php esc_html_e( 'Also turns the exporter off. WordPress.com can no longer export this site until a new secret is saved.', 'wpcom-migration' ); ?></p>
+		</form>
+		<?php
 	}
 
 	/**
@@ -370,6 +406,7 @@ class Manual_Page {
 			'unchanged'       => array( 'success', __( 'The secret was already up to date.', 'wpcom-migration' ) ),
 			'enabled'         => array( 'success', __( 'Exporter on for the next hour.', 'wpcom-migration' ) ),
 			'disabled'        => array( 'success', __( 'Exporter off.', 'wpcom-migration' ) ),
+			'discarded'       => array( 'success', __( 'Secret removed. The exporter is off.', 'wpcom-migration' ) ),
 			'not_configured'  => array( 'error', __( 'Enter an export secret first.', 'wpcom-migration' ) ),
 			'storage_failure' => array( 'error', __( 'The secret could not be saved.', 'wpcom-migration' ) ),
 		);

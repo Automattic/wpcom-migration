@@ -112,6 +112,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export URL</h2>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove secret', $step );
 			break;
 
 		case 'invalidate-secret':
@@ -163,6 +164,22 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'This site is set up and ready', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'The exporter is on until', $step );
+			break;
+
+		case 'discard-secret':
+			wpcom_migration_e2e_post( Manual_Page::DISCARD_SECRET_ACTION, array() );
+			$manual->handle_discard_secret();
+			break;
+
+		case 'assert-secret-discarded':
+			$state = Exporter::get_state();
+			if ( $state['has_secret'] || $state['window_open'] ) {
+				throw new RuntimeException( 'Removing the secret should delete it and close the window: ' . wp_json_encode( $state ) );
+			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
 			break;
 
 		case 'assert-no-mode-headings':
