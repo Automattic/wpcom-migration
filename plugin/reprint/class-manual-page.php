@@ -93,6 +93,8 @@ class Manual_Page {
 		add_action( 'admin_post_' . self::SAVE_SECRET_ACTION, array( $this, 'handle_save_secret' ) );
 		add_action( 'admin_post_' . self::SAVE_ENABLED_ACTION, array( $this, 'handle_save_enabled' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		// Priority 1: before the Command Palette (priority 10) lists $submenu.
+		add_action( 'admin_enqueue_scripts', array( $this, 'hide_submenu' ), 1 );
 	}
 
 	/**
@@ -105,8 +107,7 @@ class Manual_Page {
 	}
 
 	/**
-	 * Registers the screen and then takes it out of the sidebar, along with
-	 * the row WordPress adds for the parent the first time it gains a child.
+	 * Registers the screen as a submenu of Settings_Page.
 	 *
 	 * Priority 21: Settings_Page creates the parent at 20.
 	 */
@@ -119,7 +120,18 @@ class Manual_Page {
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
 		);
+	}
 
+	/**
+	 * Takes the screen out of the sidebar, along with the row WordPress adds
+	 * for the parent the first time it gains a child.
+	 *
+	 * Can't run in add_admin_menu(): admin.php finds a submenu page's parent
+	 * by scanning $submenu, and it does that before it lets the request in,
+	 * so the rows have to survive until then. admin_enqueue_scripts fires
+	 * once that check has passed.
+	 */
+	public function hide_submenu() {
 		remove_submenu_page( Settings_Page::PAGE_SLUG, self::PAGE_SLUG );
 		remove_submenu_page( Settings_Page::PAGE_SLUG, Settings_Page::PAGE_SLUG );
 	}

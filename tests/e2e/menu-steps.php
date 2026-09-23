@@ -20,6 +20,9 @@ use Automattic\WPCOM_Migration\Reprint\Settings_Page;
  */
 function wpcom_migration_e2e_menu_step( $step ) {
 	require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	// Firing admin_enqueue_scripts here, outside of a real admin page load,
+	// needs get_current_screen() defined for core's own hooked callbacks.
+	require_once ABSPATH . 'wp-admin/includes/screen.php';
 
 	wp_set_current_user( 1 );
 	if ( ! current_user_can( 'manage_options' ) ) {
@@ -30,25 +33,72 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		add_filter( 'wpcom_migration_show_menu', '__return_false', 99 );
 	}
 
-	// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
-	$GLOBALS['menu']              = array();
-	$GLOBALS['submenu']           = array();
-	$GLOBALS['_registered_pages'] = array();
-	$GLOBALS['_parent_pages']     = array();
-	// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+	$slugs = array();
 
-	do_action( 'admin_menu', '' );
+	// 'screens-reachable' drives admin_menu itself, once per slug, with
+	// $pagenow and $plugin_page set the way admin.php sets them; the shared
+	// fire above would just be redone with the wrong globals.
+	if ( 'screens-reachable' !== $step ) {
+		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
+		$GLOBALS['menu']              = array();
+		$GLOBALS['submenu']           = array();
+		$GLOBALS['_registered_pages'] = array();
+		$GLOBALS['_parent_pages']     = array();
+		// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
 
-	$slugs = wpcom_migration_e2e_menu_slugs();
+		do_action( 'admin_menu', '' );
+
+		$slugs = wpcom_migration_e2e_menu_slugs();
+	}
 
 	switch ( $step ) {
 		case 'sidebar':
+			// Mirrors what admin-header.php does before the sidebar and the
+			// WP 6.9+ command palette read $submenu: the by-hand screen only
+			// clears its flyout rows on admin_enqueue_scripts.
+			do_action( 'admin_enqueue_scripts', '' );
+
 			if ( array( Settings_Page::PAGE_SLUG ) !== $slugs ) {
 				throw new RuntimeException( 'Expected one sidebar row for the Reprint screen, got: ' . wp_json_encode( $slugs ) );
 			}
 
 			if ( ! empty( $GLOBALS['submenu'][ Settings_Page::PAGE_SLUG ] ) ) {
 				throw new RuntimeException( 'The Reprint screen should draw no flyout: ' . wp_json_encode( $GLOBALS['submenu'][ Settings_Page::PAGE_SLUG ] ) );
+			}
+			break;
+
+		case 'screens-reachable':
+			// What admin.php enforces before it renders a page: refuse with a
+			// 403 unless the page is both authorized and hooked. This is the
+			// path the 'manual-screen-registered' step below doesn't cover,
+			// because it looks the parent up by passing it in directly instead
+			// of letting core discover it from $submenu the way admin.php does.
+			foreach ( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) as $slug ) {
+				// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own globals; this test sets them the way admin.php does.
+				$GLOBALS['pagenow']            = 'admin.php';
+				$GLOBALS['plugin_page']        = $slug;
+				$GLOBALS['parent_file']        = null;
+				$GLOBALS['menu']               = array();
+				$GLOBALS['submenu']            = array();
+				$GLOBALS['_registered_pages']  = array();
+				$GLOBALS['_parent_pages']      = array();
+				$GLOBALS['_wp_menu_nopriv']    = array();
+				$GLOBALS['_wp_submenu_nopriv'] = array();
+				// phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+
+				do_action( 'admin_menu', '' );
+
+				// admin.php checks both of these before it fires
+				// admin_enqueue_scripts, while still requiring
+				// wp-admin/includes/menu.php. wp-admin/includes/menu.php
+				// refuses with a 403 when this is false.
+				if ( ! user_can_access_admin_page() ) {
+					throw new RuntimeException( "admin.php?page=$slug would be refused with a 403." );
+				}
+				// admin.php renders the page through this hook.
+				if ( ! get_plugin_page_hook( $slug, 'admin.php' ) ) {
+					throw new RuntimeException( "admin.php?page=$slug has no render hook." );
+				}
 			}
 			break;
 
