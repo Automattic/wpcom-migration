@@ -32,6 +32,10 @@
 		},
 		{
 			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; try { wpcom_migration_e2e_screen_step( 'reject-non-administrator-manual-access' ); } catch ( Throwable $error ) { echo $error->getMessage(); throw $error; }"
+		},
+		{
+			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'invalidate-secret' );"
 		},
 		{
