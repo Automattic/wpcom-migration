@@ -49,6 +49,16 @@ class WPCOMWPAdmin {
 			$icon = $this->bvinfo->getBrandIcon();
 			add_menu_page($bname, $bname, 'manage_options', $this->bvinfo->plugname,
 					array($this, 'adminPage'), $icon);
+
+			// The Reprint screen owns the sidebar entry now. Removing the page
+			// from the $menu global leaves its callback hooked and its
+			// $_registered_pages entry set, so admin.php?page=wpcom-migration
+			// still renders and keeps the toplevel_page_wpcom-migration hook
+			// suffix its stylesheet and notice handling key on.
+			remove_menu_page($this->bvinfo->plugname);
+		} else {
+			// Whitelabelled out of the menu: the Reprint screen hides with it.
+			add_filter('wpcom_migration_show_menu', '__return_false');
 		}
 	}
 

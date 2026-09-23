@@ -6,7 +6,7 @@
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
  * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen,
- * provisioning, connection. The secret must match the one the matching
+ * provisioning, connection, menu. The secret must match the one the matching
  * blueprint stores.
  *
  * @package wpcom-migration
@@ -39,6 +39,11 @@ switch ( $wpcom_migration_scenario ) {
 		// enabled); the same signed-preflight assertions prove the screen's
 		// form handlers left the exporter in a working state.
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
+		break;
+
+	case 'menu':
+		// The blueprint's runPHP steps are the whole test; there is nothing
+		// to ask the site over HTTP.
 		break;
 
 	case 'closed':

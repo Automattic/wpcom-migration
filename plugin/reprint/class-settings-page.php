@@ -27,13 +27,6 @@ class Settings_Page {
 	const PAGE_SLUG = 'wpcom-migration-status';
 
 	/**
-	 * The BlogVault top-level menu slug this screen hangs under.
-	 *
-	 * @var string
-	 */
-	const PARENT_SLUG = 'wpcom-migration';
-
-	/**
 	 * The admin-post action that saves the secret.
 	 *
 	 * @var string
@@ -172,16 +165,29 @@ class Settings_Page {
 	}
 
 	/**
-	 * Adds the menu entry under the plugin's menu.
+	 * Adds the plugin's one sidebar entry, unless the old screen's brand
+	 * has asked for no menu at all.
 	 */
 	public function add_admin_menu() {
-		$this->page_hook = add_submenu_page(
-			self::PARENT_SLUG,
-			__( 'Reprint migration', 'wpcom-migration' ),
-			__( 'Reprint migration', 'wpcom-migration' ),
+		/**
+		 * Filters whether the plugin shows a sidebar entry.
+		 *
+		 * The old BlogVault screen answers false when the plugin is
+		 * whitelabelled to hide. Delete the filter with that screen.
+		 *
+		 * @param bool $show Whether to register the menu entry.
+		 */
+		if ( ! apply_filters( 'wpcom_migration_show_menu', true ) ) {
+			return;
+		}
+
+		$this->page_hook = add_menu_page(
+			__( 'Migrate to WordPress.com', 'wpcom-migration' ),
+			__( 'Migrate to WordPress.com', 'wpcom-migration' ),
 			'manage_options',
 			self::PAGE_SLUG,
-			array( $this, 'render_page' )
+			array( $this, 'render_page' ),
+			'dashicons-wordpress-alt'
 		);
 	}
 

@@ -59,19 +59,22 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'assert-single-menu-entry':
+			// The Reprint screen owns the plugin's one sidebar entry (a
+			// top-level row, not a submenu of the old BlogVault screen); see
+			// menu-steps.php for the full menu assertions.
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 			$plugin_file = WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php';
 			$page        = new Settings_Page( $plugin_file );
 			$page->set_connection_section( new Connect_Page( $plugin_file ) );
 			do_action( 'admin_menu' );
-			$entries = isset( $GLOBALS['submenu']['wpcom-migration'] ) ? $GLOBALS['submenu']['wpcom-migration'] : array();
-			$slugs   = array_map(
+			$top_level_items = isset( $GLOBALS['menu'] ) ? $GLOBALS['menu'] : array();
+			$slugs           = array_map(
 				function ( $entry ) {
 					return $entry[2];
 				},
-				$entries
+				$top_level_items
 			);
-			if ( 1 !== count( array_keys( $slugs, Settings_Page::PAGE_SLUG, true ) ) || in_array( 'wpcom-migration-connect', $slugs, true ) ) {
+			if ( array( Settings_Page::PAGE_SLUG ) !== $slugs || in_array( 'wpcom-migration-connect', $slugs, true ) ) {
 				throw new RuntimeException( "Step '$step': expected one Reprint migration entry and no account entry, got: " . wp_json_encode( $slugs ) );
 			}
 			break;

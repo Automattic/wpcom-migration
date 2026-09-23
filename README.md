@@ -9,7 +9,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection, one that checks the admin menu.
 
 ## Build
 
