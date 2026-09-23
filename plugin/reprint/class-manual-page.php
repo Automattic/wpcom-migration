@@ -249,8 +249,8 @@ class Manual_Page {
 			wp_die( esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
 		}
 
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You are not allowed to manage the exporter.', 'wpcom-migration' ) );
+		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
+			wp_die( esc_html__( 'Only an administrator can manage the exporter.', 'wpcom-migration' ) );
 		}
 
 		check_admin_referer( $action );
@@ -272,7 +272,7 @@ class Manual_Page {
 	 * once the secret is valid; the blog ID when connected.
 	 */
 	public function render_page() {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
 			return;
 		}
 
