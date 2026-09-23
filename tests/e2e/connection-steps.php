@@ -340,6 +340,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$_GET[ Connect_Page::CODE_QUERY_ARG ]   = 'e2e_blocked';
 			$html                                   = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'could not register', $step );
+			if ( strpos( $html, 'could not register' ) > strpos( $html, 'class="wpcom-migration-header"' ) ) {
+				throw new RuntimeException( "Step '$step': the notice should sit above the screen's header, where wp-admin puts notices." );
+			}
 			wpcom_migration_e2e_expect_contains( $html, 'e2e_blocked', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Blocked by the e2e scenario', $step );
 			delete_option( 'wpcom_migration_e2e_last_redirect' );

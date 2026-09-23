@@ -90,7 +90,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'This site is set up and ready', $step );
+			wpcom_migration_e2e_expect_contains( $html, '<strong>This site is set up and ready.</strong>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
 			// The login stays, demoted to a link.

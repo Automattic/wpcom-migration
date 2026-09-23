@@ -230,6 +230,12 @@ class Settings_Page {
 		$state          = Exporter::get_state();
 		$user_connected = null !== $this->connection_section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 		$mode           = self::mode( $state, $user_connected );
+		if ( null !== $this->connection_section ) {
+			// Where wp-admin puts notices: above the page, not inside the column.
+			echo '<div class="wpcom-migration-notices">';
+			$this->connection_section->render_result_notice();
+			echo '</div>';
+		}
 		?>
 		<header class="wpcom-migration-header">
 			<div class="wpcom-migration-header__wpcom-logo">
@@ -241,13 +247,7 @@ class Settings_Page {
 			<main class="wpcom-migration-content">
 				<h1><?php esc_html_e( 'Migrate your site to WordPress.com', 'wpcom-migration' ); ?></h1>
 				<p><?php esc_html_e( 'Get ready for better speed, security, and support. WordPress.com copies your posts, pages, media and settings across for you.', 'wpcom-migration' ); ?></p>
-				<?php
-				if ( null !== $this->connection_section ) {
-					$this->connection_section->render_result_notice();
-				}
-
-				$this->render_mode( $mode, $state, $user_connected );
-				?>
+				<?php $this->render_mode( $mode, $state, $user_connected ); ?>
 			</main>
 		</div>
 		<?php
@@ -346,7 +346,10 @@ class Settings_Page {
 				return;
 
 			case self::MODE_PROVISIONED_WAITING:
-				$this->render_sentence( __( 'This site is set up and ready. The exporter stays off until the migration starts on WordPress.com.', 'wpcom-migration' ) );
+				$this->render_sentence_html(
+					'<strong>' . esc_html__( 'This site is set up and ready.', 'wpcom-migration' ) . '</strong> '
+					. esc_html__( 'The exporter stays off until the migration starts on WordPress.com.', 'wpcom-migration' )
+				);
 				if ( null !== $section ) {
 					$section->render_connect_button( false );
 				}

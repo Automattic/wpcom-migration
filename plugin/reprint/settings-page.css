@@ -10,6 +10,15 @@ body {
 	background: #fff;
 }
 
+/* The margins wp-admin gives notices inside .wrap. */
+.wpcom-migration-notices {
+	margin: 10px 20px 0 2px;
+}
+
+.wpcom-migration-notices:empty {
+	display: none;
+}
+
 .wpcom-migration-header {
 	display: flex;
 	padding: 20px;
