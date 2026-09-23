@@ -232,8 +232,10 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
 			<p>
-				<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
-				<span class="wpcom-migration-description"><?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?></span>
+				<span class="wpcom-migration-description">
+					<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
+					<?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?>
+				</span>
 			</p>
 		</form>
 		<?php
