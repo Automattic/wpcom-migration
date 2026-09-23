@@ -26,7 +26,7 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The Reprint migration screen
 
-`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time — one sentence saying where the site stands, at most one button, and the links that fit:
+`wp-admin/admin.php?page=wpcom-migration-status` (the plugin's one menu entry; `manage_options` to view; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). It carries the old main screen's design: the WordPress mark, a serif heading and one centred column. The screen shows one mode at a time — one sentence saying where the site stands, at most one button, and the links that fit:
 
 | Mode | When | Shows |
 |---|---|---|

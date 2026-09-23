@@ -27,6 +27,13 @@ class Settings_Page {
 	const PAGE_SLUG = 'wpcom-migration-status';
 
 	/**
+	 * Style handle for settings-page.css.
+	 *
+	 * @var string
+	 */
+	const STYLE_HANDLE = 'wpcom-migration-reprint-screen';
+
+	/**
 	 * The screen is not available: the site is a network.
 	 *
 	 * @var string
@@ -91,7 +98,7 @@ class Settings_Page {
 	private $connection_section = null;
 
 	/**
-	 * Registers the screen.
+	 * Registers the screen, its styles and its notice suppression.
 	 *
 	 * @param string $plugin_file Absolute path of the plugin's main file.
 	 */
@@ -99,6 +106,8 @@ class Settings_Page {
 		$this->plugin_file = $plugin_file;
 
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ), 20 );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'admin_head', array( $this, 'remove_admin_notices' ), 3 );
 	}
 
 	/**
@@ -147,8 +156,55 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the screen: the mode and nothing else. The by-hand controls
-	 * live on Manual_Page.
+	 * Enqueues the screen's styles on the screen only.
+	 *
+	 * @param string $hook_suffix The current admin page.
+	 */
+	public function enqueue_assets( $hook_suffix ) {
+		if ( false === $this->page_hook || $hook_suffix !== $this->page_hook ) {
+			return;
+		}
+
+		$plugin_data = get_file_data( $this->plugin_file, array( 'Version' => 'Version' ) );
+		$version     = '' !== $plugin_data['Version'] ? $plugin_data['Version'] : false;
+
+		wp_enqueue_style(
+			'wpcom-migration-variables',
+			plugins_url( 'assets/css/variables.css', $this->plugin_file ),
+			array(),
+			$version
+		);
+		wp_enqueue_style(
+			'wpcom-migration-fonts',
+			plugins_url( 'assets/css/fonts.css', $this->plugin_file ),
+			array(),
+			$version
+		);
+		wp_enqueue_style(
+			self::STYLE_HANDLE,
+			plugins_url( 'reprint/settings-page.css', $this->plugin_file ),
+			array( 'wpcom-migration-variables', 'wpcom-migration-fonts', 'dashicons' ),
+			$version
+		);
+	}
+
+	/**
+	 * Drops other plugins' notices on this screen, as the old main screen
+	 * does: the layout has nowhere to put them.
+	 */
+	public function remove_admin_notices() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Comparing the page slug selects a display behaviour.
+		if ( self::PAGE_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ?? '' ) ) ) {
+			return;
+		}
+
+		remove_all_actions( 'admin_notices' );
+		remove_all_actions( 'all_admin_notices' );
+	}
+
+	/**
+	 * Renders the screen: the old main screen's design, with the mode where
+	 * that screen had its email form.
 	 */
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -158,17 +214,27 @@ class Settings_Page {
 		$state          = Exporter::get_state();
 		$user_connected = null !== $this->connection_section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 		$mode           = self::mode( $state, $user_connected );
+		?>
+		<header class="wpcom-migration-header">
+			<div class="wpcom-migration-header__wpcom-logo">
+				<span class="dashicons dashicons-wordpress-alt" aria-hidden="true"></span>
+			</div>
+		</header>
 
-		echo '<div class="wrap">';
-		echo '<h1>' . esc_html__( 'Reprint migration', 'wpcom-migration' ) . '</h1>';
+		<div class="wpcom-migration-container">
+			<main class="wpcom-migration-content">
+				<h1><?php esc_html_e( 'Migrate your site to WordPress.com', 'wpcom-migration' ); ?></h1>
+				<p><?php esc_html_e( 'Get ready for better speed, security, and support. WordPress.com copies your posts, pages, media and settings across for you.', 'wpcom-migration' ); ?></p>
+				<?php
+				if ( null !== $this->connection_section ) {
+					$this->connection_section->render_result_notice();
+				}
 
-		if ( null !== $this->connection_section ) {
-			$this->connection_section->render_result_notice();
-		}
-
-		$this->render_mode( $mode, $state, $user_connected );
-
-		echo '</div>';
+				$this->render_mode( $mode, $state, $user_connected );
+				?>
+			</main>
+		</div>
+		<?php
 	}
 
 	/**

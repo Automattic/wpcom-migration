@@ -190,11 +190,11 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
 			<p>
-				<button type="submit" name="wpcom_migration_connect_submit" class="<?php echo $primary ? 'button button-primary' : 'button-link'; ?>">
+				<button type="submit" name="wpcom_migration_connect_submit" class="<?php echo $primary ? 'wpcom-migration-button' : 'wpcom-migration-link'; ?>">
 					<?php esc_html_e( 'Log in with WordPress.com', 'wpcom-migration' ); ?>
 				</button>
 			</p>
-			<p class="description">
+			<p class="wpcom-migration-description">
 				<?php
 				printf(
 					/* translators: %s: link to the WordPress.com terms of service. */
@@ -216,7 +216,7 @@ class Connect_Page {
 	public function render_continue_button( $primary ) {
 		?>
 		<p>
-			<a<?php echo $primary ? ' class="button button-primary"' : ''; ?> target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
+			<a<?php echo $primary ? ' class="wpcom-migration-button"' : ''; ?> target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
 				<?php esc_html_e( 'Continue on WordPress.com', 'wpcom-migration' ); ?>
 			</a>
 		</p>
@@ -232,8 +232,8 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
 			<p>
-				<button type="submit" name="wpcom_migration_disconnect_submit" class="button-link button-link-delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
-				<span class="description"><?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?></span>
+				<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
+				<span class="wpcom-migration-description"><?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?></span>
 			</p>
 		</form>
 		<?php

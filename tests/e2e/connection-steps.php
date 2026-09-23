@@ -291,7 +291,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-not-connected':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Reprint migration', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
@@ -386,7 +386,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'https://wordpress.com/setup/site-migration?from=' . rawurlencode( home_url() ), $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'button-link-delete', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-link--delete', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 
@@ -600,15 +600,16 @@ if ( ! function_exists( 'wpcom_migration_e2e_expect_mode' ) ) {
 
 if ( ! function_exists( 'wpcom_migration_e2e_expect_primary_count' ) ) {
 	/**
-	 * Fails unless the markup holds exactly the expected number of primary buttons.
+	 * Fails unless the markup holds exactly the expected number of primary
+	 * buttons. The screen's primary is the branded button, not wp-admin's.
 	 *
 	 * @param string $html     Rendered markup.
-	 * @param int    $expected Expected count of 'button-primary'.
+	 * @param int    $expected Expected count of 'wpcom-migration-button'.
 	 * @param string $step     Name of the step, for the error message.
 	 * @throws RuntimeException When the count differs.
 	 */
 	function wpcom_migration_e2e_expect_primary_count( $html, $expected, $step ) {
-		$count = substr_count( $html, 'button-primary' );
+		$count = substr_count( $html, 'wpcom-migration-button' );
 		if ( $expected !== $count ) {
 			throw new RuntimeException( "Step '$step': expected $expected primary button(s), found $count." );
 		}

@@ -45,6 +45,15 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-status', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'WordPress.com connection</h2>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Not configured yet', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-header"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-container"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com copies your posts, pages, media and settings', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<div class="wrap">', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Reprint migration</h1>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'button-primary', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Powered by', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-sidebar', $step );
 			break;
 
 		case 'render-unconfigured-without-section':
@@ -256,15 +265,16 @@ function wpcom_migration_e2e_expect_mode( $expected, $step ) {
 }
 
 /**
- * Fails unless the markup holds exactly the expected number of primary buttons.
+ * Fails unless the markup holds exactly the expected number of primary
+ * buttons. The screen's primary is the branded button, not wp-admin's.
  *
  * @param string $html     Rendered markup.
- * @param int    $expected Expected count of 'button-primary'.
+ * @param int    $expected Expected count of 'wpcom-migration-button'.
  * @param string $step     Name of the step, for the error message.
  * @throws RuntimeException When the count differs.
  */
 function wpcom_migration_e2e_expect_primary_count( $html, $expected, $step ) {
-	$count = substr_count( $html, 'button-primary' );
+	$count = substr_count( $html, 'wpcom-migration-button' );
 	if ( $expected !== $count ) {
 		throw new RuntimeException( "Step '$step': expected $expected primary button(s), found $count." );
 	}
