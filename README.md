@@ -43,7 +43,7 @@ The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no long
 
 On a network the old screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row. A brand whitelabelled with `hide` or `hide_from_menu` takes away the Reprint screen's row too; the screen stays reachable at its URL.
 
-## Setting up by hand
+## Setting up Reprint manually
 
 `wp-admin/admin.php?page=wpcom-migration-manual` (`manage_options`, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 

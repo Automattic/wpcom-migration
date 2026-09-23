@@ -129,8 +129,8 @@ class Manual_Page {
 	public function add_admin_menu() {
 		$this->page_hook = add_submenu_page(
 			Settings_Page::PAGE_SLUG,
-			__( 'Set up by hand', 'wpcom-migration' ),
-			__( 'Set up by hand', 'wpcom-migration' ),
+			__( 'Set up Reprint manually', 'wpcom-migration' ),
+			__( 'Set up Reprint manually', 'wpcom-migration' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -277,7 +277,7 @@ class Manual_Page {
 		}
 
 		if ( is_multisite() ) {
-			echo '<div class="wrap"><h1>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</h1>';
+			echo '<div class="wrap"><h1>' . esc_html__( 'Set up Reprint manually', 'wpcom-migration' ) . '</h1>';
 			echo '<p>' . esc_html__( 'The exporter runs on single sites only.', 'wpcom-migration' ) . '</p></div>';
 			return;
 		}
@@ -286,7 +286,7 @@ class Manual_Page {
 
 		echo '<div class="wrap wpcom-migration-manual">';
 		$this->render_result_notice();
-		echo '<h1>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</h1>';
+		echo '<h1>' . esc_html__( 'Set up Reprint manually', 'wpcom-migration' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 
 		$this->render_secret_form( $state );

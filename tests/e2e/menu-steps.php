@@ -114,7 +114,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 				throw new RuntimeException( 'wpcom_migration_show_menu=false should leave no sidebar row, got: ' . wp_json_encode( $slugs ) );
 			}
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up by hand', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up Reprint manually', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			break;
 

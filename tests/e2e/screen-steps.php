@@ -39,7 +39,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by hand', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Set up Reprint manually', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-reprint-api-url', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-status', $step );
@@ -105,7 +105,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Remote API URL', $step );
 
 			$manual_html = wpcom_migration_e2e_render_manual( $manual );
-			wpcom_migration_e2e_expect_contains( $manual_html, '<h1>Set up by hand</h1>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h1>Set up Reprint manually</h1>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-api-url"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
