@@ -177,7 +177,12 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( 'Removing the secret should delete it and close the window: ' . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
-			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'discarded';
+			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Secret removed.', $step );
+			if ( strpos( $manual_html, 'Secret removed.' ) > strpos( $manual_html, '<h1>' ) ) {
+				throw new RuntimeException( "Step '$step': the notice should sit above the page heading." );
+			}
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
 			break;

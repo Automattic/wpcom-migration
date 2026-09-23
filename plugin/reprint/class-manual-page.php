@@ -285,10 +285,10 @@ class Manual_Page {
 		$state = Exporter::get_state();
 
 		echo '<div class="wrap wpcom-migration-manual">';
+		$this->render_result_notice();
 		echo '<h1>' . esc_html__( 'Set up by hand', 'wpcom-migration' ) . '</h1>';
 		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 
-		$this->render_result_notice();
 		$this->render_secret_form( $state );
 
 		if ( $state['secret_valid'] ) {
