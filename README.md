@@ -26,16 +26,16 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The Reprint migration screen
 
-`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time — a heading, one sentence, at most one button, and the links that fit:
+`wp-admin/admin.php?page=wpcom-migration-status` (under the plugin's menu; `manage_options` to view and to set up by hand; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time — one sentence saying where the site stands, at most one button, and the links that fit:
 
 | Mode | When | Shows |
 |---|---|---|
-| Not available on networks | Multisite | Nothing |
+| The exporter runs on single sites only | Multisite | Nothing |
 | The export secret no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
-| Exporter on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
+| The exporter is on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
 | Connected as *login* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
-| Set up by WordPress.com | Provisioned with an application password | A *Log in with WordPress.com* link |
-| Connect this site to WordPress.com | Fresh site | *Log in with WordPress.com* |
+| This site is set up and ready | Provisioned with an application password | A *Log in with WordPress.com* link |
+| Log in with your WordPress.com account | Fresh site | *Log in with WordPress.com* |
 
 `Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`.
 

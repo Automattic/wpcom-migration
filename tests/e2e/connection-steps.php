@@ -241,12 +241,12 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-connected-and-enabled':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Exporter on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'The exporter is on until', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'This site is set up and ready', $step );
 			break;
 
 		case 'render-broken-connected':
@@ -256,7 +256,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			delete_option( Exporter::SECRET_HASH_OPTION );
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'no longer matches', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
@@ -291,7 +292,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Reprint migration', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );

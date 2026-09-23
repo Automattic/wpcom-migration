@@ -204,9 +204,9 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the mode: a heading, one sentence, at most one primary button,
-	 * and the links that fit. Connection controls render only when a
-	 * section is attached.
+	 * Renders the mode: one sentence stating where the site stands, and the
+	 * controls that fit. Connection controls render only when a section is
+	 * attached.
 	 *
 	 * @param string $mode           One of the MODE_* constants.
 	 * @param array  $state          Exporter::get_state().
@@ -217,13 +217,11 @@ class Settings_Page {
 
 		switch ( $mode ) {
 			case self::MODE_BLOCKED:
-				$this->render_heading( __( 'Not available on networks', 'wpcom-migration' ) );
-				$this->render_sentence( __( 'The exporter runs on single sites only.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
 				return;
 
 			case self::MODE_BROKEN:
-				$this->render_heading( __( 'The export secret no longer matches this site', 'wpcom-migration' ) );
-				$this->render_sentence( __( 'The site\'s salts changed. Start the migration again on WordPress.com, or save a new secret by hand below.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The export secret no longer matches this site — its security salts changed. Start the migration again on WordPress.com.', 'wpcom-migration' ) );
 				if ( null !== $section && $user_connected ) {
 					$section->render_continue_button( true );
 					$section->render_disconnect_link();
@@ -233,14 +231,13 @@ class Settings_Page {
 				return;
 
 			case self::MODE_READY:
-				$this->render_heading(
+				$this->render_sentence(
 					sprintf(
 						/* translators: %s: time of day. */
-						__( 'Exporter on until %s', 'wpcom-migration' ),
+						__( 'The exporter is on until %s. The migration runs from WordPress.com; each export keeps it on for another hour.', 'wpcom-migration' ),
 						self::window_closes_at( $state )
 					)
 				);
-				$this->render_sentence( __( 'The migration runs from WordPress.com. Each export keeps the exporter on for another hour.', 'wpcom-migration' ) );
 				if ( null !== $section && $user_connected ) {
 					$section->render_continue_button( false );
 					$section->render_disconnect_link();
@@ -250,17 +247,16 @@ class Settings_Page {
 			case self::MODE_CONNECTED_WAITING:
 				$login = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_login() : null;
 				if ( null !== $login ) {
-					$this->render_heading(
+					$this->render_sentence(
 						sprintf(
 							/* translators: %s: WordPress.com user login. */
-							__( 'Connected as %s', 'wpcom-migration' ),
+							__( 'Connected as %s. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ),
 							$login
 						)
 					);
 				} else {
-					$this->render_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ) );
+					$this->render_sentence( __( 'Connected to WordPress.com. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ) );
 				}
-				$this->render_sentence( __( 'WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ) );
 				if ( null !== $section ) {
 					$section->render_continue_button( true );
 					$section->render_disconnect_link();
@@ -268,8 +264,7 @@ class Settings_Page {
 				return;
 
 			case self::MODE_PROVISIONED_WAITING:
-				$this->render_heading( __( 'Set up by WordPress.com', 'wpcom-migration' ) );
-				$this->render_sentence( __( 'The exporter is off until the migration starts. Nothing to do here.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'This site is set up and ready. The exporter stays off until the migration starts on WordPress.com.', 'wpcom-migration' ) );
 				if ( null !== $section ) {
 					$section->render_connect_button( false );
 				}
@@ -277,22 +272,12 @@ class Settings_Page {
 
 			case self::MODE_NEEDS_CONNECTING:
 			default:
-				$this->render_heading( __( 'Connect this site to WordPress.com', 'wpcom-migration' ) );
 				$this->render_sentence( __( 'Log in with your WordPress.com account so WordPress.com can read this site and migrate it. Nothing is copied until you start the migration there.', 'wpcom-migration' ) );
 				if ( null !== $section ) {
 					$section->render_connect_button( true );
 				}
 				return;
 		}
-	}
-
-	/**
-	 * Renders the mode heading.
-	 *
-	 * @param string $text Plain text.
-	 */
-	private function render_heading( $text ) {
-		echo '<h2 class="wpcom-migration-mode">' . esc_html( $text ) . '</h2>';
 	}
 
 	/**

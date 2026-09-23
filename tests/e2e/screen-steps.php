@@ -35,7 +35,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'render-unconfigured':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by hand', $step );
@@ -50,7 +51,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			// No connection bootstrap: the mode renders without its controls.
 			$bare = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 			$html = wpcom_migration_e2e_render( $bare );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
@@ -80,8 +81,9 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This site is set up and ready', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
 			// The login stays, demoted to a link.
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
@@ -111,7 +113,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'no longer matches', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Invalid: the site', $step );
@@ -129,11 +132,12 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Exporter on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'The exporter is on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'each export keeps it on for another hour', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Nothing to do here', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'This site is set up and ready', $step );
 			break;
 
 		case 'disable':
@@ -148,8 +152,13 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter on until', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This site is set up and ready', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'The exporter is on until', $step );
+			break;
+
+		case 'assert-no-mode-headings':
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-mode', $step );
 			break;
 
 		default:
