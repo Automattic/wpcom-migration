@@ -12,6 +12,8 @@
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
+require_once __DIR__ . '/flag-steps.php';
+
 // WordPress's fatal handler would swallow the message into a generic error
 // page; print it where run.sh shows the log instead.
 set_exception_handler(
@@ -48,12 +50,29 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		update_option( 'wpcombrand', array( 'hide_from_menu' => true ) );
 	}
 
+	// Main screen flag: remove with Main_Screen.
+	if ( 'flag-blogvault' === $step ) {
+		wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+	}
+	if ( 'flag-failure-fresh' === $step ) {
+		wpcom_migration_e2e_flag_setup( 'fail' );
+	}
+	if ( 'flag-failure-keeps-row' === $step ) {
+		wpcom_migration_e2e_flag_setup(
+			'fail',
+			array(
+				'main_screen' => 'reprint',
+				'expires_at'  => time() - 1,
+			)
+		);
+	}
+
 	$slugs = array();
 
 	// These steps drive admin_menu themselves, with $pagenow and
 	// $plugin_page set the way admin.php sets them; the shared fire below
 	// would just be redone with the wrong globals.
-	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title' ), true ) ) {
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) {
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
@@ -194,6 +213,11 @@ function wpcom_migration_e2e_menu_step( $step ) {
 
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
+
+			// Main screen flag: remove with Main_Screen.
+			if ( 0 !== (int) get_option( 'wpcom_migration_e2e_flag_requests', 0 ) ) {
+				throw new RuntimeException( 'A network should never ask for the main screen flag.' );
+			}
 			break;
 
 		case 'multisite-network':
@@ -204,6 +228,50 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
 			wpcom_migration_e2e_assert_title( 'wpcom-migration', $admin->bvinfo->getBrandName(), 'network_admin_menu' );
 			wpcom_migration_e2e_assert_screens_reachable( array( 'wpcom-migration' ), 'network_admin_menu' );
+
+			// Main screen flag: remove with Main_Screen.
+			if ( 0 !== (int) get_option( 'wpcom_migration_e2e_flag_requests', 0 ) ) {
+				throw new RuntimeException( 'A network should never ask for the main screen flag.' );
+			}
+			break;
+
+		// Main screen flag: remove with Main_Screen.
+		case 'flag-blogvault':
+			wpcom_migration_e2e_assert_blogvault_main( $slugs, 'A blogvault answer' );
+			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
+			if ( 1 !== (int) get_option( 'wpcom_migration_e2e_flag_requests' ) ) {
+				throw new RuntimeException( 'Menu, Settings link and redirect should share one fetch.' );
+			}
+			break;
+
+		case 'flag-failure-fresh':
+			wpcom_migration_e2e_assert_blogvault_main( $slugs, 'A failed first fetch' );
+			break;
+
+		case 'flag-failure-keeps-row':
+			if ( array( Settings_Page::PAGE_SLUG ) !== $slugs ) {
+				throw new RuntimeException( 'A failed fetch should keep the stored reprint row, got: ' . wp_json_encode( $slugs ) );
+			}
+			break;
+
+		case 'flag-redirect-first':
+			// Nothing stored; admin_init's redirect is the first to ask.
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+			$captured = null;
+			add_filter(
+				'wp_redirect',
+				function ( $location ) use ( &$captured ) {
+					$captured = $location;
+					return '';
+				}
+			);
+			update_option( 'wpcomredirect', 'yes' );
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+			if ( $admin->mainUrl() !== $captured ) {
+				throw new RuntimeException( 'The first redirect after activation should follow the fetched answer, got: ' . wp_json_encode( $captured ) );
+			}
 			break;
 
 		default:
@@ -224,6 +292,44 @@ function wpcom_migration_e2e_menu_slugs() {
 	sort( $slugs );
 
 	return $slugs;
+}
+
+/**
+ * Asserts the BlogVault screen is main: its row alone in the sidebar, and the
+ * Settings link and activation redirect leading to it.
+ *
+ * Main screen flag: remove with Main_Screen.
+ *
+ * @param array  $slugs Sidebar slugs after admin_menu.
+ * @param string $label What led here, for messages.
+ * @throws RuntimeException When an expectation fails.
+ */
+function wpcom_migration_e2e_assert_blogvault_main( array $slugs, $label ) {
+	if ( array( 'wpcom-migration' ) !== $slugs ) {
+		throw new RuntimeException( "$label should leave the BlogVault row alone in the sidebar, got: " . wp_json_encode( $slugs ) );
+	}
+
+	$admin    = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+	$expected = $admin->mainUrl();
+
+	$links = $admin->settingsLink( array(), 'wpcom-migration/wpcom_migration.php' );
+	if ( 1 !== count( $links ) || false === strpos( $links[0], '"' . $expected . '"' ) ) {
+		throw new RuntimeException( "$label: the Settings link should lead to $expected, got: " . wp_json_encode( $links ) );
+	}
+
+	$captured = null;
+	add_filter(
+		'wp_redirect',
+		function ( $location ) use ( &$captured ) {
+			$captured = $location;
+			return '';
+		}
+	);
+	update_option( 'wpcomredirect', 'yes' );
+	$admin->initHandler();
+	if ( $expected !== $captured ) {
+		throw new RuntimeException( "$label: the activation redirect should lead to $expected, got: " . wp_json_encode( $captured ) );
+	}
 }
 
 /**

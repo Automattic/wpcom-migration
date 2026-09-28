@@ -130,8 +130,9 @@ class Settings_Page {
 
 	/**
 	 * Registers the screen as the plugin's one sidebar entry, then takes the
-	 * row back out on a network or when the old screen's brand has asked for
-	 * no menu. The screen stays reachable at its URL either way.
+	 * row back out on a network, when the old screen's brand has asked for
+	 * no menu, or while WordPress.com names the old screen main. The screen
+	 * stays reachable at its URL either way.
 	 */
 	public function add_admin_menu() {
 		$this->page_hook = add_menu_page(
@@ -152,7 +153,7 @@ class Settings_Page {
 		 *
 		 * @param bool $show Whether the screen gets a sidebar row.
 		 */
-		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() ) {
+		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() && Main_Screen::is_reprint() ) { // Main screen flag: remove with Main_Screen.
 			return;
 		}
 
