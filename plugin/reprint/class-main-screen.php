@@ -21,7 +21,7 @@ class Main_Screen {
 	 *
 	 * @var string
 	 */
-	const ENDPOINT = 'https://public-api.wordpress.com/wpcom/v2/wpcom-migration/plugin-config';
+	const ENDPOINT = 'https://public-api.wordpress.com/wpcom/v2/migration-plugin-config';
 
 	/**
 	 * Option holding { main_screen, expires_at }.

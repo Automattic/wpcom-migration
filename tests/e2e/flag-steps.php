@@ -83,7 +83,7 @@ function wpcom_migration_e2e_flag_step( $step ) {
 
 			$last    = get_option( 'wpcom_migration_e2e_flag_last' );
 			$data    = get_file_data( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php', array( 'Version' => 'Version' ) );
-			$expects = Main_Screen::ENDPOINT . '?plugin_version=' . rawurlencode( $data['Version'] );
+			$expects = 'https://public-api.wordpress.com/wpcom/v2/migration-plugin-config?plugin_version=' . rawurlencode( $data['Version'] );
 			if ( $expects !== $last['url'] ) {
 				throw new RuntimeException( 'Requested ' . $last['url'] . ", expected $expects." );
 			}
