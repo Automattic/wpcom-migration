@@ -3,6 +3,10 @@
 	"preferredVersions": { "php": "8.2", "wp": "latest" },
 	"steps": [
 		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
+		},
+		{
 			"step": "activatePlugin",
 			"pluginPath": "wpcom-migration/wpcom_migration.php"
 		},
