@@ -12,7 +12,7 @@
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
-require_once __DIR__ . '/flag-steps.php'; // Main screen flag: remove with Main_Screen.
+require_once __DIR__ . '/flag-steps.php';
 
 // WordPress's fatal handler would swallow the message into a generic error
 // page; print it where run.sh shows the log instead.
@@ -50,7 +50,6 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		update_option( 'wpcombrand', array( 'hide_from_menu' => true ) );
 	}
 
-	// Main screen flag: remove with Main_Screen.
 	if ( 'flag-blogvault' === $step ) {
 		wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
 	}
@@ -72,7 +71,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	// These steps drive admin_menu themselves, with $pagenow and
 	// $plugin_page set the way admin.php sets them; the shared fire below
 	// would just be redone with the wrong globals.
-	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) { // Main screen flag: remove with Main_Screen.
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) {
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
@@ -214,7 +213,6 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
 
-			// Main screen flag: remove with Main_Screen.
 			if ( 0 !== (int) get_option( 'wpcom_migration_e2e_flag_requests', 0 ) ) {
 				throw new RuntimeException( 'A network should never ask for the main screen flag.' );
 			}
@@ -229,13 +227,11 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			wpcom_migration_e2e_assert_title( 'wpcom-migration', $admin->bvinfo->getBrandName(), 'network_admin_menu' );
 			wpcom_migration_e2e_assert_screens_reachable( array( 'wpcom-migration' ), 'network_admin_menu' );
 
-			// Main screen flag: remove with Main_Screen.
 			if ( 0 !== (int) get_option( 'wpcom_migration_e2e_flag_requests', 0 ) ) {
 				throw new RuntimeException( 'A network should never ask for the main screen flag.' );
 			}
 			break;
 
-		// Main screen flag: remove with Main_Screen.
 		case 'flag-blogvault':
 			wpcom_migration_e2e_assert_blogvault_main( $slugs, 'A blogvault answer' );
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
@@ -297,8 +293,6 @@ function wpcom_migration_e2e_menu_slugs() {
 /**
  * Asserts the BlogVault screen is main: its row alone in the sidebar, and the
  * Settings link and activation redirect leading to it.
- *
- * Main screen flag: remove with Main_Screen.
  *
  * @param array  $slugs Sidebar slugs after admin_menu.
  * @param string $label What led here, for messages.

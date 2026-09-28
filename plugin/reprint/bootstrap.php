@@ -36,7 +36,6 @@ add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) )
 register_activation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 
-// Main screen flag: remove with Main_Screen.
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Main_Screen::class, 'forget' ) );
 
 /**

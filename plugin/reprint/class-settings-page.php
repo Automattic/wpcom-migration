@@ -153,7 +153,7 @@ class Settings_Page {
 		 *
 		 * @param bool $show Whether the screen gets a sidebar row.
 		 */
-		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() && Main_Screen::is_reprint() ) { // Main screen flag: remove with Main_Screen.
+		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() && Main_Screen::is_reprint() ) {
 			return;
 		}
 

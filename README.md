@@ -9,7 +9,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network. Every blueprint first installs a must-use plugin that answers the main screen flag endpoint.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
 
@@ -41,7 +41,7 @@ To activate a source checkout directly (without a build), run `composer install 
 
 The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no longer in the sidebar. It stays reachable at its URL.
 
-Until the WordPress.com side of Reprint ships, WordPress.com decides which of the two screens is main: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/wpcom-migration/plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. With `blogvault`, the old screen gets the sidebar row, the *Settings* link and the activation redirect, and the Reprint screen is reachable only at its URL. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after five minutes. Networks never ask. The flag is temporary; its lines are marked `Main screen flag: remove with Main_Screen.`
+Until the WordPress.com side of Reprint ships, WordPress.com decides which of the two screens is main: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/wpcom-migration/plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. With `blogvault`, the old screen gets the sidebar row, the *Settings* link and the activation redirect, and the Reprint screen is reachable only at its URL. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after five minutes. Networks never ask.
 
 On a network the old screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row. A brand whitelabelled with `hide` or `hide_from_menu` takes away the Reprint screen's row too; the screen stays reachable at its URL.
 

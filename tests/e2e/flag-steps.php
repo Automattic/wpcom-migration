@@ -4,8 +4,6 @@
  * the endpoint mock in flag-mock.php. Each step throws on a failed
  * expectation.
  *
- * Main screen flag: remove with Main_Screen.
- *
  * @package wpcom-migration
  */
 

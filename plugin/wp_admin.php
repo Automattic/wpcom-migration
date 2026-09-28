@@ -34,7 +34,7 @@ class WPCOMWPAdmin {
 	 * `adminurl`, where it still describes the old screen.
 	 */
 	public function migrationScreenUrl() {
-		if (!is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && $this->reprintIsMain()) { // Main screen flag: remove with Main_Screen.
+		if (!is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && $this->reprintIsMain()) {
 			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
 		}
 		return $this->mainUrl();
@@ -43,8 +43,6 @@ class WPCOMWPAdmin {
 	/**
 	 * Whether WordPress.com names the Reprint screen main. False in a source
 	 * checkout without plugin/vendor/, where the Reprint classes are absent.
-	 *
-	 * Main screen flag: remove with Main_Screen.
 	 */
 	private function reprintIsMain() {
 		return class_exists('\Automattic\WPCOM_Migration\Reprint\Main_Screen') && \Automattic\WPCOM_Migration\Reprint\Main_Screen::is_reprint();
@@ -85,7 +83,7 @@ class WPCOMWPAdmin {
 			// notice handling key on. The network admin, where the Reprint
 			// screen doesn't run, keeps this row, and so does a single site
 			// while WordPress.com names this screen main.
-			if (!is_multisite() && $this->reprintIsMain()) { // Main screen flag: remove with Main_Screen.
+			if (!is_multisite() && $this->reprintIsMain()) {
 				remove_menu_page($this->bvinfo->plugname);
 				add_action('load-'.$hook, array($this, 'setScreenTitle'));
 			}

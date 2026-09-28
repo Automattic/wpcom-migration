@@ -2,9 +2,6 @@
 /**
  * Which screen the plugin's entry points lead to, as WordPress.com decides.
  *
- * Main screen flag: remove with Main_Screen. See
- * docs/superpowers/specs/2026-09-28-main-screen-flag-design.md.
- *
  * @package wpcom-migration
  */
 
