@@ -115,6 +115,74 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove secret', $step );
 			break;
 
+		case 'reject-non-administrator-manual-access':
+			add_role(
+				'migration-options-only',
+				'Migration options only',
+				array(
+					'read'           => true,
+					'manage_options' => true,
+				)
+			);
+			$user_id = wp_insert_user(
+				array(
+					'user_login' => 'migration-options-only',
+					'user_pass'  => wp_generate_password( 24, false ),
+					'role'       => 'migration-options-only',
+				)
+			);
+			if ( is_wp_error( $user_id ) ) {
+				throw new RuntimeException( 'Could not create the options-only user: ' . $user_id->get_error_message() );
+			}
+
+			wp_set_current_user( $user_id );
+			if ( ! current_user_can( 'manage_options' ) || in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
+				throw new RuntimeException( 'The test user must have manage_options without the administrator role.' );
+			}
+			if ( '' !== wpcom_migration_e2e_render_manual( $manual ) ) {
+				throw new RuntimeException( 'A non-administrator can view the manual export screen.' );
+			}
+
+			$die_handler     = static function () {
+				throw new RuntimeException( 'manual access denied' );
+			};
+			$die_filter      = static function () use ( $die_handler ) {
+				return $die_handler;
+			};
+			$redirect_filter = static function () {
+				throw new RuntimeException( 'A manual action reached its redirect.' );
+			};
+			add_filter( 'wp_die_handler', $die_filter );
+			add_filter( 'wp_redirect', $redirect_filter );
+			try {
+				$actions = array(
+					array( Manual_Page::SAVE_SECRET_ACTION, 'handle_save_secret', array( Manual_Page::SECRET_FIELD => 'attacker-secret' ) ),
+					array( Manual_Page::SAVE_ENABLED_ACTION, 'handle_save_enabled', array( Manual_Page::ENABLED_FIELD => '1' ) ),
+					array( Manual_Page::DISCARD_SECRET_ACTION, 'handle_discard_secret', array() ),
+				);
+				foreach ( $actions as $action ) {
+					wpcom_migration_e2e_post( $action[0], $action[2] );
+					try {
+						$manual->{$action[1]}();
+						throw new RuntimeException( 'A manual action returned without denying access.' );
+					} catch ( RuntimeException $exception ) {
+						if ( 'manual access denied' !== $exception->getMessage() ) {
+							throw $exception;
+						}
+					}
+				}
+			} finally {
+				remove_filter( 'wp_die_handler', $die_filter );
+				remove_filter( 'wp_redirect', $redirect_filter );
+				wp_set_current_user( 1 );
+			}
+
+			$state = Exporter::get_state();
+			if ( 'smoke-secret-0123456789abcdef0123456789abcdef' !== get_option( Exporter::SECRET_OPTION ) || ! $state['secret_valid'] || $state['window_open'] ) {
+				throw new RuntimeException( 'Non-administrator access changed exporter credentials or state.' );
+			}
+			break;
+
 		case 'invalidate-secret':
 			delete_option( Exporter::SECRET_HASH_OPTION );
 			$state = Exporter::get_state();
