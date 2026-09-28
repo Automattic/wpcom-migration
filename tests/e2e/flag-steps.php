@@ -90,6 +90,9 @@ function wpcom_migration_e2e_flag_step( $step ) {
 			if ( 2 !== $last['timeout'] ) {
 				throw new RuntimeException( 'The fetch should time out after 2 s, got ' . wp_json_encode( $last['timeout'] ) . '.' );
 			}
+			if ( 0 !== $last['redirection'] ) {
+				throw new RuntimeException( 'The fetch should not follow redirects, got redirection ' . wp_json_encode( $last['redirection'] ) . '.' );
+			}
 			break;
 
 		case 'flag-cached':
@@ -219,6 +222,27 @@ function wpcom_migration_e2e_flag_step( $step ) {
 			$hook = 'deactivate_' . plugin_basename( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 			if ( false === has_action( $hook, array( Main_Screen::class, 'forget' ) ) ) {
 				throw new RuntimeException( "forget() is not hooked to $hook." );
+			}
+			break;
+
+		case 'flag-reactivate':
+			// A deactivation that skips its hooks, as the upgrader's does,
+			// leaves the answer stored; activating asks again anyway.
+			$plugin = 'wpcom-migration/wpcom_migration.php';
+			wpcom_migration_e2e_flag_setup(
+				$reprint,
+				array(
+					'main_screen' => 'blogvault',
+					'expires_at'  => time() + 100,
+				)
+			);
+			deactivate_plugins( $plugin, true );
+			$result = activate_plugin( $plugin );
+			if ( is_wp_error( $result ) ) {
+				throw new RuntimeException( 'Reactivating failed: ' . $result->get_error_message() );
+			}
+			if ( true !== Main_Screen::is_reprint() || 1 !== (int) get_option( 'wpcom_migration_e2e_flag_requests' ) ) {
+				throw new RuntimeException( 'Activating should drop the stored blogvault answer and fetch reprint.' );
 			}
 			break;
 

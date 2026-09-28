@@ -92,7 +92,7 @@ class Main_Screen {
 
 	/**
 	 * Deletes the stored answer, so the next check asks again. Runs on
-	 * deactivation.
+	 * activation and deactivation.
 	 */
 	public static function forget() {
 		self::$is_reprint = null;
@@ -143,7 +143,11 @@ class Main_Screen {
 		$plugin_data = get_file_data( dirname( __DIR__ ) . '/wpcom_migration.php', array( 'Version' => 'Version' ) );
 		$response    = wp_remote_get(
 			add_query_arg( 'plugin_version', rawurlencode( $plugin_data['Version'] ), self::ENDPOINT ),
-			array( 'timeout' => self::TIMEOUT )
+			array(
+				'timeout'     => self::TIMEOUT,
+				// Each hop gets its own timeout; the endpoint never redirects.
+				'redirection' => 0,
+			)
 		);
 
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {

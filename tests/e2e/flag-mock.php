@@ -25,8 +25,9 @@ add_filter(
 		update_option(
 			'wpcom_migration_e2e_flag_last',
 			array(
-				'url'     => $url,
-				'timeout' => isset( $args['timeout'] ) ? $args['timeout'] : null,
+				'url'         => $url,
+				'timeout'     => isset( $args['timeout'] ) ? $args['timeout'] : null,
+				'redirection' => isset( $args['redirection'] ) ? $args['redirection'] : null,
 			),
 			false
 		);
