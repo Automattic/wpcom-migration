@@ -12,7 +12,7 @@
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
-require_once __DIR__ . '/flag-steps.php';
+require_once __DIR__ . '/flag-steps.php'; // Main screen flag: remove with Main_Screen.
 
 // WordPress's fatal handler would swallow the message into a generic error
 // page; print it where run.sh shows the log instead.
@@ -72,7 +72,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	// These steps drive admin_menu themselves, with $pagenow and
 	// $plugin_page set the way admin.php sets them; the shared fire below
 	// would just be redone with the wrong globals.
-	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) {
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) { // Main screen flag: remove with Main_Screen.
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
