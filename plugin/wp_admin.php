@@ -25,7 +25,8 @@ class WPCOMWPAdmin {
 
 	/**
 	 * Where the plugin's own entry points send the user. The Reprint screen
-	 * on a single site when it is loaded; the old screen on a network, where
+	 * on a single site when it is loaded. While WordPress.com names the old
+	 * screen main, the old screen. The old screen on a network, where
 	 * the Reprint screen can't migrate, and in a source checkout without
 	 * plugin/vendor/, where the Reprint classes are absent.
 	 *
@@ -33,10 +34,18 @@ class WPCOMWPAdmin {
 	 * `adminurl`, where it still describes the old screen.
 	 */
 	public function migrationScreenUrl() {
-		if (!is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page')) {
+		if (!is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && $this->reprintIsMain()) {
 			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
 		}
 		return $this->mainUrl();
+	}
+
+	/**
+	 * Whether WordPress.com names the Reprint screen main. False in a source
+	 * checkout without plugin/vendor/, where the Reprint classes are absent.
+	 */
+	private function reprintIsMain() {
+		return class_exists('\Automattic\WPCOM_Migration\Reprint\Main_Screen') && \Automattic\WPCOM_Migration\Reprint\Main_Screen::is_reprint();
 	}
 
 	function removeAdminNotices() {
@@ -72,8 +81,9 @@ class WPCOMWPAdmin {
 			// admin.php?page=wpcom-migration still renders and keeps the
 			// toplevel_page_wpcom-migration hook suffix its stylesheet and
 			// notice handling key on. The network admin, where the Reprint
-			// screen doesn't run, keeps this row.
-			if (!is_multisite()) {
+			// screen doesn't run, keeps this row, and so does a single site
+			// while WordPress.com names this screen main.
+			if (!is_multisite() && $this->reprintIsMain()) {
 				remove_menu_page($this->bvinfo->plugname);
 				add_action('load-'.$hook, array($this, 'setScreenTitle'));
 			}

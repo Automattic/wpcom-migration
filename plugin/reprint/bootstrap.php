@@ -6,6 +6,7 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Main_Screen;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\REST_Controller;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
@@ -34,6 +35,11 @@ add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) )
 // while the write veto was not in place is discarded.
 register_activation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
+
+// A reactivated plugin asks WordPress.com for the main screen again, also
+// after a deactivation that skipped its hooks.
+register_activation_hook( $wpcom_migration_plugin_file, array( Main_Screen::class, 'forget' ) );
+register_deactivation_hook( $wpcom_migration_plugin_file, array( Main_Screen::class, 'forget' ) );
 
 /**
  * Holds the screen so the connection bootstrap can attach its section.
