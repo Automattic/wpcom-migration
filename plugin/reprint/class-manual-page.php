@@ -343,21 +343,24 @@ class Manual_Page {
 			<p><?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_secret_submit', false ); ?></p>
 		</form>
 		<?php
-		if ( $state['has_secret'] ) {
-			$this->render_discard_form();
+		if ( $state['has_credential'] ) {
+			$this->render_discard_form( $state );
 		}
 	}
 
 	/**
-	 * Renders the form that removes the secret.
+	 * Renders the form that removes the stored credentials, labelled for the
+	 * secret when one is stored and for the public key otherwise.
+	 *
+	 * @param array $state Exporter::get_state().
 	 */
-	private function render_discard_form() {
+	private function render_discard_form( array $state ) {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCARD_SECRET_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCARD_SECRET_ACTION ); ?>
-			<button type="submit" name="wpcom_migration_reprint_discard_secret_submit" class="button-link"><?php esc_html_e( 'Remove secret', 'wpcom-migration' ); ?></button>
-			<p class="description"><?php esc_html_e( 'Also turns the exporter off. WordPress.com can no longer export this site until a new secret is saved.', 'wpcom-migration' ); ?></p>
+			<button type="submit" name="wpcom_migration_reprint_discard_secret_submit" class="button-link"><?php echo esc_html( $state['has_secret'] ? __( 'Remove secret', 'wpcom-migration' ) : __( 'Remove public key', 'wpcom-migration' ) ); ?></button>
+			<p class="description"><?php echo esc_html( $state['has_secret'] ? __( 'Also turns the exporter off. WordPress.com can no longer export this site until a new secret is saved.', 'wpcom-migration' ) : __( 'Also turns the exporter off. WordPress.com can no longer export this site until it sets the exporter up again.', 'wpcom-migration' ) ); ?></p>
 		</form>
 		<?php
 	}

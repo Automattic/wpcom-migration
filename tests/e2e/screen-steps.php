@@ -271,6 +271,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$manual_html = wpcom_migration_e2e_render_manual( $manual );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'value="' . Manual_Page::DISCARD_SECRET_ACTION . '"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove public key', $step );
 			break;
 
 		case 'invalidate-public-key':
