@@ -12,13 +12,18 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use Automattic\Jetpack\Connection\Rest_Authentication;
+use InvalidArgumentException;
+use WordPress\Reprint\Server\PublicKeyServer;
+use WordPress\Reprint\Server\Utils;
 use WP_Error;
 use WP_REST_Controller;
+use WP_REST_Request;
 use WP_REST_Response;
 use WP_REST_Server;
 
 /**
- * POST wpcom-migration/v1/reprint/rotate-export-secret and enable-export.
+ * POST wpcom-migration/v1/reprint/rotate-export-secret, install-public-key and
+ * enable-export.
  */
 class REST_Controller extends WP_REST_Controller {
 
@@ -37,7 +42,7 @@ class REST_Controller extends WP_REST_Controller {
 	protected $rest_base = 'reprint';
 
 	/**
-	 * Registers both routes. Always registered: the permission check refuses
+	 * Registers the routes. Always registered: the permission check refuses
 	 * anyone else, and a 404 would read as "plugin absent".
 	 */
 	public function register_routes() {
@@ -49,6 +54,25 @@ class REST_Controller extends WP_REST_Controller {
 					'methods'             => WP_REST_Server::CREATABLE,
 					'callback'            => array( $this, 'rotate_secret' ),
 					'permission_callback' => array( $this, 'permission_check' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/' . $this->rest_base . '/install-public-key',
+			array(
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'install_public_key' ),
+					'permission_callback' => array( $this, 'permission_check' ),
+					'args'                => array(
+						'public_key' => array(
+							'description' => __( 'RSA public key, as PEM or one line of base64.', 'wpcom-migration' ),
+							'type'        => 'string',
+							'required'    => true,
+						),
+					),
 				),
 			)
 		);
@@ -108,17 +132,72 @@ class REST_Controller extends WP_REST_Controller {
 	}
 
 	/**
+	 * Replaces the enrolled public key and returns its key id.
+	 *
+	 * Reprint checks and canonicalizes the key, so the id returned is the one
+	 * the client computes from its private key.
+	 *
+	 * @param WP_REST_Request $request The request, carrying public_key.
+	 * @return WP_REST_Response|WP_Error The key id, or a 400, 500 or 501.
+	 */
+	public function install_public_key( WP_REST_Request $request ) {
+		if ( ! Utils::key_auth_required() ) {
+			return new WP_Error(
+				'wpcom_migration_key_auth_unsupported',
+				__( 'This site cannot verify public keys. Rotate the export secret instead.', 'wpcom-migration' ),
+				array( 'status' => 501 )
+			);
+		}
+
+		try {
+			$public_key = PublicKeyServer::assert_valid_public_key( (string) $request['public_key'] );
+		} catch ( InvalidArgumentException $exception ) {
+			return new WP_Error(
+				'wpcom_migration_invalid_public_key',
+				$exception->getMessage(),
+				array( 'status' => 400 )
+			);
+		}
+
+		if ( ! Exporter::store_public_key( $public_key ) ) {
+			return new WP_Error(
+				'wpcom_migration_public_key_not_stored',
+				__( 'Failed to persist the public key.', 'wpcom-migration' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		$key_id = Utils::public_key_fingerprint( $public_key );
+
+		Exporter::record_event(
+			'public_key_installed',
+			array(
+				'user_id' => get_current_user_id(),
+				'key_id'  => $key_id,
+			)
+		);
+
+		return new WP_REST_Response(
+			array(
+				'key_id'     => $key_id,
+				'export_url' => $this->export_url(),
+			),
+			200
+		);
+	}
+
+	/**
 	 * Opens the export window without rotating the secret, so a caller that
-	 * already has one can reopen a window that closed.
+	 * already has a credential can reopen a window that closed.
 	 *
 	 * @return WP_REST_Response|WP_Error The unix time the window opened at.
 	 */
 	public function enable_export() {
 		$state = Exporter::get_state();
-		if ( ! $state['secret_valid'] ) {
+		if ( ! $state['credential_valid'] ) {
 			return new WP_Error(
-				'wpcom_migration_no_secret',
-				__( 'Save a secret first.', 'wpcom-migration' ),
+				'wpcom_migration_no_credential',
+				__( 'Install a public key or save a secret first.', 'wpcom-migration' ),
 				array( 'status' => 409 )
 			);
 		}
@@ -147,7 +226,7 @@ class REST_Controller extends WP_REST_Controller {
 	/**
 	 * An administrator, authenticated by a Jetpack user token or by core.
 	 *
-	 * A role check, not a capability one: this hands out a secret that
+	 * A role check, not a capability one: this installs a credential that
 	 * streams the whole database and file tree, and no capability says that.
 	 *
 	 * @return bool|WP_Error

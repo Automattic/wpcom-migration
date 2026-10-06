@@ -6,7 +6,7 @@
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
  * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen,
- * provisioning, connection, menu. The secret must match the one the matching
+ * provisioning, provisioning-key, connection, menu. The secret must match the one the matching
  * blueprint stores.
  *
  * @package wpcom-migration
@@ -33,14 +33,14 @@ require_once __DIR__ . '/provisioning-steps.php';
 
 switch ( $wpcom_migration_scenario ) {
 	case 'open':
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
 		break;
 
 	case 'screen':
 		// The screen blueprint ends with the window open (secret valid,
 		// enabled); the same signed-preflight assertions prove the screen's
 		// form handlers left the exporter in a working state.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
 		break;
 
 	case 'menu':
@@ -114,7 +114,7 @@ switch ( $wpcom_migration_scenario ) {
 		// nothing can ever answer.
 		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_secret' );
+		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_credential' );
 
 		// An administrator rotates: a fresh 64-hex secret and the export URL.
 		$response = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
@@ -145,7 +145,7 @@ switch ( $wpcom_migration_scenario ) {
 		}
 
 		// The secret WordPress.com received serves a real export.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $rotated_secret );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret ) );
 
 		// Rotating again retires the old secret: a request signed with it is
 		// refused, while the new one still opens the window.
@@ -161,7 +161,97 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_status( $response, 403 );
 		wpcom_migration_e2e_expect_error_json( $response, 403 );
 
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $new_secret );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $new_secret ) );
+		break;
+
+	case 'provisioning-key':
+		// WordPress.com provisions a site that verifies keys: it installs its
+		// public key, opens the window, and signs every export request with
+		// the private half.
+		$install_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/install-public-key';
+		$enable_url  = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/enable-export';
+
+		list( $private_key, $public_key ) = WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+		$key_client                       = new WordPress\Reprint\Server\PublicKeyClient( $private_key );
+
+		// The route exists.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		if ( ! isset( $json['routes']['/wpcom-migration/v1/reprint/install-public-key'] ) ) {
+			wpcom_migration_e2e_fail( 'Namespace index lacks install-public-key: ' . $response['body'] );
+		}
+
+		// Nobody: 401. An editor: 403.
+		$response = wpcom_migration_e2e_request( $install_url, array(), 'POST', array( 'public_key' => $public_key ) );
+		wpcom_migration_e2e_expect_status( $response, 401 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
+
+		$response = wpcom_migration_e2e_request( $install_url, wpcom_migration_e2e_basic_auth_headers( 'e2e-editor', WPCOM_MIGRATION_E2E_EDITOR_APP_PASSWORD ), 'POST', array( 'public_key' => $public_key ) );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
+
+		$admin_headers = wpcom_migration_e2e_basic_auth_headers( 'admin', WPCOM_MIGRATION_E2E_ADMIN_APP_PASSWORD );
+
+		// Nothing stored yet: enable refuses.
+		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 409 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_credential' );
+
+		// Not a key, a private key, and a key under 3072 bits: each refused
+		// with Reprint's reason.
+		$weak_key = openssl_pkey_get_details(
+			openssl_pkey_new(
+				array(
+					'private_key_bits' => 2048,
+					'private_key_type' => OPENSSL_KEYTYPE_RSA,
+				)
+			)
+		)['key'];
+		foreach ( array( 'not a key', $private_key, $weak_key ) as $bad_key ) {
+			$response = wpcom_migration_e2e_request( $install_url, $admin_headers, 'POST', array( 'public_key' => $bad_key ) );
+			wpcom_migration_e2e_expect_status( $response, 400 );
+			wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_invalid_public_key' );
+		}
+
+		// An administrator installs the key: the id the client computes, and
+		// the export URL.
+		$response = wpcom_migration_e2e_request( $install_url, $admin_headers, 'POST', array( 'public_key' => $public_key ) );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		if ( ! isset( $json['key_id'] ) || $key_client->get_key_id() !== $json['key_id'] ) {
+			wpcom_migration_e2e_fail( 'Install returned the wrong key_id (want ' . $key_client->get_key_id() . '): ' . $response['body'] );
+		}
+		if ( ! isset( $json['export_url'] ) || $wpcom_migration_base_url . '/?reprint-api-wpcom-migration' !== $json['export_url'] ) {
+			wpcom_migration_e2e_fail( 'Install returned an unexpected export_url: ' . $response['body'] );
+		}
+
+		// Key stored, window still closed: a key-signed request gets 409.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
+		wpcom_migration_e2e_expect_status( $response, 409 );
+		wpcom_migration_e2e_expect_error_json( $response, 409 );
+
+		// Enable, and the key serves a real export.
+		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
+
+		// Installing another key, sent as PEM, retires the first.
+		list( $second_private_key, $second_public_key ) = WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+		$second_client                                  = new WordPress\Reprint\Server\PublicKeyClient( $second_private_key );
+
+		$response = wpcom_migration_e2e_request( $install_url, $admin_headers, 'POST', array( 'public_key' => WordPress\Reprint\Server\Utils::public_key_to_pem( $second_public_key ) ) );
+		wpcom_migration_e2e_expect_status( $response, 200 );
+		$json = wpcom_migration_e2e_expect_json( $response );
+		if ( ! isset( $json['key_id'] ) || $second_client->get_key_id() !== $json['key_id'] ) {
+			wpcom_migration_e2e_fail( 'A PEM install returned the wrong key_id (want ' . $second_client->get_key_id() . '): ' . $response['body'] );
+		}
+
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403 );
+
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $second_client, $wpcom_migration_endpoint ) );
 		break;
 
 	case 'connection':
@@ -180,7 +270,7 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
 
 		// The window the REST route opened serves a real export.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, $wpcom_migration_secret );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
 		break;
 
 	default:
@@ -192,11 +282,11 @@ fwrite( STDOUT, "Scenario '$wpcom_migration_scenario' passed.\n" );
 /**
  * Asserts a signed preflight request answers as the window being open.
  *
- * @param string $url    Preflight endpoint URL.
- * @param string $secret The shared secret.
+ * @param string   $url     Preflight endpoint URL.
+ * @param string[] $headers Signature header lines for $url.
  */
-function wpcom_migration_e2e_assert_open( $url, $secret ) {
-	$response = wpcom_migration_e2e_request( $url, wpcom_migration_e2e_signed_headers( $secret ) );
+function wpcom_migration_e2e_assert_open( $url, array $headers ) {
+	$response = wpcom_migration_e2e_request( $url, $headers );
 	wpcom_migration_e2e_expect_status( $response, 200 );
 	$json = wpcom_migration_e2e_expect_json( $response );
 	foreach ( array( 'ok', 'protocol_version', 'php', 'wp_detect' ) as $key ) {
@@ -234,6 +324,21 @@ function wpcom_migration_e2e_signed_headers( $secret ) {
 }
 
 /**
+ * X-Auth-* header lines for a GET signed with a private key.
+ *
+ * @param WordPress\Reprint\Server\PublicKeyClient $client The signing client.
+ * @param string                                   $url    The request URL; its path and query are signed.
+ * @return string[]
+ */
+function wpcom_migration_e2e_key_signed_headers( $client, $url ) {
+	$lines = array();
+	foreach ( $client->get_auth_headers( 'GET', $url ) as $name => $value ) {
+		$lines[] = $name . ': ' . $value;
+	}
+	return $lines;
+}
+
+/**
  * A basic-auth header line for an application password, as WordPress.com
  * sends it.
  *
@@ -261,22 +366,25 @@ function wpcom_migration_e2e_expect_rest_error( array $response, $code ) {
 /**
  * Sends a request.
  *
- * @param string   $url     Request URL.
- * @param string[] $headers Header lines.
- * @param string   $method  HTTP method.
+ * @param string     $url       Request URL.
+ * @param string[]   $headers   Header lines.
+ * @param string     $method    HTTP method.
+ * @param array|null $json_body Body to send as JSON, or null for none.
  * @return array{status: int, headers: array<string, string>, body: string}
  */
-function wpcom_migration_e2e_request( $url, array $headers, $method = 'GET' ) {
-	$context = stream_context_create(
-		array(
-			'http' => array(
-				'method'        => $method,
-				'header'        => implode( "\r\n", $headers ),
-				'ignore_errors' => true,
-				'timeout'       => 120,
-			),
-		)
+function wpcom_migration_e2e_request( $url, array $headers, $method = 'GET', $json_body = null ) {
+	$http = array(
+		'method'        => $method,
+		'ignore_errors' => true,
+		'timeout'       => 120,
 	);
+	if ( null !== $json_body ) {
+		$headers[]       = 'Content-Type: application/json';
+		$http['content'] = json_encode( $json_body );
+	}
+	$http['header'] = implode( "\r\n", $headers );
+
+	$context = stream_context_create( array( 'http' => $http ) );
 
 	$body = file_get_contents( $url, false, $context );
 	if ( false === $body ) {
