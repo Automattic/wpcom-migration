@@ -41,14 +41,14 @@ class Settings_Page {
 	const MODE_BLOCKED = 'blocked';
 
 	/**
-	 * A secret is stored but no longer matches the site's salts.
+	 * A credential is stored but none matches the site's salts.
 	 *
 	 * @var string
 	 */
 	const MODE_BROKEN = 'broken';
 
 	/**
-	 * The secret is valid and the exporter is on.
+	 * A credential is valid and the exporter is on.
 	 *
 	 * @var string
 	 */
@@ -62,7 +62,7 @@ class Settings_Page {
 	const MODE_CONNECTED_WAITING = 'connected_waiting';
 
 	/**
-	 * WordPress.com installed a secret; the exporter is off; no user connection.
+	 * WordPress.com installed a credential; the exporter is off; no user connection.
 	 *
 	 * @var string
 	 */
@@ -267,11 +267,11 @@ class Settings_Page {
 			return self::MODE_BLOCKED;
 		}
 
-		if ( $state['has_secret'] && ! $state['secret_valid'] ) {
+		if ( $state['has_credential'] && ! $state['credential_valid'] ) {
 			return self::MODE_BROKEN;
 		}
 
-		if ( $state['secret_valid'] && $state['window_open'] ) {
+		if ( $state['credential_valid'] && $state['window_open'] ) {
 			return self::MODE_READY;
 		}
 
@@ -279,7 +279,7 @@ class Settings_Page {
 			return self::MODE_CONNECTED_WAITING;
 		}
 
-		if ( $state['secret_valid'] ) {
+		if ( $state['credential_valid'] ) {
 			return self::MODE_PROVISIONED_WAITING;
 		}
 
@@ -304,7 +304,7 @@ class Settings_Page {
 				return;
 
 			case self::MODE_BROKEN:
-				$this->render_sentence( __( 'The export secret no longer matches this site — its security salts changed. Start the migration again on WordPress.com.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'The export credential no longer matches this site — its security salts changed. Start the migration again on WordPress.com.', 'wpcom-migration' ) );
 				if ( null !== $section && $user_connected ) {
 					$section->render_continue_button( true );
 					$section->render_disconnect_link();

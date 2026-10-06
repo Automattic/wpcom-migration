@@ -211,7 +211,7 @@ class Manual_Page {
 		$this->authorize( self::SAVE_ENABLED_ACTION );
 
 		$state = Exporter::get_state();
-		if ( ! $state['secret_valid'] ) {
+		if ( ! $state['credential_valid'] ) {
 			$this->redirect_with_notice( 'not_configured' );
 		}
 
@@ -269,7 +269,7 @@ class Manual_Page {
 
 	/**
 	 * Renders the screen: the secret form; the exporter toggle and export URL
-	 * once the secret is valid; the blog ID when connected.
+	 * once a credential is valid; the blog ID when connected.
 	 */
 	public function render_page() {
 		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
@@ -291,7 +291,7 @@ class Manual_Page {
 
 		$this->render_secret_form( $state );
 
-		if ( $state['secret_valid'] ) {
+		if ( $state['credential_valid'] ) {
 			$this->render_enable_form( $state );
 			$this->render_api_url();
 		}

@@ -241,7 +241,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-secret-discarded':
 			$state = Exporter::get_state();
-			if ( $state['has_secret'] || $state['window_open'] ) {
+			if ( $state['has_secret'] || $state['has_public_key'] || $state['window_open'] ) {
 				throw new RuntimeException( 'Removing the secret should delete it and close the window: ' . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
@@ -253,6 +253,35 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
+			break;
+
+		case 'store-public-key-only':
+			// What WordPress.com leaves on a site that verifies keys: a key,
+			// no secret.
+			Exporter::discard_credentials();
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			if ( ! Exporter::store_public_key( $public_key ) ) {
+				throw new RuntimeException( "Step '$step': could not store a public key." );
+			}
+			$state = Exporter::get_state();
+			if ( $state['has_secret'] || ! $state['public_key_valid'] || ! $state['credential_valid'] || $state['window_open'] ) {
+				throw new RuntimeException( "Step '$step': expected a valid key, no secret, window closed: " . wp_json_encode( $state ) );
+			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
+			break;
+
+		case 'invalidate-public-key':
+			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
+			$state = Exporter::get_state();
+			if ( ! $state['has_public_key'] || $state['public_key_valid'] || $state['credential_valid'] ) {
+				throw new RuntimeException( "Step '$step': deleting the hash should leave the key set but invalid: " . wp_json_encode( $state ) );
+			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
+			$html = wpcom_migration_e2e_render( $page );
+			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
 			break;
 
 		case 'assert-no-mode-headings':
