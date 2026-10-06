@@ -22,11 +22,13 @@ $wpcom_migration_scenario   = $argv[3];
 $wpcom_migration_secret     = 'smoke-secret-0123456789abcdef0123456789abcdef';
 $wpcom_migration_endpoint   = $wpcom_migration_base_url . '/?reprint-api-wpcom-migration&endpoint=preflight';
 
-$wpcom_migration_client_file = $wpcom_migration_plugin_dir . '/vendor/wp-php-toolkit/reprint-server/src/class-hmac-client.php';
-if ( ! is_file( $wpcom_migration_client_file ) ) {
+$wpcom_migration_server_src = $wpcom_migration_plugin_dir . '/vendor/wp-php-toolkit/reprint-server/src/';
+if ( ! is_file( $wpcom_migration_server_src . 'class-hmac-client.php' ) ) {
 	wpcom_migration_e2e_fail( 'Not a built plugin tree (no HMAC client): ' . $wpcom_migration_plugin_dir );
 }
-require_once $wpcom_migration_client_file;
+foreach ( array( 'class-envelope-signer.php', 'class-utils.php', 'class-hmac-client.php', 'class-public-key-client.php' ) as $wpcom_migration_server_file ) {
+	require_once $wpcom_migration_server_src . $wpcom_migration_server_file;
+}
 require_once __DIR__ . '/provisioning-steps.php';
 
 switch ( $wpcom_migration_scenario ) {
