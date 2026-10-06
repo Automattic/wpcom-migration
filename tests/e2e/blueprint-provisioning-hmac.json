@@ -4,6 +4,10 @@
 	"steps": [
 		{
 			"step": "runPHP",
+			"code": "<?php @mkdir( '/wordpress/wp-content/mu-plugins', 0777, true ); copy( '/wordpress/wp-content/wpcom-migration-e2e/hmac-only-mu-plugin.php', '/wordpress/wp-content/mu-plugins/hmac-only.php' );"
+		},
+		{
+			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
 		},
 		{

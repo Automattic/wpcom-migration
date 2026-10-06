@@ -6,7 +6,7 @@
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
  * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen,
- * provisioning, provisioning-key, connection, menu. The secret must match the one the matching
+ * provisioning-hmac, provisioning-key, connection, menu. The secret must match the one the matching
  * blueprint stores.
  *
  * @package wpcom-migration
@@ -82,10 +82,11 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_error_json( $response, 409 );
 		break;
 
-	case 'provisioning':
-		// WordPress.com installs the plugin through core, then provisions the
-		// exporter with an application password. All over HTTP with basic
-		// auth, as WordPress.com sends it.
+	case 'provisioning-hmac':
+		// On a host without OpenSSL, WordPress.com installs the plugin through
+		// core, then provisions the exporter with a shared secret and an
+		// application password. All over HTTP with basic auth, as
+		// WordPress.com sends it.
 		$rotate_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret';
 		$enable_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/enable-export';
 
@@ -93,7 +94,7 @@ switch ( $wpcom_migration_scenario ) {
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
-		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
 			if ( ! isset( $json['routes'][ $route ] ) ) {
 				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
 			}
@@ -109,6 +110,11 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
 
 		$admin_headers = wpcom_migration_e2e_basic_auth_headers( 'admin', WPCOM_MIGRATION_E2E_ADMIN_APP_PASSWORD );
+
+		// No OpenSSL, so no key could ever be verified.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/install-public-key', $admin_headers, 'POST', array( 'public_key' => 'irrelevant' ) );
+		wpcom_migration_e2e_expect_status( $response, 501 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_key_auth_unsupported' );
 
 		// No secret stored yet: enable refuses rather than open a window
 		// nothing can ever answer.
@@ -193,6 +199,11 @@ switch ( $wpcom_migration_scenario ) {
 
 		$admin_headers = wpcom_migration_e2e_basic_auth_headers( 'admin', WPCOM_MIGRATION_E2E_ADMIN_APP_PASSWORD );
 
+		// This host verifies keys, so a secret would never be accepted.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret', $admin_headers, 'POST' );
+		wpcom_migration_e2e_expect_status( $response, 501 );
+		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_secret_auth_unsupported' );
+
 		// Nothing stored yet: enable refuses.
 		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 409 );
@@ -259,7 +270,7 @@ switch ( $wpcom_migration_scenario ) {
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
-		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
 			if ( ! isset( $json['routes'][ $route ] ) ) {
 				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
 			}

@@ -107,9 +107,20 @@ class REST_Controller extends WP_REST_Controller {
 	 * for passwords a person types, and sites can filter it through
 	 * `random_password`, an extension point a credential should not have.
 	 *
-	 * @return WP_REST_Response|WP_Error The new secret, or a 500.
+	 * @return WP_REST_Response|WP_Error The new secret, or a 500 or 501.
 	 */
 	public function rotate_secret() {
+		// Where OpenSSL can verify keys, Reprint signs with them and its
+		// servers stop accepting secrets, so a secret issued here would go
+		// unused.
+		if ( Utils::key_auth_required() ) {
+			return new WP_Error(
+				'wpcom_migration_secret_auth_unsupported',
+				__( 'This site verifies exports with public keys. Install a public key instead.', 'wpcom-migration' ),
+				array( 'status' => 501 )
+			);
+		}
+
 		$secret = bin2hex( random_bytes( 32 ) );
 
 		if ( ! Exporter::store_secret( $secret ) ) {
