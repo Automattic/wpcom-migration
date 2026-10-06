@@ -5,11 +5,11 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (credentials, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, one that provisions through the REST routes, one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, two that provision through the REST routes (with a public key, and with a shared secret on a host made to look like it lacks OpenSSL), one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
 
@@ -31,7 +31,7 @@ To activate a source checkout directly (without a build), run `composer install 
 | Mode | When | Shows |
 |---|---|---|
 | The exporter runs on single sites only | Multisite | Nothing |
-| The export secret no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
+| The export credential no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
 | The exporter is on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
 | Connected as *email* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
 | This site is set up and ready | Provisioned with an application password | A *Log in with WordPress.com* link |
@@ -47,11 +47,13 @@ On a network the old screen keeps its row in the network admin, and the *Setting
 
 ## Setting up Reprint manually
 
-`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
+`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also removes an installed public key and turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 
-Two lanes end at the same two routes, `POST /wp-json/wpcom-migration/v1/reprint/rotate-export-secret` → `{ "secret", "export_url" }` and `POST …/enable-export` → `{ "enabled_at", "export_url" }`. Both require an administrator, authenticated either by core (an application password) or by a Jetpack user token; `enable-export` answers 409 until a valid secret is stored, and both answer 501 on a network. Reprint transfers over https only.
+Two lanes end at the same three routes: `POST /wp-json/wpcom-migration/v1/reprint/install-public-key {"public_key"}` → `{ "key_id", "export_url" }`, `POST …/rotate-export-secret` → `{ "secret", "export_url" }` and `POST …/enable-export` → `{ "enabled_at", "export_url" }`. All require an administrator, authenticated either by core (an application password) or by a Jetpack user token, and all answer 501 on a network. Reprint transfers over https only.
+
+Which credential WordPress.com sets up depends on the host. Where `openssl_verify()` exists, Reprint signs with keys: WordPress.com installs its public key (PEM or one line of base64, RSA, 3072 bits or more; anything else is a 400 `wpcom_migration_invalid_public_key`), and `rotate-export-secret` answers 501 `wpcom_migration_secret_auth_unsupported`. Elsewhere it rotates the secret, and `install-public-key` answers 501 `wpcom_migration_key_auth_unsupported`. The site holds one key at a time; installing another replaces it. `enable-export` answers 409 `wpcom_migration_no_credential` until either credential is stored and valid. Export requests are verified by Reprint's `RequestAuthenticator`, which accepts whichever of the two the host supports.
 
 **Application password** — where `GET /wp-json/` lists `authentication.application-passwords` (core: `is_ssl()` true and no plugin has switched them off). WordPress.com sends the administrator once to `wp-admin/authorize-application.php?app_name=Migrate+to+WordPress.com&app_id=<uuid>&success_url=…&reject_url=…`; core redirects to `success_url` with `site_url`, `user_login` and `password`. WordPress.com then checks the password with `GET /wp-json/wp/v2/users/me` (a 401 here means the server strips the `Authorization` header — Apache CGI without the rewrite rule WordPress 5.6 added; saving Permalinks regenerates it), installs and activates the plugin (`POST /wp-json/wp/v2/plugins {"slug":"wpcom-migration","status":"active"}`; an older copy is replaced by `PUT …/plugins/wpcom-migration/wpcom_migration {"status":"inactive"}`, `DELETE`, then the `POST`, since core has no update route), calls the two routes, exports, and revokes the password (`GET …/users/me/application-passwords/introspect`, then `DELETE …/application-passwords/<uuid>`). No login on the site.
 
