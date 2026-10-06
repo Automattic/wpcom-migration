@@ -6,6 +6,8 @@
  * @package wpcom-migration
  */
 
+use WordPress\Reprint\Server\Utils;
+
 require_once WP_PLUGIN_DIR . '/wpcom-migration/vendor/wp-php-toolkit/reprint-server/src/class-utils.php';
 
-\WordPress\Reprint\Server\Utils::override_key_auth_required_for_tests( false );
+Utils::override_key_auth_required_for_tests( false );
