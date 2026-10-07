@@ -205,8 +205,9 @@ class Exporter {
 		 * secret, a credential hash or the signature.
 		 *
 		 * @param string $event   One of export_served, export_refused,
-		 *                        secret_rotated, public_key_installed,
-	 *                        window_opened, window_closed,
+		 *                        secret_rotated, secret_removed,
+		 *                        public_key_installed, public_key_removed,
+		 *                        window_opened, window_closed,
 		 *                        credentials_discarded, credential_hash_mismatch.
 		 * @param array  $context Details of the event.
 		 */
@@ -217,8 +218,7 @@ class Exporter {
 	 * Discards any stored export credentials.
 	 *
 	 * Runs on plugin activation and deactivation, clearing whatever was
-	 * written while protect_options() was not in place; on disconnect; and
-	 * from the by-hand screen's Remove secret button.
+	 * written while protect_options() was not in place; and on disconnect.
 	 */
 	public static function discard_credentials() {
 		$had_any = false;
@@ -231,6 +231,39 @@ class Exporter {
 				'credentials_discarded',
 				array( 'boundary' => current_filter() )
 			);
+		}
+	}
+
+	/**
+	 * Discards the stored secret and turns the exporter off, leaving any
+	 * public key in place.
+	 */
+	public static function discard_secret() {
+		self::discard_credential( self::SECRET_OPTION, self::SECRET_HASH_OPTION, 'secret_removed' );
+	}
+
+	/**
+	 * Discards the stored public key and turns the exporter off, leaving any
+	 * secret in place.
+	 */
+	public static function discard_public_key() {
+		self::discard_credential( self::PUBLIC_KEY_OPTION, self::PUBLIC_KEY_HASH_OPTION, 'public_key_removed' );
+	}
+
+	/**
+	 * Deletes one credential and its hash, and closes the export window.
+	 *
+	 * @param string $option      The credential's option.
+	 * @param string $hash_option The option holding its hash.
+	 * @param string $event       Event to report when anything was deleted.
+	 */
+	private static function discard_credential( $option, $hash_option, $event ) {
+		$had_any = delete_option( $option );
+		$had_any = delete_option( $hash_option ) || $had_any;
+		self::close_export_window();
+
+		if ( $had_any ) {
+			self::record_event( $event, array( 'user_id' => get_current_user_id() ) );
 		}
 	}
 

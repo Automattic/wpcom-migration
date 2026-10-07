@@ -255,24 +255,73 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
 			break;
 
-		case 'store-public-key-only':
-			// What WordPress.com leaves on a site that verifies keys: a key,
-			// no secret.
-			Exporter::discard_credentials();
-			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
-			if ( ! Exporter::store_public_key( $public_key ) ) {
-				throw new RuntimeException( "Step '$step': could not store a public key." );
-			}
+		case 'render-public-key-form':
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'name="' . Manual_Page::PUBLIC_KEY_FIELD . '"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Enroll key', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
+			break;
+
+		case 'enroll-invalid-public-key':
+			wpcom_migration_e2e_post( Manual_Page::SAVE_PUBLIC_KEY_ACTION, array( Manual_Page::PUBLIC_KEY_FIELD => 'not a key' ) );
+			$manual->handle_save_public_key();
+			break;
+
+		case 'assert-no-public-key':
 			$state = Exporter::get_state();
-			if ( $state['has_secret'] || ! $state['public_key_valid'] || ! $state['credential_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': expected a valid key, no secret, window closed: " . wp_json_encode( $state ) );
+			if ( $state['has_public_key'] ) {
+				throw new RuntimeException( "Step '$step': an invalid key must not be stored: " . wp_json_encode( $state ) );
+			}
+			break;
+
+		case 'enroll-public-key':
+			// A PEM block, as an administrator would paste it; the one-line
+			// form is kept to compare against what gets stored.
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			update_option( 'wpcom_migration_e2e_public_key', $public_key );
+			wpcom_migration_e2e_post( Manual_Page::SAVE_PUBLIC_KEY_ACTION, array( Manual_Page::PUBLIC_KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			$manual->handle_save_public_key();
+			break;
+
+		case 'assert-public-key-enrolled':
+			$public_key = get_option( 'wpcom_migration_e2e_public_key' );
+			$state      = Exporter::get_state();
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['public_key_valid'] || $state['has_secret'] || $state['window_open'] ) {
+				throw new RuntimeException( "Step '$step': expected the enrolled key, no secret, window closed: " . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
-			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_saved';
+			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key saved.', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<code>' . \WordPress\Reprint\Server\Utils::public_key_fingerprint( $public_key ) . '</code>', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'value="' . Manual_Page::REMOVE_PUBLIC_KEY_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
-			wpcom_migration_e2e_expect_contains( $manual_html, 'value="' . Manual_Page::DISCARD_SECRET_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove public key', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
+			break;
+
+		case 'remove-public-key':
+			wpcom_migration_e2e_post( Manual_Page::REMOVE_PUBLIC_KEY_ACTION, array() );
+			$manual->handle_remove_public_key();
+			break;
+
+		case 'assert-public-key-removed':
+			$state = Exporter::get_state();
+			if ( $state['has_public_key'] || $state['window_open'] ) {
+				throw new RuntimeException( "Step '$step': removing the key should delete it and close the window: " . wp_json_encode( $state ) );
+			}
+			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_removed';
+			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key removed.', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
+			break;
+
+		case 'assert-secret-removed-key-kept':
+			$state = Exporter::get_state();
+			if ( $state['has_secret'] || ! $state['public_key_valid'] || $state['window_open'] ) {
+				throw new RuntimeException( "Step '$step': removing the secret should keep the key and close the window: " . wp_json_encode( $state ) );
+			}
 			break;
 
 		case 'invalidate-public-key':

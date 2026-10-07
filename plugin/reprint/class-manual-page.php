@@ -1,6 +1,7 @@
 <?php
 /**
- * The by-hand screen: export secret, exporter toggle, export URL, blog ID.
+ * The by-hand screen: export secret, public key, exporter toggle, export URL,
+ * blog ID.
  *
  * Nothing links here; support gives out the URL.
  *
@@ -9,11 +10,15 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
+use InvalidArgumentException;
+use WordPress\Reprint\Server\PublicKeyServer;
+use WordPress\Reprint\Server\Utils;
+
 /**
  * Renders wp-admin/admin.php?page=wpcom-migration-manual and handles its
  * forms.
  *
- * Both forms post to admin-post.php rather than options.php: the Settings API
+ * The forms post to admin-post.php rather than options.php: the Settings API
  * writes the option itself, and Exporter's write veto would discard it.
  */
 class Manual_Page {
@@ -47,6 +52,21 @@ class Manual_Page {
 	const DISCARD_SECRET_ACTION = 'wpcom_migration_reprint_discard_secret';
 
 	/**
+	 * The admin-post action that enrolls a public key, replacing any other.
+	 *
+	 * @var string
+	 */
+	const SAVE_PUBLIC_KEY_ACTION = 'wpcom_migration_reprint_save_public_key';
+
+	/**
+	 * The admin-post action that removes the public key and turns the
+	 * exporter off.
+	 *
+	 * @var string
+	 */
+	const REMOVE_PUBLIC_KEY_ACTION = 'wpcom_migration_reprint_remove_public_key';
+
+	/**
 	 * Query argument carrying the result of a form post back to the screen.
 	 *
 	 * @var string
@@ -59,6 +79,13 @@ class Manual_Page {
 	 * @var string
 	 */
 	const SECRET_FIELD = 'wpcom_migration_reprint_secret';
+
+	/**
+	 * Name of the public key textarea.
+	 *
+	 * @var string
+	 */
+	const PUBLIC_KEY_FIELD = 'wpcom_migration_reprint_public_key';
 
 	/**
 	 * Name of the enable checkbox.
@@ -107,6 +134,8 @@ class Manual_Page {
 		add_action( 'admin_post_' . self::SAVE_SECRET_ACTION, array( $this, 'handle_save_secret' ) );
 		add_action( 'admin_post_' . self::SAVE_ENABLED_ACTION, array( $this, 'handle_save_enabled' ) );
 		add_action( 'admin_post_' . self::DISCARD_SECRET_ACTION, array( $this, 'handle_discard_secret' ) );
+		add_action( 'admin_post_' . self::SAVE_PUBLIC_KEY_ACTION, array( $this, 'handle_save_public_key' ) );
+		add_action( 'admin_post_' . self::REMOVE_PUBLIC_KEY_ACTION, array( $this, 'handle_remove_public_key' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		// Priority 1: before the Command Palette (priority 10) lists $submenu.
 		add_action( 'admin_enqueue_scripts', array( $this, 'hide_submenu' ), 1 );
@@ -234,8 +263,60 @@ class Manual_Page {
 	public function handle_discard_secret() {
 		$this->authorize( self::DISCARD_SECRET_ACTION );
 
-		Exporter::discard_credentials();
+		Exporter::discard_secret();
 		$this->redirect_with_notice( 'discarded' );
+	}
+
+	/**
+	 * Enrolls the pasted public key, replacing any other, and redirects back
+	 * with a result notice.
+	 */
+	public function handle_save_public_key() {
+		$this->authorize( self::SAVE_PUBLIC_KEY_ACTION );
+
+		if ( ! Utils::key_auth_required() ) {
+			$this->redirect_with_notice( 'key_unsupported' );
+		}
+
+		// PublicKeyServer::assert_valid_public_key() is the real check; the
+		// sanitizer only cleans the pasted text.
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in authorize().
+		$pasted_key = sanitize_textarea_field( wp_unslash( $_POST[ self::PUBLIC_KEY_FIELD ] ?? '' ) );
+
+		try {
+			$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
+		} catch ( InvalidArgumentException $exception ) {
+			$this->redirect_with_notice( 'key_invalid' );
+		}
+
+		$state = Exporter::get_state();
+		if ( $state['public_key_valid'] && get_option( Exporter::PUBLIC_KEY_OPTION ) === $public_key ) {
+			$this->redirect_with_notice( 'key_unchanged' );
+		}
+
+		if ( ! Exporter::store_public_key( $public_key ) ) {
+			$this->redirect_with_notice( 'key_storage_failure' );
+		}
+
+		Exporter::record_event(
+			'public_key_installed',
+			array(
+				'user_id' => get_current_user_id(),
+				'key_id'  => Utils::public_key_fingerprint( $public_key ),
+			)
+		);
+		$this->redirect_with_notice( 'key_saved' );
+	}
+
+	/**
+	 * Removes the public key, turns the exporter off, and redirects back with
+	 * a result notice.
+	 */
+	public function handle_remove_public_key() {
+		$this->authorize( self::REMOVE_PUBLIC_KEY_ACTION );
+
+		Exporter::discard_public_key();
+		$this->redirect_with_notice( 'key_removed' );
 	}
 
 	/**
@@ -260,7 +341,10 @@ class Manual_Page {
 	 * Redirects back to the screen with a result code and exits.
 	 *
 	 * @param string $result One of saved, unchanged, enabled, disabled,
-	 *                       discarded, not_configured, storage_failure.
+	 *                       discarded, not_configured, storage_failure,
+	 *                       key_saved, key_unchanged, key_removed,
+	 *                       key_invalid, key_unsupported,
+	 *                       key_storage_failure.
 	 */
 	private function redirect_with_notice( $result ) {
 		wp_safe_redirect( add_query_arg( self::NOTICE_QUERY_ARG, $result, self::page_url() ) );
@@ -268,8 +352,9 @@ class Manual_Page {
 	}
 
 	/**
-	 * Renders the screen: the secret form; the exporter toggle and export URL
-	 * once a credential is valid; the blog ID when connected.
+	 * Renders the screen: the secret form; the public key form and table; the
+	 * exporter toggle and export URL once a credential is valid; the blog ID
+	 * when connected.
 	 */
 	public function render_page() {
 		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
@@ -290,6 +375,7 @@ class Manual_Page {
 		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 
 		$this->render_secret_form( $state );
+		$this->render_public_key_section( $state );
 
 		if ( $state['credential_valid'] ) {
 			$this->render_enable_form( $state );
@@ -343,25 +429,83 @@ class Manual_Page {
 			<p><?php submit_button( __( 'Save secret', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_secret_submit', false ); ?></p>
 		</form>
 		<?php
-		if ( $state['has_credential'] ) {
-			$this->render_discard_form( $state );
+		if ( $state['has_secret'] ) {
+			$this->render_discard_form();
 		}
 	}
 
 	/**
-	 * Renders the form that removes the stored credentials, labelled for the
-	 * secret when one is stored and for the public key otherwise.
-	 *
-	 * @param array $state Exporter::get_state().
+	 * Renders the form that removes the secret.
 	 */
-	private function render_discard_form( array $state ) {
+	private function render_discard_form() {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCARD_SECRET_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCARD_SECRET_ACTION ); ?>
-			<button type="submit" name="wpcom_migration_reprint_discard_secret_submit" class="button-link"><?php echo esc_html( $state['has_secret'] ? __( 'Remove secret', 'wpcom-migration' ) : __( 'Remove public key', 'wpcom-migration' ) ); ?></button>
-			<p class="description"><?php echo esc_html( $state['has_secret'] ? __( 'Also turns the exporter off. WordPress.com can no longer export this site until a new secret is saved.', 'wpcom-migration' ) : __( 'Also turns the exporter off. WordPress.com can no longer export this site until it sets the exporter up again.', 'wpcom-migration' ) ); ?></p>
+			<button type="submit" name="wpcom_migration_reprint_discard_secret_submit" class="button-link"><?php esc_html_e( 'Remove secret', 'wpcom-migration' ); ?></button>
+			<p class="description"><?php esc_html_e( 'Also turns the exporter off. WordPress.com can no longer export this site with the secret until a new one is saved.', 'wpcom-migration' ); ?></p>
 		</form>
+		<?php
+	}
+
+	/**
+	 * Renders the enrollment form and the enrolled key, or a note that this
+	 * host cannot verify keys.
+	 *
+	 * @param array $state Exporter::get_state().
+	 */
+	private function render_public_key_section( array $state ) {
+		?>
+		<hr />
+		<h2><?php esc_html_e( 'Public key', 'wpcom-migration' ); ?></h2>
+		<?php
+		if ( ! Utils::key_auth_required() ) {
+			echo '<p class="description">' . esc_html__( 'Public keys need OpenSSL, which this host does not have.', 'wpcom-migration' ) . '</p>';
+			return;
+		}
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<input type="hidden" name="action" value="<?php echo esc_attr( self::SAVE_PUBLIC_KEY_ACTION ); ?>" />
+			<?php wp_nonce_field( self::SAVE_PUBLIC_KEY_ACTION ); ?>
+			<p>
+				<label for="wpcom-migration-reprint-public-key"><?php esc_html_e( 'Public key', 'wpcom-migration' ); ?></label><br />
+				<textarea id="wpcom-migration-reprint-public-key" name="<?php echo esc_attr( self::PUBLIC_KEY_FIELD ); ?>" rows="4" class="large-text code"></textarea>
+			</p>
+			<p class="description"><?php esc_html_e( 'Paste the public key printed by "reprint keygen" or by "reprint pull". A PEM block or the single line are both accepted. Enrolling a key replaces the one below.', 'wpcom-migration' ); ?></p>
+			<p><?php submit_button( __( 'Enroll key', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_public_key_submit', false ); ?></p>
+		</form>
+		<?php
+		if ( ! $state['has_public_key'] ) {
+			return;
+		}
+
+		try {
+			$key_id = Utils::public_key_fingerprint( (string) get_option( Exporter::PUBLIC_KEY_OPTION, '' ) );
+		} catch ( InvalidArgumentException $exception ) {
+			$key_id = '—';
+		}
+		?>
+		<table class="widefat striped wpcom-migration-reprint-key-table">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Key id', 'wpcom-migration' ); ?></th>
+					<th></th>
+				</tr>
+			</thead>
+			<tbody>
+				<tr>
+					<td><code><?php echo esc_html( $key_id ); ?></code></td>
+					<td>
+						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline">
+							<input type="hidden" name="action" value="<?php echo esc_attr( self::REMOVE_PUBLIC_KEY_ACTION ); ?>" />
+							<?php wp_nonce_field( self::REMOVE_PUBLIC_KEY_ACTION ); ?>
+							<?php submit_button( __( 'Remove', 'wpcom-migration' ), 'link-delete', 'wpcom_migration_reprint_remove_public_key_submit', false ); ?>
+						</form>
+					</td>
+				</tr>
+			</tbody>
+		</table>
+		<p class="description"><?php esc_html_e( 'Removing the key also turns the exporter off.', 'wpcom-migration' ); ?></p>
 		<?php
 	}
 
@@ -383,7 +527,7 @@ class Manual_Page {
 					value="1"<?php checked( $state['window_open'] ); ?> />
 				<?php esc_html_e( 'Turn the exporter on', 'wpcom-migration' ); ?>
 			</label>
-			<p class="description"><?php esc_html_e( 'While on, anyone with the export secret can download this site\'s database and files. It turns itself off an hour after the last export.', 'wpcom-migration' ); ?></p>
+			<p class="description"><?php esc_html_e( 'While on, anyone with the export secret or the private half of the public key can download this site\'s database and files. It turns itself off an hour after the last export.', 'wpcom-migration' ); ?></p>
 			<p><?php submit_button( __( 'Save', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_enabled_submit', false ); ?></p>
 		</form>
 		<?php
@@ -418,13 +562,19 @@ class Manual_Page {
 		$result = sanitize_key( wp_unslash( $_GET[ self::NOTICE_QUERY_ARG ] ?? '' ) );
 
 		$notices = array(
-			'saved'           => array( 'success', __( 'Secret saved.', 'wpcom-migration' ) ),
-			'unchanged'       => array( 'success', __( 'The secret was already up to date.', 'wpcom-migration' ) ),
-			'enabled'         => array( 'success', __( 'Exporter on for the next hour.', 'wpcom-migration' ) ),
-			'disabled'        => array( 'success', __( 'Exporter off.', 'wpcom-migration' ) ),
-			'discarded'       => array( 'success', __( 'Secret removed. The exporter is off.', 'wpcom-migration' ) ),
-			'not_configured'  => array( 'error', __( 'Enter an export secret first.', 'wpcom-migration' ) ),
-			'storage_failure' => array( 'error', __( 'The secret could not be saved.', 'wpcom-migration' ) ),
+			'saved'               => array( 'success', __( 'Secret saved.', 'wpcom-migration' ) ),
+			'unchanged'           => array( 'success', __( 'The secret was already up to date.', 'wpcom-migration' ) ),
+			'enabled'             => array( 'success', __( 'Exporter on for the next hour.', 'wpcom-migration' ) ),
+			'disabled'            => array( 'success', __( 'Exporter off.', 'wpcom-migration' ) ),
+			'discarded'           => array( 'success', __( 'Secret removed. The exporter is off.', 'wpcom-migration' ) ),
+			'not_configured'      => array( 'error', __( 'Enter an export secret first.', 'wpcom-migration' ) ),
+			'storage_failure'     => array( 'error', __( 'The secret could not be saved.', 'wpcom-migration' ) ),
+			'key_saved'           => array( 'success', __( 'Public key saved.', 'wpcom-migration' ) ),
+			'key_unchanged'       => array( 'success', __( 'That public key was already enrolled.', 'wpcom-migration' ) ),
+			'key_removed'         => array( 'success', __( 'Public key removed. The exporter is off.', 'wpcom-migration' ) ),
+			'key_invalid'         => array( 'error', __( 'That is not a usable public key. Paste the RSA public key, 3072 bits or more, printed by "reprint keygen".', 'wpcom-migration' ) ),
+			'key_unsupported'     => array( 'error', __( 'Public keys need OpenSSL, which this host does not have.', 'wpcom-migration' ) ),
+			'key_storage_failure' => array( 'error', __( 'The public key could not be saved.', 'wpcom-migration' ) ),
 		);
 
 		if ( ! isset( $notices[ $result ] ) ) {

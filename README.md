@@ -47,7 +47,7 @@ On a network the old screen keeps its row in the network admin, and the *Setting
 
 ## Setting up Reprint manually
 
-`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form, a *Remove secret* button (which also removes an installed public key and turns the exporter off), the exporter toggle, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards the secret and the exporter state.
+`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form and a *Remove secret* button; on a host with `openssl_verify()`, a public key textarea (*Enroll key*, PEM or one line, replacing any enrolled key) and a table with the enrolled key's id and a *Remove* button; the exporter toggle, the export URL and the WordPress.com blog ID. Removing either credential turns the exporter off and leaves the other in place. Deactivating the plugin disconnects and discards the secret and the exporter state.
 
 ## How WordPress.com provisions the exporter
 
