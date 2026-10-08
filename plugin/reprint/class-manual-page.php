@@ -202,9 +202,15 @@ class Manual_Page {
 		);
 
 		// Descriptions get a paragraph's margin, not wp-admin's tighter one.
+		// List tables align cells to the top, which leaves the key id sitting
+		// above the Remove button beside it.
 		wp_register_style( self::STYLE_HANDLE, false, array(), $version );
 		wp_enqueue_style( self::STYLE_HANDLE );
-		wp_add_inline_style( self::STYLE_HANDLE, '.wpcom-migration-manual p.description { margin: 1em 0; }' );
+		wp_add_inline_style(
+			self::STYLE_HANDLE,
+			'.wpcom-migration-manual p.description { margin: 1em 0; }'
+			. ' .wpcom-migration-reprint-key-table td { vertical-align: middle; }'
+		);
 	}
 
 	/**
