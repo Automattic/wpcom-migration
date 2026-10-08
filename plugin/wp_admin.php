@@ -61,8 +61,11 @@ class WPCOMWPAdmin {
 
 		if ($this->bvinfo->isActivateRedirectSet()) {
 			$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
-			if (!wp_doing_ajax()) {
-				wp_redirect($this->migrationScreenUrl());
+			// A bulk activation lands on the plugin list; it stays there.
+			if (!wp_doing_ajax() && !isset($_GET['activate-multi'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				if (wp_redirect($this->migrationScreenUrl())) {
+					exit;
+				}
 			}
 		}
 	}

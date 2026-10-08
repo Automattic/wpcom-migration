@@ -194,6 +194,61 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
+		case 'reactivation-redirect':
+			// An account makes activate() take its already-configured branch,
+			// which pings the app; answer every request locally.
+			update_option( 'bvAccountsList', array( 'e2e-public-key' => array( 'wpcom-migration' => 1 ) ) );
+			add_filter(
+				'pre_http_request',
+				function () {
+					return array(
+						'headers'  => array(),
+						'body'     => '',
+						'response' => array(
+							'code'    => 200,
+							'message' => 'OK',
+						),
+						'cookies'  => array(),
+					);
+				}
+			);
+			$plugin = 'wpcom-migration/wpcom_migration.php';
+			deactivate_plugins( $plugin, true );
+			update_option( 'wpcomredirect', 'no' );
+			$result = activate_plugin( $plugin );
+			delete_option( 'bvAccountsList' );
+			if ( is_wp_error( $result ) ) {
+				throw new RuntimeException( 'Reactivating failed: ' . $result->get_error_message() );
+			}
+			if ( 'yes' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'Reactivating should ask for the redirect again.' );
+			}
+			update_option( 'wpcomredirect', 'no' );
+			break;
+
+		case 'bulk-activation-stays':
+			$captured = null;
+			add_filter(
+				'wp_redirect',
+				function ( $location ) use ( &$captured ) {
+					$captured = $location;
+					return '';
+				}
+			);
+			update_option( 'wpcomredirect', 'yes' );
+			$_GET['activate-multi'] = 'true';
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+
+			if ( null !== $captured ) {
+				throw new RuntimeException( 'A bulk activation should stay on the plugin list, got: ' . $captured );
+			}
+			if ( 'no' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'A bulk activation should use up the redirect.' );
+			}
+			break;
+
 		case 'multisite-subsite':
 			// The plugin's entry points on a network lead to the old screen
 			// in the network admin; a subsite has no row, since the Reprint

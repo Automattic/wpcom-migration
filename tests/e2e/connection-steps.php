@@ -247,12 +247,12 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-connected-and-enabled':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'The exporter is on until', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'This site is set up and ready', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Site ready to migrate', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
+			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected to WordPress.com', $step );
 			break;
 
 		case 'render-broken-connected':
@@ -264,9 +264,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 			if ( ! Exporter::store_public_key( $public_key ) ) {
 				throw new RuntimeException( "Step '$step': could not restore the key." );
 			}
@@ -298,13 +298,12 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect this site to WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected to WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'WordPress.com connection</h2>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-status', $step );
 			break;
@@ -346,8 +345,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$_GET[ Connect_Page::CODE_QUERY_ARG ]   = 'e2e_blocked';
 			$html                                   = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'could not register', $step );
-			if ( strpos( $html, 'could not register' ) > strpos( $html, 'class="wpcom-migration-header"' ) ) {
-				throw new RuntimeException( "Step '$step': the notice should sit above the screen's header, where wp-admin puts notices." );
+			if ( strpos( $html, 'could not register' ) > strpos( $html, 'class="wpcom-migration-container"' ) ) {
+				throw new RuntimeException( "Step '$step': the notice should sit above the screen's column, where wp-admin puts notices." );
 			}
 			wpcom_migration_e2e_expect_contains( $html, 'e2e_blocked', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Blocked by the e2e scenario', $step );
@@ -386,33 +385,20 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-connected':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Connected as <strong>e2e@example.com</strong>', $step );
-			if ( 1 !== substr_count( $html, 'Connected as <strong>e2e@example.com</strong>' ) ) {
-				throw new RuntimeException( "Step '$step': expected 'Connected as <strong>e2e@example.com</strong>' exactly once: " . substr( $html, 0, 400 ) );
-			}
-			wpcom_migration_e2e_expect_contains( $html, 'sets up the exporter when the migration starts', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'https://wordpress.com/setup/site-migration?from=' . rawurlencode( home_url() ), $step );
+			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--success">Connected to WordPress.com</p>', $step );
+			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate.', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'e2e@example.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-link--delete', $step );
+			wpcom_migration_e2e_expect_contains( $html, 's connection to WordPress.com.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 
 			// The blog ID lives on the by-hand screen now.
 			$manual_html = wpcom_migration_e2e_render_manual_page();
 			wpcom_migration_e2e_expect_contains( $manual_html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
-			break;
-
-		case 'render-connected-without-user-data':
-			delete_transient( 'jetpack_connected_user_data_1' );
-			// Cache the failure the package would otherwise record after a
-			// remote call, so the render is offline and quick.
-			set_transient( 'jetpack_connected_user_data_1', 'error', 5 * MINUTE_IN_SECONDS );
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
-			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Connected to WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
 			break;
 
 		default:
@@ -628,12 +614,12 @@ if ( ! function_exists( 'wpcom_migration_e2e_expect_primary_count' ) ) {
 	 * buttons. The screen's primary is the branded button, not wp-admin's.
 	 *
 	 * @param string $html     Rendered markup.
-	 * @param int    $expected Expected count of 'wpcom-migration-button'.
+	 * @param int    $expected Expected count of class="wpcom-migration-button".
 	 * @param string $step     Name of the step, for the error message.
 	 * @throws RuntimeException When the count differs.
 	 */
 	function wpcom_migration_e2e_expect_primary_count( $html, $expected, $step ) {
-		$count = substr_count( $html, 'wpcom-migration-button' );
+		$count = substr_count( $html, 'class="wpcom-migration-button"' );
 		if ( $expected !== $count ) {
 			throw new RuntimeException( "Step '$step': expected $expected primary button(s), found $count." );
 		}

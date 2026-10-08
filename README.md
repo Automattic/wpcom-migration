@@ -26,18 +26,20 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The Reprint migration screen
 
-`wp-admin/admin.php?page=wpcom-migration-status` (the plugin's one menu entry; `manage_options` to view; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). It carries the old main screen's design: the WordPress mark, a serif heading and one centred column. The screen shows one mode at a time — one sentence saying where the site stands, at most one button, and the links that fit:
+`wp-admin/admin.php?page=wpcom-migration-status` (the plugin's one menu entry; `manage_options` to view; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time:
 
 | Mode | When | Shows |
 |---|---|---|
 | The exporter runs on single sites only | Multisite | Nothing |
-| The export credential no longer matches this site | The site's salts changed | *Log in with WordPress.com*, or *Continue on WordPress.com* when connected |
-| The exporter is on until *time* | A migration is running | *Continue on WordPress.com* and *Disconnect*, when connected |
-| Connected as *email* | Logged in; the migration has not started | *Continue on WordPress.com*, a *Disconnect* link |
-| This site is set up and ready | Provisioned with an application password | A *Log in with WordPress.com* link |
-| Log in with your WordPress.com account | Fresh site | *Log in with WordPress.com* |
+| The export credential no longer matches this site | The site's salts changed | *Connect WordPress.com*, or *Go to WordPress.com* and *Disconnect* when connected |
+| Pill: *Site ready to migrate* | The exporter is on | *Go to WordPress.com* |
+| Pill: *Connected to WordPress.com* | Logged in; the exporter is off | *Go to WordPress.com*, a *Disconnect* link |
+| Pill: *Set up by WordPress.com* | Provisioned with an application password; the exporter is off | *Go to WordPress.com* |
+| Log in with your WordPress.com account to connect this site | Fresh site | *Connect WordPress.com* |
 
-`Settings_Page::mode()` picks the first that fits, top to bottom. The *Continue* link's target is filtered by `wpcom_migration_continue_url`.
+`Settings_Page::mode()` picks the first that fits, top to bottom. *Go to WordPress.com* links to `https://my.wordpress.com/sites`; the `wpcom_migration_continue_url` filter changes that.
+
+Every activation sends the administrator to the main screen on their next wp-admin page load, except a bulk activation, which stays on the plugin list.
 
 The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no longer in the sidebar. It stays reachable at its URL.
 
@@ -57,7 +59,7 @@ Which credential WordPress.com sets up depends on the host. Where `openssl_verif
 
 **Application password** — where `GET /wp-json/` lists `authentication.application-passwords` (core: `is_ssl()` true and no plugin has switched them off). WordPress.com sends the administrator once to `wp-admin/authorize-application.php?app_name=Migrate+to+WordPress.com&app_id=<uuid>&success_url=…&reject_url=…`; core redirects to `success_url` with `site_url`, `user_login` and `password`. WordPress.com then checks the password with `GET /wp-json/wp/v2/users/me` (a 401 here means the server strips the `Authorization` header — Apache CGI without the rewrite rule WordPress 5.6 added; saving Permalinks regenerates it), installs and activates the plugin (`POST /wp-json/wp/v2/plugins {"slug":"wpcom-migration","status":"active"}`; an older copy is replaced by `PUT …/plugins/wpcom-migration/wpcom_migration {"status":"inactive"}`, `DELETE`, then the `POST`, since core has no update route), calls the two routes, exports, and revokes the password (`GET …/users/me/application-passwords/introspect`, then `DELETE …/application-passwords/<uuid>`). No login on the site.
 
-**Jetpack connection** — everywhere else, including sites where Wordfence or another security plugin has disabled application passwords. The administrator installs the plugin from the plugin directory and presses *Log in with WordPress.com* on the screen; the connection package registers the site and sends them to WordPress.com to authorize, then back. A site that already runs Jetpack is connected at once for the account that connected Jetpack — the connection is shared. WordPress.com then calls the routes signed with the user token.
+**Jetpack connection** — everywhere else, including sites where Wordfence or another security plugin has disabled application passwords. The administrator installs the plugin from the plugin directory and presses *Connect WordPress.com* on the screen; the connection package registers the site and sends them to WordPress.com to authorize, then back. A site that already runs Jetpack is connected at once for the account that connected Jetpack — the connection is shared. WordPress.com then calls the routes signed with the user token.
 
 Connection events fire `wpcom_migration_connection_event`, exporter events `wpcom_migration_reprint_export_event`; none carries a token, secret or signature.
 
