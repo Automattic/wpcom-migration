@@ -614,12 +614,12 @@ if ( ! function_exists( 'wpcom_migration_e2e_expect_primary_count' ) ) {
 	 * buttons. The screen's primary is the branded button, not wp-admin's.
 	 *
 	 * @param string $html     Rendered markup.
-	 * @param int    $expected Expected count of 'wpcom-migration-button'.
+	 * @param int    $expected Expected count of class="wpcom-migration-button".
 	 * @param string $step     Name of the step, for the error message.
 	 * @throws RuntimeException When the count differs.
 	 */
 	function wpcom_migration_e2e_expect_primary_count( $html, $expected, $step ) {
-		$count = substr_count( $html, 'wpcom-migration-button' );
+		$count = substr_count( $html, 'class="wpcom-migration-button"' );
 		if ( $expected !== $count ) {
 			throw new RuntimeException( "Step '$step': expected $expected primary button(s), found $count." );
 		}
