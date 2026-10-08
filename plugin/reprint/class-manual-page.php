@@ -478,7 +478,7 @@ class Manual_Page {
 				<textarea id="wpcom-migration-reprint-public-key" name="<?php echo esc_attr( self::PUBLIC_KEY_FIELD ); ?>" rows="4" class="large-text code"></textarea>
 			</p>
 			<p class="description"><?php esc_html_e( 'Paste the public key printed by "reprint keygen" or by "reprint pull". A PEM block or the single line are both accepted. Enrolling a key replaces the one below.', 'wpcom-migration' ); ?></p>
-			<p><?php submit_button( __( 'Enroll key', 'wpcom-migration' ), 'secondary', 'wpcom_migration_reprint_save_public_key_submit', false ); ?></p>
+			<p><?php submit_button( __( 'Enroll key', 'wpcom-migration' ), 'primary', 'wpcom_migration_reprint_save_public_key_submit', false ); ?></p>
 		</form>
 		<?php
 		if ( ! $state['has_public_key'] ) {
