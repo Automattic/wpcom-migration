@@ -27,6 +27,8 @@ if (!class_exists('WPCOMWPAction')) :
 			} else {
 				WPCOMAccount::setup($this->settings);
 			}
+			// Every activation leads to the migration screen, not only the first.
+			$this->settings->updateOption($this->bvinfo->plug_redirect, 'yes');
 		}
 
 		public function deactivate() {
