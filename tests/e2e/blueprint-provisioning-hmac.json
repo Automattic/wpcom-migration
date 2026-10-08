@@ -1,0 +1,26 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"preferredVersions": { "php": "8.2", "wp": "latest" },
+	"steps": [
+		{
+			"step": "runPHP",
+			"code": "<?php @mkdir( '/wordpress/wp-content/mu-plugins', 0777, true ); copy( '/wordpress/wp-content/wpcom-migration-e2e/hmac-only-mu-plugin.php', '/wordpress/wp-content/mu-plugins/hmac-only.php' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
+		},
+		{
+			"step": "defineWpConfigConsts",
+			"consts": { "WP_ENVIRONMENT_TYPE": "local" }
+		},
+		{
+			"step": "activatePlugin",
+			"pluginPath": "wpcom-migration/wpcom_migration.php"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/provisioning-steps.php'; wpcom_migration_e2e_provisioning_step( 'create-application-passwords' );"
+		}
+	]
+}

@@ -2,8 +2,9 @@
 #
 # Boots the built plugin in WordPress Playground once per credential state
 # and checks the export endpoint's answers, then once more to drive the
-# settings screen through its form handlers, and once more to provision
-# through the REST routes with application passwords.
+# settings screen through its form handlers, and twice more to provision
+# through the REST routes with application passwords: once with a shared
+# secret and once with a public key.
 #
 # The multisite scenario runs its blueprint without a server: Playground
 # refuses to enable multisite on a custom port, and its steps need no HTTP.
@@ -31,7 +32,7 @@ PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
 # shellcheck disable=SC2206 # A space-separated scenario list, split on purpose.
-SCENARIOS=(${E2E_SCENARIOS:-open closed secret-hash-deleted enabled-hash-deleted screen provisioning connection menu multisite})
+SCENARIOS=(${E2E_SCENARIOS:-open closed secret-hash-deleted enabled-hash-deleted screen provisioning-hmac provisioning-key connection menu multisite})
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then

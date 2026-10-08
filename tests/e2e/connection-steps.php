@@ -173,52 +173,58 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			delete_option( 'wpcom_migration_e2e_last_redirect' );
 			break;
 
-		case 'rest-rotate-secret-user-set-without-authentication':
+		case 'rest-install-public-key-user-set-without-authentication':
 			// A user that exists but was authenticated by neither core nor
 			// Jetpack — a plugin forcing a login on every request, say — is
 			// refused; core answers 403 because a user is set.
 			wp_set_current_user( 1 );
-			$response = rest_do_request( new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/rotate-export-secret' ) );
-			wpcom_migration_e2e_expect_rest_status( $response, 403, $step );
-			if ( get_option( Exporter::SECRET_OPTION ) ) {
-				throw new RuntimeException( "Step '$step': a refused request must not store a secret." );
+			$request = new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/install-public-key' );
+			$request->set_param( 'public_key', wpcom_migration_e2e_public_key() );
+			wpcom_migration_e2e_expect_rest_status( rest_do_request( $request ), 403, $step );
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) ) {
+				throw new RuntimeException( "Step '$step': a refused request must not store a key." );
 			}
 			break;
 
-		case 'rest-rotate-secret-cookie-nonce':
+		case 'rest-install-public-key-cookie-nonce':
 			// A logged-in administrator with a valid REST nonce: core's
 			// cookie lane.
 			wp_set_current_user( 1 );
 			$_REQUEST['_wpnonce'] = wp_create_nonce( 'wp_rest' );
-			$response             = rest_do_request( new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/rotate-export-secret' ) );
+			$request              = new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/install-public-key' );
+			$request->set_param( 'public_key', wpcom_migration_e2e_public_key() );
+			$response = rest_do_request( $request );
 			unset( $_REQUEST['_wpnonce'] );
 			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
-			if ( ! get_option( Exporter::SECRET_OPTION ) ) {
-				throw new RuntimeException( "Step '$step': a cookie-and-nonce rotation should store a secret." );
+			if ( ! get_option( Exporter::PUBLIC_KEY_OPTION ) ) {
+				throw new RuntimeException( "Step '$step': a cookie-and-nonce install should store a key." );
 			}
 			break;
 
-		case 'rest-rotate-secret-cookie-bad-nonce':
+		case 'rest-install-public-key-cookie-bad-nonce':
 			wp_set_current_user( 1 );
 			$_REQUEST['_wpnonce'] = 'not-a-nonce';
-			$response             = rest_do_request( new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/rotate-export-secret' ) );
+			$request              = new WP_REST_Request( 'POST', '/wpcom-migration/v1/reprint/install-public-key' );
+			$request->set_param( 'public_key', wpcom_migration_e2e_public_key() );
+			$response = rest_do_request( $request );
 			unset( $_REQUEST['_wpnonce'] );
 			wpcom_migration_e2e_expect_rest_status( $response, 403, $step );
 			break;
 
-		case 'rest-rotate-secret-user-token':
-			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_USER_TOKEN, 1 );
+		case 'rest-install-public-key-user-token':
+			$public_key = wpcom_migration_e2e_public_key();
+			$response   = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/install-public-key', WPCOM_MIGRATION_E2E_USER_TOKEN, 1, array( 'public_key' => $public_key ) );
 			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
 			$data = $response->get_data();
-			if ( ! isset( $data['secret'] ) || ! preg_match( '/^[0-9a-f]{64}$/', $data['secret'] ) ) {
-				throw new RuntimeException( "Step '$step': expected a 64-hex secret, got: " . wp_json_encode( $data ) );
+			if ( ! isset( $data['key_id'] ) || \WordPress\Reprint\Server\Utils::public_key_fingerprint( $public_key ) !== $data['key_id'] ) {
+				throw new RuntimeException( "Step '$step': unexpected key_id: " . wp_json_encode( $data ) );
 			}
 			if ( ! isset( $data['export_url'] ) || home_url( '/?' . Exporter::QUERY_VAR ) !== $data['export_url'] ) {
 				throw new RuntimeException( "Step '$step': unexpected export_url: " . wp_json_encode( $data ) );
 			}
 			$state = Exporter::get_state();
-			if ( ! $state['secret_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': rotating should store a valid secret and leave the window closed: " . wp_json_encode( $state ) );
+			if ( ! $state['public_key_valid'] || $state['window_open'] ) {
+				throw new RuntimeException( "Step '$step': installing should store a valid key and leave the window closed: " . wp_json_encode( $state ) );
 			}
 			break;
 
@@ -250,10 +256,10 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-broken-connected':
-			// Break the secret, look, then mend it so the later steps still
-			// find a valid one.
-			$secret = get_option( Exporter::SECRET_OPTION );
-			delete_option( Exporter::SECRET_HASH_OPTION );
+			// Break the key, look, then mend it so the later steps still find
+			// a valid one.
+			$public_key = get_option( Exporter::PUBLIC_KEY_OPTION );
+			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
@@ -261,22 +267,22 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
-			if ( ! Exporter::store_secret( $secret ) ) {
-				throw new RuntimeException( "Step '$step': could not restore the secret." );
+			if ( ! Exporter::store_public_key( $public_key ) ) {
+				throw new RuntimeException( "Step '$step': could not restore the key." );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			break;
 
-		case 'rest-rotate-secret-blog-token':
+		case 'rest-install-public-key-blog-token':
 			// A blog token sets no user, so WordPress answers 401, not 403.
-			$secret_before = get_option( Exporter::SECRET_OPTION );
-			if ( ! $secret_before ) {
-				throw new RuntimeException( "Step '$step': the earlier user-token rotation should have left a secret." );
+			$key_before = get_option( Exporter::PUBLIC_KEY_OPTION );
+			if ( ! $key_before ) {
+				throw new RuntimeException( "Step '$step': the earlier user-token install should have left a key." );
 			}
-			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/rotate-export-secret', WPCOM_MIGRATION_E2E_BLOG_TOKEN, 0 );
+			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/install-public-key', WPCOM_MIGRATION_E2E_BLOG_TOKEN, 0, array( 'public_key' => wpcom_migration_e2e_public_key() ) );
 			wpcom_migration_e2e_expect_rest_status( $response, 401, $step );
-			if ( get_option( Exporter::SECRET_OPTION ) !== $secret_before ) {
-				throw new RuntimeException( "Step '$step': a refused request must not rotate the secret." );
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $key_before ) {
+				throw new RuntimeException( "Step '$step': a refused request must not replace the key." );
 			}
 			break;
 
@@ -426,10 +432,11 @@ function wpcom_migration_e2e_connection_step( $step ) {
  * @param string $route        REST route, e.g. /wpcom-migration/v1/reprint/enable-export.
  * @param string $access_token "key.secret" for a blog token, "key.secret.user_id" for a user token.
  * @param int    $user_id      0 for a blog token.
+ * @param array  $params       REST parameters.
  * @return WP_REST_Response
  * @throws RuntimeException When signing fails.
  */
-function wpcom_migration_e2e_signed_rest_request( $route, $access_token, $user_id ) {
+function wpcom_migration_e2e_signed_rest_request( $route, $access_token, $user_id, array $params = array() ) {
 	$token_parts = explode( '.', $access_token );
 	$token_key   = $token_parts[0];
 
@@ -458,7 +465,21 @@ function wpcom_migration_e2e_signed_rest_request( $route, $access_token, $user_i
 	Rest_Authentication::init()->reset_saved_auth_state();
 	wp_get_current_user();
 
-	return rest_do_request( new WP_REST_Request( 'POST', $route ) );
+	$request = new WP_REST_Request( 'POST', $route );
+	foreach ( $params as $name => $value ) {
+		$request->set_param( $name, $value );
+	}
+	return rest_do_request( $request );
+}
+
+/**
+ * A fresh one-line public key, as WordPress.com would send.
+ *
+ * @return string
+ */
+function wpcom_migration_e2e_public_key() {
+	list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+	return $public_key;
 }
 
 /**

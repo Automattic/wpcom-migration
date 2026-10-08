@@ -1,6 +1,6 @@
 <?php
 /**
- * HMAC-authenticated, time-limited Reprint export.
+ * Signed, time-limited Reprint export.
  *
  * Modeled on Jetpack's Reprint_Exporter (Automattic/jetpack#52278).
  *
@@ -9,8 +9,9 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
-use WordPress\Reprint\Server\HMACServer;
 use WordPress\Reprint\Server\HTTPServer;
+use WordPress\Reprint\Server\RequestAuthenticator;
+use WordPress\Reprint\Server\Utils;
 
 /**
  * Owns the export credentials and answers ?reprint-api-wpcom-migration.
@@ -39,6 +40,20 @@ class Exporter {
 	const SECRET_HASH_OPTION = 'wpcom_migration_reprint_secret_hash';
 
 	/**
+	 * Option holding the enrolled public key, in one-line form.
+	 *
+	 * @var string
+	 */
+	const PUBLIC_KEY_OPTION = 'wpcom_migration_reprint_public_key';
+
+	/**
+	 * Option holding the HMAC of the public key under the site's auth salt.
+	 *
+	 * @var string
+	 */
+	const PUBLIC_KEY_HASH_OPTION = 'wpcom_migration_reprint_public_key_hash';
+
+	/**
 	 * Option holding the unix time the export window was last opened. The
 	 * window is a sliding 60-minute one.
 	 *
@@ -61,16 +76,19 @@ class Exporter {
 	const GUARDED_OPTIONS = array(
 		self::SECRET_OPTION,
 		self::SECRET_HASH_OPTION,
+		self::PUBLIC_KEY_OPTION,
+		self::PUBLIC_KEY_HASH_OPTION,
 		self::ENABLED_OPTION,
 		self::ENABLED_HASH_OPTION,
 	);
 
 	/**
-	 * Clock-skew tolerance, in seconds, allowed for HMAC signatures.
+	 * Clock-skew tolerance, in seconds, allowed for request signatures and
+	 * the window stamp.
 	 *
 	 * @var int
 	 */
-	const HMAC_CLOCK_SKEW = 300;
+	const CLOCK_SKEW = 300;
 
 	/**
 	 * Action fired for export events.
@@ -187,7 +205,9 @@ class Exporter {
 		 * secret, a credential hash or the signature.
 		 *
 		 * @param string $event   One of export_served, export_refused,
-		 *                        secret_rotated, window_opened, window_closed,
+		 *                        secret_rotated, secret_removed,
+		 *                        public_key_installed, public_key_removed,
+		 *                        window_opened, window_closed,
 		 *                        credentials_discarded, credential_hash_mismatch.
 		 * @param array  $context Details of the event.
 		 */
@@ -198,8 +218,7 @@ class Exporter {
 	 * Discards any stored export credentials.
 	 *
 	 * Runs on plugin activation and deactivation, clearing whatever was
-	 * written while protect_options() was not in place; on disconnect; and
-	 * from the by-hand screen's Remove secret button.
+	 * written while protect_options() was not in place; and on disconnect.
 	 */
 	public static function discard_credentials() {
 		$had_any = false;
@@ -212,6 +231,39 @@ class Exporter {
 				'credentials_discarded',
 				array( 'boundary' => current_filter() )
 			);
+		}
+	}
+
+	/**
+	 * Discards the stored secret and turns the exporter off, leaving any
+	 * public key in place.
+	 */
+	public static function discard_secret() {
+		self::discard_credential( self::SECRET_OPTION, self::SECRET_HASH_OPTION, 'secret_removed' );
+	}
+
+	/**
+	 * Discards the stored public key and turns the exporter off, leaving any
+	 * secret in place.
+	 */
+	public static function discard_public_key() {
+		self::discard_credential( self::PUBLIC_KEY_OPTION, self::PUBLIC_KEY_HASH_OPTION, 'public_key_removed' );
+	}
+
+	/**
+	 * Deletes one credential and its hash, and closes the export window.
+	 *
+	 * @param string $option      The credential's option.
+	 * @param string $hash_option The option holding its hash.
+	 * @param string $event       Event to report when anything was deleted.
+	 */
+	private static function discard_credential( $option, $hash_option, $event ) {
+		$had_any = delete_option( $option );
+		$had_any = delete_option( $hash_option ) || $had_any;
+		self::close_export_window();
+
+		if ( $had_any ) {
+			self::record_event( $event, array( 'user_id' => get_current_user_id() ) );
 		}
 	}
 
@@ -236,6 +288,28 @@ class Exporter {
 		// rewrites only the hash.
 		return get_option( self::SECRET_OPTION ) === $secret
 			&& self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret );
+	}
+
+	/**
+	 * Stores a public key together with its salt-keyed hash, replacing any
+	 * key stored before.
+	 *
+	 * Takes the one-line form PublicKeyServer::assert_valid_public_key()
+	 * returns. Saving a key touches neither the secret nor the export window.
+	 *
+	 * @param string $public_key The one-line public key.
+	 * @return bool Whether the key and a matching hash are now stored.
+	 */
+	public static function store_public_key( $public_key ) {
+		if ( ! is_string( $public_key ) || '' === $public_key ) {
+			return false;
+		}
+
+		self::write_option( self::PUBLIC_KEY_OPTION, $public_key );
+		self::write_option( self::PUBLIC_KEY_HASH_OPTION, self::compute_credential_hash( self::PUBLIC_KEY_HASH_OPTION, $public_key ) );
+
+		return get_option( self::PUBLIC_KEY_OPTION ) === $public_key
+			&& self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
 	}
 
 	/**
@@ -286,7 +360,7 @@ class Exporter {
 		$now        = null === $now ? time() : (int) $now;
 
 		return $enabled_at > 0
-			&& $enabled_at <= $now + self::HMAC_CLOCK_SKEW
+			&& $enabled_at <= $now + self::CLOCK_SKEW
 			&& ( $now - $enabled_at ) <= HOUR_IN_SECONDS
 			&& self::credential_hash_matches( self::ENABLED_HASH_OPTION, $enabled_at );
 	}
@@ -318,23 +392,35 @@ class Exporter {
 	}
 
 	/**
-	 * The state the settings screen renders.
+	 * The state the screens render.
 	 *
 	 * @return array {
 	 *     @type bool     $has_secret        Whether a secret is stored.
 	 *     @type bool     $secret_valid      Whether its hash matches under the current salt.
+	 *     @type bool     $has_public_key    Whether a public key is stored.
+	 *     @type bool     $public_key_valid  Whether its hash matches under the current salt.
+	 *     @type bool     $has_credential    Whether either is stored.
+	 *     @type bool     $credential_valid  Whether either is valid.
 	 *     @type bool     $window_open       Whether the export window is open.
 	 *     @type int|null $window_expires_at Unix time the window lapses, or null when closed.
 	 * }
 	 */
 	public static function get_state() {
-		$secret      = get_option( self::SECRET_OPTION, '' );
-		$has_secret  = is_string( $secret ) && '' !== $secret;
-		$window_open = self::is_export_window_open();
+		$secret           = get_option( self::SECRET_OPTION, '' );
+		$has_secret       = is_string( $secret ) && '' !== $secret;
+		$secret_valid     = $has_secret && self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret );
+		$public_key       = get_option( self::PUBLIC_KEY_OPTION, '' );
+		$has_public_key   = is_string( $public_key ) && '' !== $public_key;
+		$public_key_valid = $has_public_key && self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
+		$window_open      = self::is_export_window_open();
 
 		return array(
 			'has_secret'        => $has_secret,
-			'secret_valid'      => $has_secret && self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret ),
+			'secret_valid'      => $secret_valid,
+			'has_public_key'    => $has_public_key,
+			'public_key_valid'  => $public_key_valid,
+			'has_credential'    => $has_secret || $has_public_key,
+			'credential_valid'  => $secret_valid || $public_key_valid,
 			'window_open'       => $window_open,
 			'window_expires_at' => $window_open ? (int) get_option( self::ENABLED_OPTION, 0 ) + HOUR_IN_SECONDS : null,
 		);
@@ -359,8 +445,8 @@ class Exporter {
 
 		// Any origin: the client may run in a browser (Playground) from
 		// deployments we cannot know ahead of time, and origin is no boundary
-		// when every request needs the HMAC secret anyway. Preflights come
-		// before HMAC because browsers send them without credentials, and
+		// when every request must be signed anyway. Preflights come before
+		// the signature check because browsers send them without credentials, and
 		// before the window check so a client whose window has closed can
 		// reach the 409 below.
 		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized,WordPress.Security.ValidatedSanitizedInput.MissingUnslash
@@ -376,34 +462,45 @@ class Exporter {
 
 		// Without a valid signature a closed window answers nothing, so an idle
 		// site stays indistinguishable from one that never had the feature.
-		$window_open = self::is_export_window_open();
+		$state       = self::get_state();
+		$window_open = $state['window_open'];
 
-		$secret = get_option( self::SECRET_OPTION, '' );
-		if ( ! is_string( $secret ) || '' === $secret ) {
+		if ( ! $state['has_credential'] ) {
 			if ( ! $window_open ) {
 				return;
 			}
-			$this->error( 503, 'Export not configured. Save a shared secret on the Migrate to WordPress.com Reprint migration screen.' );
+			$this->error( 503, 'Export not configured. Start the migration on WordPress.com.' );
 			return;
 		}
 
-		// A secret this class did not hash under the current salt is no
+		// A credential this class did not hash under the current salt is no
 		// credential at all, so it never reaches signature verification.
-		if ( ! self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret ) ) {
+		if ( ! $state['credential_valid'] ) {
 			if ( ! $window_open ) {
 				return;
 			}
 			self::record_event( 'credential_hash_mismatch' );
-			$this->error( 503, 'Export credential invalidated: the stored secret does not match this site\'s salts. Save a new secret on the settings screen.' );
+			$this->error( 503, 'Export credential invalidated: the stored credential does not match this site\'s salts. Start the migration again on WordPress.com.' );
 			return;
 		}
 
-		$auth_error = $this->verify_hmac( $secret );
-		if ( null !== $auth_error ) {
+		$secret      = $state['secret_valid'] ? get_option( self::SECRET_OPTION ) : null;
+		$public_keys = array();
+		if ( $state['public_key_valid'] ) {
+			$public_key = get_option( self::PUBLIC_KEY_OPTION );
+
+			$public_keys[ Utils::public_key_fingerprint( $public_key ) ] = $public_key;
+		}
+
+		$auth_failure = $this->verify_signature( $secret, $public_keys );
+		if ( null !== $auth_failure ) {
 			if ( ! $window_open ) {
 				return;
 			}
-			$this->error( 403, $auth_error );
+			// Reprint's client maps the reason to its message, and reads
+			// not_configured as an answer only from a 503.
+			$status = RequestAuthenticator::REASON_NOT_CONFIGURED === $auth_failure['reason'] ? 503 : 403;
+			$this->error( $status, $auth_failure['message'], $auth_failure['reason'] );
 			return;
 		}
 
@@ -447,16 +544,31 @@ class Exporter {
 	}
 
 	/**
-	 * Verifies the HMAC signature of the current request.
+	 * Verifies the current request's signature against the stored secret or
+	 * public key. Reprint decides which scheme this host accepts.
 	 *
-	 * Seam so a test double can skip the real server.
+	 * Seam so a test double can skip the real authenticator.
 	 *
-	 * @param string $secret The shared secret.
-	 * @return string|null Error message on failure, null on success.
+	 * @param string|null          $secret      The valid shared secret, or null.
+	 * @param array<string,string> $public_keys Valid public keys by key id.
+	 * @return array|null {
+	 *     Null on success, otherwise the failure.
+	 *
+	 *     @type string $message Error description.
+	 *     @type string $reason  Reprint's reason code, e.g. unknown_key or not_configured.
+	 * }
 	 */
-	protected function verify_hmac( $secret ) {
-		$hmac_server = new HMACServer( $secret, self::HMAC_CLOCK_SKEW );
-		return $hmac_server->verify_globals();
+	protected function verify_signature( $secret, array $public_keys ) {
+		$authenticator = new RequestAuthenticator( $secret, $public_keys, self::CLOCK_SKEW );
+		$error         = $authenticator->verify_globals();
+		if ( null === $error ) {
+			return null;
+		}
+
+		return array(
+			'message' => $error,
+			'reason'  => $authenticator->last_error_reason() ?? RequestAuthenticator::REASON_AUTH_FAILED,
+		);
 	}
 
 	/**
@@ -490,17 +602,25 @@ class Exporter {
 	/**
 	 * Sends a JSON error response and terminates.
 	 *
-	 * @param int    $code    HTTP status code.
-	 * @param string $message Error description.
+	 * @param int         $code    HTTP status code.
+	 * @param string      $message Error description.
+	 * @param string|null $reason  Machine-readable reason code, or null for none.
 	 */
-	protected function error( $code, $message ) {
-		self::record_event(
-			'export_refused',
-			array(
-				'code'   => $code,
-				'reason' => $message,
-			)
+	protected function error( $code, $message, $reason = null ) {
+		$context = array(
+			'code'   => $code,
+			'reason' => $message,
 		);
+		$body    = array(
+			'error' => $message,
+			'code'  => $code,
+		);
+		if ( null !== $reason ) {
+			$context['reason_code'] = $reason;
+			$body['reason']         = $reason;
+		}
+
+		self::record_event( 'export_refused', $context );
 
 		$this->send_cors_headers();
 		if ( ! headers_sent() ) {
@@ -508,13 +628,7 @@ class Exporter {
 			header( 'Content-Type: application/json' );
 		}
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
-		echo json_encode(
-			array(
-				'error' => $message,
-				'code'  => $code,
-			),
-			JSON_FORCE_OBJECT
-		);
+		echo json_encode( $body, JSON_FORCE_OBJECT );
 		$this->terminate();
 	}
 
