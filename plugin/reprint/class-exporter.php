@@ -492,12 +492,15 @@ class Exporter {
 			$public_keys[ Utils::public_key_fingerprint( $public_key ) ] = $public_key;
 		}
 
-		$auth_error = $this->verify_signature( $secret, $public_keys );
-		if ( null !== $auth_error ) {
+		$auth_failure = $this->verify_signature( $secret, $public_keys );
+		if ( null !== $auth_failure ) {
 			if ( ! $window_open ) {
 				return;
 			}
-			$this->error( 403, $auth_error );
+			// Reprint's client maps the reason to its message, and reads
+			// not_configured as an answer only from a 503.
+			$status = RequestAuthenticator::REASON_NOT_CONFIGURED === $auth_failure['reason'] ? 503 : 403;
+			$this->error( $status, $auth_failure['message'], $auth_failure['reason'] );
 			return;
 		}
 
@@ -548,11 +551,24 @@ class Exporter {
 	 *
 	 * @param string|null          $secret      The valid shared secret, or null.
 	 * @param array<string,string> $public_keys Valid public keys by key id.
-	 * @return string|null Error message on failure, null on success.
+	 * @return array|null {
+	 *     Null on success, otherwise the failure.
+	 *
+	 *     @type string $message Error description.
+	 *     @type string $reason  Reprint's reason code, e.g. unknown_key or not_configured.
+	 * }
 	 */
 	protected function verify_signature( $secret, array $public_keys ) {
 		$authenticator = new RequestAuthenticator( $secret, $public_keys, self::CLOCK_SKEW );
-		return $authenticator->verify_globals();
+		$error         = $authenticator->verify_globals();
+		if ( null === $error ) {
+			return null;
+		}
+
+		return array(
+			'message' => $error,
+			'reason'  => $authenticator->last_error_reason() ?? RequestAuthenticator::REASON_AUTH_FAILED,
+		);
 	}
 
 	/**
@@ -586,17 +602,25 @@ class Exporter {
 	/**
 	 * Sends a JSON error response and terminates.
 	 *
-	 * @param int    $code    HTTP status code.
-	 * @param string $message Error description.
+	 * @param int         $code    HTTP status code.
+	 * @param string      $message Error description.
+	 * @param string|null $reason  Machine-readable reason code, or null for none.
 	 */
-	protected function error( $code, $message ) {
-		self::record_event(
-			'export_refused',
-			array(
-				'code'   => $code,
-				'reason' => $message,
-			)
+	protected function error( $code, $message, $reason = null ) {
+		$context = array(
+			'code'   => $code,
+			'reason' => $message,
 		);
+		$body    = array(
+			'error' => $message,
+			'code'  => $code,
+		);
+		if ( null !== $reason ) {
+			$context['reason_code'] = $reason;
+			$body['reason']         = $reason;
+		}
+
+		self::record_event( 'export_refused', $context );
 
 		$this->send_cors_headers();
 		if ( ! headers_sent() ) {
@@ -604,13 +628,7 @@ class Exporter {
 			header( 'Content-Type: application/json' );
 		}
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode
-		echo json_encode(
-			array(
-				'error' => $message,
-				'code'  => $code,
-			),
-			JSON_FORCE_OBJECT
-		);
+		echo json_encode( $body, JSON_FORCE_OBJECT );
 		$this->terminate();
 	}
 

@@ -258,11 +258,19 @@ switch ( $wpcom_migration_scenario ) {
 			wpcom_migration_e2e_fail( 'A PEM install returned the wrong key_id (want ' . $second_client->get_key_id() . '): ' . $response['body'] );
 		}
 
+		// The retired key is unknown now, and says so in the code the client
+		// maps to its message.
 		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
 		wpcom_migration_e2e_expect_status( $response, 403 );
-		wpcom_migration_e2e_expect_error_json( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403, 'unknown_key' );
 
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $second_client, $wpcom_migration_endpoint ) );
+
+		// A secret-signed request on a site with only a key: no secret is
+		// configured, which the client reads from a 503 not_configured.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
+		wpcom_migration_e2e_expect_status( $response, 503 );
+		wpcom_migration_e2e_expect_error_json( $response, 503, 'not_configured' );
 		break;
 
 	case 'connection':
@@ -464,15 +472,20 @@ function wpcom_migration_e2e_expect_json( array $response ) {
 }
 
 /**
- * Fails unless the body is the exporter's error JSON with the given code.
+ * Fails unless the body is the exporter's error JSON with the given code,
+ * and the given reason when one is named.
  *
- * @param array $response Response from wpcom_migration_e2e_request().
- * @param int   $code     Expected 'code' value.
+ * @param array       $response Response from wpcom_migration_e2e_request().
+ * @param int         $code     Expected 'code' value.
+ * @param string|null $reason   Expected 'reason' value, or null to skip the check.
  */
-function wpcom_migration_e2e_expect_error_json( array $response, $code ) {
+function wpcom_migration_e2e_expect_error_json( array $response, $code, $reason = null ) {
 	$json = wpcom_migration_e2e_expect_json( $response );
 	if ( ! isset( $json['code'], $json['error'] ) || $code !== (int) $json['code'] ) {
 		wpcom_migration_e2e_fail( sprintf( 'Expected error JSON with code %d, got: %s', $code, $response['body'] ) );
+	}
+	if ( null !== $reason && ( ! isset( $json['reason'] ) || $reason !== $json['reason'] ) ) {
+		wpcom_migration_e2e_fail( sprintf( 'Expected error JSON with reason %s, got: %s', $reason, $response['body'] ) );
 	}
 }
 
