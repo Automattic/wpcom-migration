@@ -200,7 +200,7 @@ class Settings_Page {
 		wp_enqueue_style(
 			self::STYLE_HANDLE,
 			plugins_url( 'reprint/settings-page.css', $this->plugin_file ),
-			array( 'wpcom-migration-variables', 'wpcom-migration-fonts', 'dashicons' ),
+			array( 'wpcom-migration-variables', 'wpcom-migration-fonts' ),
 			$version
 		);
 	}
@@ -220,8 +220,7 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the screen: the old main screen's design, with the mode where
-	 * that screen had its email form.
+	 * Renders the screen: one centred column holding the mode.
 	 */
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
@@ -238,17 +237,9 @@ class Settings_Page {
 			echo '</div>';
 		}
 		?>
-		<header class="wpcom-migration-header">
-			<div class="wpcom-migration-header__wpcom-logo">
-				<span class="dashicons dashicons-wordpress-alt" aria-hidden="true"></span>
-			</div>
-		</header>
-
 		<div class="wpcom-migration-container">
 			<main class="wpcom-migration-content">
-				<h1><?php esc_html_e( 'Migrate your site to WordPress.com', 'wpcom-migration' ); ?></h1>
-				<p><?php esc_html_e( 'Get ready for better speed, security, and support. WordPress.com copies your posts, pages, media and settings across for you.', 'wpcom-migration' ); ?></p>
-				<?php $this->render_mode( $mode, $state, $user_connected ); ?>
+				<?php $this->render_mode( $mode, $user_connected ); ?>
 			</main>
 		</div>
 		<?php
@@ -287,111 +278,103 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the mode: one sentence stating where the site stands, and the
-	 * controls that fit. Connection controls render only when a section is
-	 * attached.
+	 * Renders the mode: a status pill where one fits, the heading, where the
+	 * site stands, and the controls that fit. Connection controls render only
+	 * when a section is attached.
 	 *
 	 * @param string $mode           One of the MODE_* constants.
-	 * @param array  $state          Exporter::get_state().
 	 * @param bool   $user_connected Whether the current user is connected to WordPress.com.
 	 */
-	private function render_mode( $mode, array $state, $user_connected ) {
+	private function render_mode( $mode, $user_connected ) {
 		$section = $this->connection_section;
 
 		switch ( $mode ) {
 			case self::MODE_BLOCKED:
+				$this->render_pill_and_heading();
 				$this->render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
 				return;
 
 			case self::MODE_BROKEN:
+				$this->render_pill_and_heading();
 				$this->render_sentence( __( 'The export credential no longer matches this site — its security salts changed. Start the migration again on WordPress.com.', 'wpcom-migration' ) );
 				if ( null !== $section && $user_connected ) {
-					$section->render_continue_button( true );
+					$section->render_continue_button();
 					$section->render_disconnect_link();
 				} elseif ( null !== $section ) {
-					$section->render_connect_button( true );
+					$section->render_connect_button();
 				}
 				return;
 
 			case self::MODE_READY:
-				$this->render_sentence(
-					sprintf(
-						/* translators: %s: time of day. */
-						__( 'The exporter is on until %s. The migration runs from WordPress.com; each export keeps it on for another hour.', 'wpcom-migration' ),
-						self::window_closes_at( $state )
-					)
-				);
-				if ( null !== $section && $user_connected ) {
-					$section->render_continue_button( false );
-					$section->render_disconnect_link();
+				$this->render_pill_and_heading( __( 'Site ready to migrate', 'wpcom-migration' ), 'info' );
+				$this->render_sentence( __( 'Your site is now ready to be copied by WordPress.com. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'Keep this plugin active until the migration is done. We email you when it\'s finished.', 'wpcom-migration' ) );
+				if ( null !== $section ) {
+					$section->render_continue_button();
 				}
 				return;
 
 			case self::MODE_CONNECTED_WAITING:
-				$email = null !== $section ? \Automattic\WPCOM_Migration\Connect_Page::connected_email() : null;
-				if ( null !== $email ) {
-					$this->render_sentence_html(
-						sprintf(
-							/* translators: %s: WordPress.com account email address, in bold. */
-							esc_html__( 'Connected as %s. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ),
-							'<strong>' . esc_html( $email ) . '</strong>'
-						)
-					);
-				} else {
-					$this->render_sentence( __( 'Connected to WordPress.com. WordPress.com sets up the exporter when the migration starts.', 'wpcom-migration' ) );
-				}
+				$this->render_pill_and_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ), 'success' );
+				$this->render_ready_to_migrate();
 				if ( null !== $section ) {
-					$section->render_continue_button( true );
+					$section->render_continue_button();
 					$section->render_disconnect_link();
 				}
 				return;
 
 			case self::MODE_PROVISIONED_WAITING:
-				$this->render_sentence_html(
-					'<strong>' . esc_html__( 'This site is set up and ready.', 'wpcom-migration' ) . '</strong> '
-					. esc_html__( 'The exporter stays off until the migration starts on WordPress.com.', 'wpcom-migration' )
-				);
+				$this->render_pill_and_heading( __( 'Set up by WordPress.com', 'wpcom-migration' ), 'info' );
+				$this->render_ready_to_migrate();
 				if ( null !== $section ) {
-					$section->render_connect_button( false );
+					$section->render_continue_button();
 				}
 				return;
 
 			case self::MODE_NEEDS_CONNECTING:
 			default:
-				$this->render_sentence( __( 'Log in with your WordPress.com account so WordPress.com can read this site and migrate it. Nothing is copied until you start the migration there.', 'wpcom-migration' ) );
+				$this->render_pill_and_heading();
+				$this->render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
+				$this->render_sentence( __( 'Log in with your WordPress.com account to connect this site. Nothing is copied until you start the migration on WordPress.com.', 'wpcom-migration' ) );
 				if ( null !== $section ) {
-					$section->render_connect_button( true );
+					$section->render_connect_button();
 				}
 				return;
 		}
 	}
 
 	/**
-	 * Renders the mode's one sentence.
+	 * Renders the heading, with a status pill above it when given one.
+	 *
+	 * @param string $pill Pill text, or '' for none.
+	 * @param string $tone success (green) or info (blue).
+	 */
+	private function render_pill_and_heading( $pill = '', $tone = 'info' ) {
+		if ( '' !== $pill ) {
+			echo '<p class="wpcom-migration-pill wpcom-migration-pill--' . esc_attr( $tone ) . '">' . esc_html( $pill ) . '</p>';
+		}
+		echo '<h1>' . esc_html__( 'Migrate your site to WordPress.com', 'wpcom-migration' ) . '</h1>';
+	}
+
+	/**
+	 * Renders the sentence the two waiting modes share.
+	 */
+	private function render_ready_to_migrate() {
+		$this->render_sentence(
+			sprintf(
+				/* translators: %s: the site's address, without the scheme. */
+				__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here.', 'wpcom-migration' ),
+				untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) )
+			)
+		);
+	}
+
+	/**
+	 * Renders one paragraph of the mode.
 	 *
 	 * @param string $text Plain text.
 	 */
 	private function render_sentence( $text ) {
-		$this->render_sentence_html( esc_html( $text ) );
-	}
-
-	/**
-	 * Renders the mode's one sentence from markup the caller has escaped.
-	 *
-	 * @param string $html Escaped HTML.
-	 */
-	private function render_sentence_html( $html ) {
-		echo '<p class="wpcom-migration-guidance">' . $html . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by the caller.
-	}
-
-	/**
-	 * The time of day the exporter turns itself off, in the site's format.
-	 *
-	 * @param array $state Exporter::get_state(), with the window open.
-	 * @return string
-	 */
-	private static function window_closes_at( array $state ) {
-		$expires = $state['window_expires_at'] + (int) ( get_option( 'gmt_offset' ) * HOUR_IN_SECONDS );
-		return date_i18n( get_option( 'time_format' ), $expires );
+		echo '<p class="wpcom-migration-guidance">' . esc_html( $text ) . '</p>';
 	}
 }

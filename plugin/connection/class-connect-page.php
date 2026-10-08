@@ -180,25 +180,23 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the login form: the screen's primary button, or a plain link.
-	 *
-	 * @param bool $primary Whether the submit is the primary button.
+	 * Renders the login form, with the terms it agrees to.
 	 */
-	public function render_connect_button( $primary ) {
+	public function render_connect_button() {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
 			<p>
-				<button type="submit" name="wpcom_migration_connect_submit" class="<?php echo $primary ? 'wpcom-migration-button' : 'wpcom-migration-link'; ?>">
-					<?php esc_html_e( 'Log in with WordPress.com', 'wpcom-migration' ); ?>
+				<button type="submit" name="wpcom_migration_connect_submit" class="wpcom-migration-button">
+					<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
 				</button>
 			</p>
 			<p class="wpcom-migration-description">
 				<?php
 				printf(
 					/* translators: %s: link to the WordPress.com terms of service. */
-					esc_html__( 'By connecting you agree to the %s.', 'wpcom-migration' ),
+					esc_html__( 'By connecting, you agree to the %s', 'wpcom-migration' ),
 					'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
 				);
 				?>
@@ -208,16 +206,15 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the link to WordPress.com: the screen's primary button, or a
-	 * plain link. It starts nothing on this site.
-	 *
-	 * @param bool $primary Whether it is the primary button.
+	 * Renders the link to WordPress.com as the screen's button. It starts
+	 * nothing on this site.
 	 */
-	public function render_continue_button( $primary ) {
+	public function render_continue_button() {
 		?>
 		<p>
-			<a<?php echo $primary ? ' class="wpcom-migration-button"' : ''; ?> target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
-				<?php esc_html_e( 'Continue on WordPress.com', 'wpcom-migration' ); ?>
+			<a class="wpcom-migration-button" target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
+				<?php esc_html_e( 'Go to WordPress.com', 'wpcom-migration' ); ?>
+				<svg class="wpcom-migration-button__icon" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><path d="M1.5 8.5l7-7M3 1.5h5.5V7" /></svg>
 			</a>
 		</p>
 		<?php
@@ -232,28 +229,13 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
 			<p>
-				<span class="wpcom-migration-description">
-					<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--delete"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
-					<?php esc_html_e( 'Removes this site\'s WordPress.com connection and the export secret WordPress.com installed.', 'wpcom-migration' ); ?>
-				</span>
+				<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--quiet"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
+			</p>
+			<p class="wpcom-migration-description">
+				<?php esc_html_e( 'Removes this site\'s connection to WordPress.com.', 'wpcom-migration' ); ?>
 			</p>
 		</form>
 		<?php
-	}
-
-	/**
-	 * The WordPress.com email address of the connected user, when the package
-	 * has it.
-	 *
-	 * @return string|null
-	 */
-	public static function connected_email() {
-		$user_data = Connection::connected_wpcom_user();
-		if ( is_array( $user_data ) && ! empty( $user_data['email'] ) ) {
-			return (string) $user_data['email'];
-		}
-
-		return null;
 	}
 
 	/**
@@ -264,14 +246,11 @@ class Connect_Page {
 	 */
 	public static function continue_url() {
 		/**
-		 * Filters the WordPress.com URL the connected screen links to.
+		 * Filters the WordPress.com URL the screen's button links to.
 		 *
-		 * @param string $url Default: the WordPress.com site-migration setup, with this site as the source.
+		 * @param string $url Default: the user's sites on WordPress.com.
 		 */
-		return apply_filters(
-			'wpcom_migration_continue_url',
-			'https://wordpress.com/setup/site-migration?from=' . rawurlencode( home_url() )
-		);
+		return apply_filters( 'wpcom_migration_continue_url', 'https://my.wordpress.com/sites' );
 	}
 
 	/**

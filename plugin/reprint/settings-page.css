@@ -1,5 +1,5 @@
 /*
- * The Reprint migration screen: the old main screen's design, one column.
+ * The Reprint migration screen: one centred column.
  *
  * variables.css supplies the palette, fonts.css the Recoleta face. The old
  * screen's style.css is deliberately not a dependency — it is that screen's
@@ -19,29 +19,21 @@ body {
 	display: none;
 }
 
-.wpcom-migration-header {
-	display: flex;
-	padding: 20px;
-}
-
-.wpcom-migration-header__wpcom-logo span {
-	width: 24px;
-	height: 24px;
-	font-size: 24px;
-}
-
 .wpcom-migration-container {
-	box-sizing: border-box;
-	max-width: 476px;
+	box-sizing: content-box;
+	max-width: 660px;
 	margin: 0 auto;
 	padding: 40px 20px;
-	font-size: 14px;
-	color: var( --wpcom-migration-gray-70 );
+	font-size: 15px;
+	line-height: 24px;
+	color: var( --wpcom-migration-gray-100 );
 	text-underline-offset: 4px;
 }
 
 .wpcom-migration-container h1 {
-	margin: 0;
+	max-width: 440px;
+	margin: 0 0 16px;
+	padding: 0;
 	color: var( --wpcom-migration-gray-100 );
 	font-family: var( --wpcom-migration-heading-font-family );
 	font-size: 34px;
@@ -50,8 +42,9 @@ body {
 }
 
 .wpcom-migration-container p {
-	margin: 8px 0;
+	margin: 16px 0;
 	font-size: inherit;
+	line-height: inherit;
 }
 
 .wpcom-migration-container a:not( .wpcom-migration-button ) {
@@ -63,22 +56,43 @@ body {
 	text-decoration: none;
 }
 
-.wpcom-migration-guidance {
-	margin-top: 24px;
+.wpcom-migration-container .wpcom-migration-pill {
+	display: inline-block;
+	margin: 0 0 16px;
+	padding: 2px 8px;
+	border-radius: 6px;
+	font-size: 12px;
+	line-height: 20px;
+}
+
+.wpcom-migration-pill--success {
+	color: #00450c;
+	background: #b8f5c8;
+}
+
+.wpcom-migration-pill--info {
+	color: #0b2a6f;
+	background: #dfe8fd;
 }
 
 .wpcom-migration-button {
 	display: inline-block;
-	margin: 4px 0;
-	padding: 12px 24px;
+	margin: 0;
+	padding: 10px 12px;
 	border: 0;
-	border-radius: 4px;
+	border-radius: 2px;
 	color: var( --wpcom-migration-white );
 	background: var( --wpcom-migration-primary-bg );
-	font-size: 14px;
-	line-height: 1.4;
+	font-size: 13px;
+	font-weight: normal;
+	line-height: 20px;
 	text-decoration: none;
 	cursor: pointer;
+}
+
+.wpcom-migration-button__icon {
+	margin-left: 2px;
+	vertical-align: 0;
 }
 
 .wpcom-migration-container a.wpcom-migration-button:hover,
@@ -93,18 +107,25 @@ body {
 	border: 0;
 	background: none;
 	color: var( --wpcom-migration-primary-bg );
-	font-size: inherit;
+	font-size: 13px;
+	line-height: 20px;
 	text-decoration: underline;
+	text-underline-offset: 4px;
 	cursor: pointer;
 }
 
-.wpcom-migration-link--delete {
-	color: #b32d2e;
+.wpcom-migration-link--quiet {
+	color: var( --wpcom-migration-gray-100 );
 }
 
-.wpcom-migration-description {
+.wpcom-migration-link:hover {
+	color: var( --wpcom-migration-link-hover-color );
+	text-decoration: none;
+}
+
+.wpcom-migration-container .wpcom-migration-description {
 	color: var( --wpcom-migration-gray-50 );
-	font-size: 12px;
+	font-size: 13px;
 	line-height: 20px;
 }
 
@@ -115,7 +136,7 @@ body {
 
 @media ( min-width: 961px ) {
 	.wpcom-migration-container {
-		padding-top: 100px;
+		padding-top: 148px;
 	}
 
 	.wpcom-migration-container h1 {
