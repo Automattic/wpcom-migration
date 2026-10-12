@@ -26,7 +26,7 @@ To activate a source checkout directly (without a build), run `composer install 
 
 ## The screens
 
-`wp-admin/admin.php?page=wpcom-migration-status` is the Reprint migration screen. It tells the administrator where the site stands in the migration and offers the next step: connect the site to WordPress.com, continue on WordPress.com, or disconnect. Viewing it needs `manage_options`. Connecting, disconnecting, and provisioning through the routes need the `administrator` role. It works on single sites only, and shows one mode at a time:
+`wp-admin/admin.php?page=wpcom-migration-status` is the Reprint migration screen. It tells the administrator where the site stands in the migration and offers the next step: connect the site to WordPress.com or continue on WordPress.com. Viewing it needs `manage_options`. Connecting, disconnecting, and provisioning through the routes need the `administrator` role. It works on single sites only, and shows one mode at a time:
 
 | Mode | When | Shows |
 |---|---|---|
@@ -52,15 +52,13 @@ Networks never ask. On a network the BlogVault screen keeps its row in the netwo
 
 ## How WordPress.com provisions the exporter
 
-WordPress.com reaches the site in one of two ways, described below: with an application password, or through a Jetpack connection. Either way it calls one of two routes: `POST /wp-json/wpcom-migration/v1/reprint/install-public-key {"public_key"}` → `{ "key_id", "export_url" }` or `POST …/rotate-export-secret` → `{ "secret", "export_url" }`. Both require an administrator, authenticated by core (an application password) or by a Jetpack user token, and both answer 501 on a network. Reprint transfers over https only.
+WordPress.com reaches the site in one of two ways, described below: with an application password, or through a Jetpack connection. Either way it calls one of two routes: `POST /wp-json/wpcom-migration/v1/reprint/install-public-key {"public_key"}` → `{ "key_id", "export_url" }` or `POST …/rotate-export-secret` → `{ "secret", "export_url" }`. Both require an administrator, authenticated by core (an application password) or by a Jetpack user token, and both answer 501 on a network.
 
 Which credential WordPress.com sets up depends on the host. Where `openssl_verify()` exists, Reprint signs with keys: WordPress.com installs its public key (PEM or one line of base64, RSA, 3072 bits or more; anything else is a 400 `wpcom_migration_invalid_public_key`), and `rotate-export-secret` answers 501 `wpcom_migration_secret_auth_unsupported`. Elsewhere it rotates the secret, and `install-public-key` answers 501 `wpcom_migration_key_auth_unsupported`. The site holds one key at a time; installing another replaces it. The exporter is on while either credential is stored and valid; there is no separate switch and no time limit, since the plugin is removed once the migration is done. Export requests are verified by Reprint's `RequestAuthenticator`, which accepts whichever of the two the host supports.
 
 **Application password** — where `GET /wp-json/` lists `authentication.application-passwords` (core: `is_ssl()` true and no plugin has switched them off). WordPress.com sends the administrator once to `wp-admin/authorize-application.php?app_name=Migrate+to+WordPress.com&app_id=<uuid>&success_url=…&reject_url=…`; core redirects to `success_url` with `site_url`, `user_login` and `password`. WordPress.com then checks the password with `GET /wp-json/wp/v2/users/me` (a 401 here means the server strips the `Authorization` header — Apache CGI without the rewrite rule WordPress 5.6 added; saving Permalinks regenerates it), installs and activates the plugin (`POST /wp-json/wp/v2/plugins {"slug":"wpcom-migration","status":"active"}`; an older copy is replaced by `PUT …/plugins/wpcom-migration/wpcom_migration {"status":"inactive"}`, `DELETE`, then the `POST`, since core has no update route), calls the route for the host's credential, exports, and revokes the password (`GET …/users/me/application-passwords/introspect`, then `DELETE …/application-passwords/<uuid>`). No login on the site.
 
 **Jetpack connection** — everywhere else, including sites where Wordfence or another security plugin has disabled application passwords. The administrator installs the plugin from the plugin directory and presses *Connect WordPress.com* on the screen; the connection package registers the site and sends them to WordPress.com to authorize, then back. A site that already runs Jetpack is connected at once for the account that connected Jetpack — the connection is shared. WordPress.com then calls the route signed with the user token.
-
-Connection events fire `wpcom_migration_connection_event`, exporter events `wpcom_migration_reprint_export_event`; none carries a token, secret or signature.
 
 ## Checks
 
@@ -81,8 +79,7 @@ Publishing to wp.org is not automated.
 - Running this plugin next to `reprint-server-wp` is unsupported. Both ship the same package; a request that loads classes from both copies can fatal on the package's path-required function files.
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
 - Sites on placeholder salts get the write veto but not the salt binding: `wp_salt()` stores its own salt in `wp_options`, where whoever can write the credential can read it.
-- The connection package requires PHP 7.4, so the plugin does too.
-- Reprint transfers over https only; a site that cannot serve https cannot be migrated this way.
+- The Jetpack connection package (`automattic/jetpack-connection`) requires PHP 7.4, so the plugin does too.
 - `wp/v2/plugins` installs from wordpress.org by slug only, so the version with the exporter must be published there before WordPress.com can install it.
 
 ## Security
