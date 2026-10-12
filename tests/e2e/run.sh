@@ -7,8 +7,8 @@
 # through the REST routes with application passwords: once with a shared
 # secret and once with a public key.
 #
-# The multisite scenario runs its blueprint without a server: Playground
-# refuses to enable multisite on a custom port, and its steps need no HTTP.
+# The multisite scenario runs its blueprint without a server: multisite
+# does not support custom ports, and its steps need no HTTP.
 #
 # Usage: tests/e2e/run.sh <built-plugin-dir>
 #   e.g. tests/e2e/run.sh build/wpcom-migration

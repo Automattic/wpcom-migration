@@ -7,11 +7,24 @@
 			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
 		},
 		{
-			"step": "enableMultisite"
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/upgrade.php'; require_once ABSPATH . 'wp-admin/includes/network.php'; install_network(); $result = populate_network( 1, 'localhost', get_option( 'admin_email' ), 'Network', '/', false ); if ( is_wp_error( $result ) ) { file_put_contents( 'php://stderr', $result->get_error_message() . \"\\n\" ); exit( 1 ); }"
+		},
+		{
+			"step": "defineWpConfigConsts",
+			"consts": {
+				"WP_ALLOW_MULTISITE": true,
+				"MULTISITE": true,
+				"SUBDOMAIN_INSTALL": false,
+				"DOMAIN_CURRENT_SITE": "localhost",
+				"PATH_CURRENT_SITE": "/",
+				"SITE_ID_CURRENT_SITE": 1,
+				"BLOG_ID_CURRENT_SITE": 1
+			}
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/plugin.php'; $result = activate_plugin( 'wpcom-migration/wpcom_migration.php', '', true ); if ( is_wp_error( $result ) ) { file_put_contents( 'php://stderr', $result->get_error_message() . \"\\n\" ); exit( 1 ); }"
+			"code": "<?php require '/wordpress/wp-load.php'; if ( ! is_multisite() ) { file_put_contents( 'php://stderr', \"The network was not set up.\\n\" ); exit( 1 ); } require_once ABSPATH . 'wp-admin/includes/plugin.php'; $result = activate_plugin( 'wpcom-migration/wpcom_migration.php', '', true ); if ( is_wp_error( $result ) ) { file_put_contents( 'php://stderr', $result->get_error_message() . \"\\n\" ); exit( 1 ); }"
 		},
 		{
 			"step": "runPHP",
