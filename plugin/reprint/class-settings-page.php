@@ -364,6 +364,6 @@ class Settings_Page {
 	 * @param string $text Plain text.
 	 */
 	private function render_sentence( $text ) {
-		echo '<p class="wpcom-migration-guidance">' . esc_html( $text ) . '</p>';
+		echo '<p class="wpcom-migration-guidance">' . esc_html( wptexturize( $text ) ) . '</p>';
 	}
 }

@@ -113,8 +113,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--info">Site ready to migrate</p>', $step );
-			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate. The migration runs from WordPress.com, so there&#039;s nothing else to do here. Your site stays online and unchanged while it&#039;s copied.', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#039;ll email you when it&#039;s finished.', $step );
+			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate. The migration runs from WordPress.com, so there&#8217;s nothing else to do here. Your site stays online and unchanged while it&#8217;s copied.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is now ready to be copied', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
