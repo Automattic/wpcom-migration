@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
 # Boots the built plugin in WordPress Playground once per credential state
-# and checks the export endpoint's answers, then once more to drive the
-# settings screen through its form handlers, and twice more to provision
+# and checks the export endpoint's answers, then twice more to drive the
+# screens through their form handlers (once with a public key, once with a
+# shared secret), and twice more to provision
 # through the REST routes with application passwords: once with a shared
 # secret and once with a public key.
 #
@@ -32,7 +33,7 @@ PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
 # shellcheck disable=SC2206 # A space-separated scenario list, split on purpose.
-SCENARIOS=(${E2E_SCENARIOS:-secret no-credential secret-hash-deleted screen provisioning-hmac provisioning-key connection menu multisite})
+SCENARIOS=(${E2E_SCENARIOS:-secret no-credential secret-hash-deleted screen screen-hmac provisioning-hmac provisioning-key connection menu multisite})
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then

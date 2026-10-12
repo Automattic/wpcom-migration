@@ -9,7 +9,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, one that drives the Reprint migration screen, two that provision through the REST routes (with a public key, and with a shared secret on a host made to look like it lacks OpenSSL), one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
+- `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, two that drive the screens (with a public key, and with a shared secret), two that provision through the REST routes (with a public key, and with a shared secret on a host made to look like it lacks OpenSSL), one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
 
@@ -48,7 +48,7 @@ On a network the old screen keeps its row in the network admin, and the *Setting
 
 ## Setting up Reprint manually
 
-`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the export secret form and a *Remove secret* button; on a host with `openssl_verify()`, a public key textarea (*Enroll key*, PEM or one line, replacing any enrolled key) and a table with the enrolled key's id and a *Remove* button; the export URL and the WordPress.com blog ID. Removing either credential leaves the other in place. Deactivating the plugin disconnects and discards both credentials.
+`wp-admin/admin.php?page=wpcom-migration-manual` (`administrator` role, single-site only). Nothing links to it; support gives out the URL. It holds the credential the host verifies: on a host with `openssl_verify()`, a public key textarea (*Enroll key*, PEM or one line, replacing any enrolled key) and a table with the enrolled key's id and a *Remove* button; elsewhere, the export secret form and a *Remove secret* button. Below it, the export URL and the WordPress.com blog ID. Deactivating the plugin disconnects and discards both credentials.
 
 ## How WordPress.com provisions the exporter
 

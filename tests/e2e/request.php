@@ -5,7 +5,7 @@
  *
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
- * Scenarios: secret, no-credential, secret-hash-deleted, screen,
+ * Scenarios: secret, no-credential, secret-hash-deleted, screen, screen-hmac,
  * provisioning-hmac, provisioning-key, connection, menu. The secret must match
  * the one the matching blueprint stores.
  *
@@ -49,6 +49,7 @@ switch ( $wpcom_migration_scenario ) {
 		break;
 
 	case 'screen':
+	case 'screen-hmac':
 	case 'menu':
 		// The blueprint's runPHP steps are the whole test; there is nothing
 		// to ask the site over HTTP.

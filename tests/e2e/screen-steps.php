@@ -69,6 +69,25 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			break;
 
+		case 'render-secret-form':
+			$manual_html = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'name="' . Manual_Page::PUBLIC_KEY_FIELD . '"', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, '<h2>Public key</h2>', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Public keys need OpenSSL', $step );
+			break;
+
+		case 'assert-secret-refused':
+			$state = Exporter::get_state();
+			if ( $state['has_secret'] ) {
+				throw new RuntimeException( "Step '$step': a host that verifies keys must not store a secret: " . wp_json_encode( $state ) );
+			}
+			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'secret_unsupported';
+			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
+			wpcom_migration_e2e_expect_contains( $manual_html, 'This site verifies exports with public keys.', $step );
+			break;
+
 		case 'save-secret-empty':
 			wpcom_migration_e2e_post( Manual_Page::SAVE_SECRET_ACTION, array( Manual_Page::SECRET_FIELD => '' ) );
 			$manual->handle_save_secret(); // Redirects and exits.
@@ -115,6 +134,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export URL</h2>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove secret', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'name="' . Manual_Page::PUBLIC_KEY_FIELD . '"', $step );
 			break;
 
 		case 'reject-non-administrator-manual-access':
@@ -225,6 +245,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, 'name="' . Manual_Page::PUBLIC_KEY_FIELD . '"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Enroll key', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, '<h2>Export secret</h2>', $step );
 			break;
 
 		case 'enroll-invalid-public-key':
@@ -262,6 +284,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, '<code>' . \WordPress\Reprint\Server\Utils::public_key_fingerprint( $public_key ) . '</code>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'value="' . Manual_Page::REMOVE_PUBLIC_KEY_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'id="wpcom-migration-reprint-secret"', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
 			break;
 
@@ -279,15 +302,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key removed.', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
-			break;
-
-		case 'assert-secret-removed-key-kept':
-			$state = Exporter::get_state();
-			if ( $state['has_secret'] || ! $state['public_key_valid'] ) {
-				throw new RuntimeException( "Step '$step': removing the secret should keep the key: " . wp_json_encode( $state ) );
-			}
-			// The key alone keeps the exporter on.
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			break;
 
 		case 'invalidate-public-key':
