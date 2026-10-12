@@ -369,7 +369,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 's connection to WordPress.com.', $step );
+			wpcom_migration_e2e_expect_contains( $html, '&#8217;s connection to WordPress.com.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 
