@@ -24,9 +24,9 @@ The build runs `composer install` in `plugin/`, copies the tree to a staging dir
 
 To activate a source checkout directly (without a build), run `composer install --no-dev --working-dir=plugin` first; without `plugin/vendor/` the plugin activates but the exporter and the WordPress.com connection are absent.
 
-## The Reprint migration screen
+## The screens
 
-`wp-admin/admin.php?page=wpcom-migration-status` (the plugin's one menu entry; `manage_options` to view; the `administrator` role to connect, disconnect, or provision through the routes; single-site only). The screen shows one mode at a time:
+`wp-admin/admin.php?page=wpcom-migration-status` is the Reprint migration screen. It tells the administrator where the site stands in the migration and offers the next step: connect the site to WordPress.com, continue on WordPress.com, or disconnect. Viewing it needs `manage_options`. Connecting, disconnecting, and provisioning through the routes need the `administrator` role. It works on single sites only, and shows one mode at a time:
 
 | Mode | When | Shows |
 |---|---|---|
@@ -38,13 +38,13 @@ To activate a source checkout directly (without a build), run `composer install 
 
 `Settings_Page::mode()` picks the first that fits, top to bottom. *Go to WordPress.com* links to `https://my.wordpress.com/sites`; the `wpcom_migration_continue_url` filter changes that.
 
-Every activation sends the administrator to the main screen on their next wp-admin page load, except a bulk activation, which stays on the plugin list.
+`wp-admin/admin.php?page=wpcom-migration-manual` sets up Reprint by hand; see [Setting up Reprint manually](#setting-up-reprint-manually).
 
-The old BlogVault screen at `wp-admin/admin.php?page=wpcom-migration` is no longer in the sidebar. It stays reachable at its URL.
+`wp-admin/admin.php?page=wpcom-migration` is the BlogVault screen the plugin had before Reprint.
 
-Until the WordPress.com side of Reprint ships, WordPress.com decides which of the two screens is main: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/migration-plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. With `blogvault`, the old screen gets the sidebar row, the *Settings* link and the activation redirect, and the Reprint screen is reachable only at its URL. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after five minutes. Networks never ask.
+Until the WordPress.com side of Reprint ships, WordPress.com decides which of the Reprint and BlogVault screens is the main one: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/migration-plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after five minutes. The main screen gets the plugin's one sidebar row, the *Settings* link on the plugin list, and the activation redirect: every activation sends the administrator to it on their next wp-admin page load, except a bulk activation, which stays on the plugin list. The other screen stays reachable at its URL, as does the manual one. A brand whitelabelled with `hide` or `hide_from_menu` gets no sidebar row for either screen.
 
-On a network the old screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row. A brand whitelabelled with `hide` or `hide_from_menu` takes away the Reprint screen's row too; the screen stays reachable at its URL.
+Networks never ask. On a network the BlogVault screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row.
 
 ## Setting up Reprint manually
 
@@ -52,7 +52,7 @@ On a network the old screen keeps its row in the network admin, and the *Setting
 
 ## How WordPress.com provisions the exporter
 
-Two lanes end at the same two routes: `POST /wp-json/wpcom-migration/v1/reprint/install-public-key {"public_key"}` → `{ "key_id", "export_url" }` and `POST …/rotate-export-secret` → `{ "secret", "export_url" }`. All require an administrator, authenticated either by core (an application password) or by a Jetpack user token, and all answer 501 on a network. Reprint transfers over https only.
+WordPress.com reaches the site in one of two ways, described below: with an application password, or through a Jetpack connection. Either way it calls one of two routes: `POST /wp-json/wpcom-migration/v1/reprint/install-public-key {"public_key"}` → `{ "key_id", "export_url" }` or `POST …/rotate-export-secret` → `{ "secret", "export_url" }`. Both require an administrator, authenticated by core (an application password) or by a Jetpack user token, and both answer 501 on a network. Reprint transfers over https only.
 
 Which credential WordPress.com sets up depends on the host. Where `openssl_verify()` exists, Reprint signs with keys: WordPress.com installs its public key (PEM or one line of base64, RSA, 3072 bits or more; anything else is a 400 `wpcom_migration_invalid_public_key`), and `rotate-export-secret` answers 501 `wpcom_migration_secret_auth_unsupported`. Elsewhere it rotates the secret, and `install-public-key` answers 501 `wpcom_migration_key_auth_unsupported`. The site holds one key at a time; installing another replaces it. The exporter is on while either credential is stored and valid; there is no separate switch and no time limit, since the plugin is removed once the migration is done. Export requests are verified by Reprint's `RequestAuthenticator`, which accepts whichever of the two the host supports.
 
