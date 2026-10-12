@@ -3,7 +3,7 @@
  * The by-hand screen: the export secret or the public key, whichever this
  * host verifies; export URL; blog ID.
  *
- * Nothing links here; support gives out the URL.
+ * A debugging screen. Nothing links here.
  *
  * @package wpcom-migration
  */
@@ -341,7 +341,6 @@ class Manual_Page {
 		echo '<div class="wrap wpcom-migration-manual">';
 		$this->render_result_notice();
 		echo '<h1>' . esc_html__( 'Set up Reprint manually', 'wpcom-migration' ) . '</h1>';
-		echo '<p class="description">' . esc_html__( 'Support may ask you to set this up by hand.', 'wpcom-migration' ) . '</p>';
 
 		if ( Utils::key_auth_required() ) {
 			$this->render_public_key_section( $state );
