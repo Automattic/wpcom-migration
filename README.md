@@ -76,7 +76,6 @@ Publishing to wp.org is not automated.
 
 ## Known limitations
 
-- Running this plugin next to `reprint-server-wp` is unsupported. Both ship the same package; a request that loads classes from both copies can fatal on the package's path-required function files.
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
 - Sites on placeholder salts get the write veto but not the salt binding: `wp_salt()` stores its own salt in `wp_options`, where whoever can write the credential can read it.
 - The Jetpack connection package (`automattic/jetpack-connection`) requires PHP 7.4, so the plugin does too.
