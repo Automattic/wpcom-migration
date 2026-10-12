@@ -22,8 +22,7 @@ use WP_REST_Response;
 use WP_REST_Server;
 
 /**
- * POST wpcom-migration/v1/reprint/rotate-export-secret, install-public-key and
- * enable-export.
+ * POST wpcom-migration/v1/reprint/rotate-export-secret and install-public-key.
  */
 class REST_Controller extends WP_REST_Controller {
 
@@ -73,18 +72,6 @@ class REST_Controller extends WP_REST_Controller {
 							'required'    => true,
 						),
 					),
-				),
-			)
-		);
-
-		register_rest_route(
-			$this->namespace,
-			'/' . $this->rest_base . '/enable-export',
-			array(
-				array(
-					'methods'             => WP_REST_Server::CREATABLE,
-					'callback'            => array( $this, 'enable_export' ),
-					'permission_callback' => array( $this, 'permission_check' ),
 				),
 			)
 		);
@@ -191,43 +178,6 @@ class REST_Controller extends WP_REST_Controller {
 		return new WP_REST_Response(
 			array(
 				'key_id'     => $key_id,
-				'export_url' => $this->export_url(),
-			),
-			200
-		);
-	}
-
-	/**
-	 * Opens the export window without rotating the secret, so a caller that
-	 * already has a credential can reopen a window that closed.
-	 *
-	 * @return WP_REST_Response|WP_Error The unix time the window opened at.
-	 */
-	public function enable_export() {
-		$state = Exporter::get_state();
-		if ( ! $state['credential_valid'] ) {
-			return new WP_Error(
-				'wpcom_migration_no_credential',
-				__( 'Install a public key or save a secret first.', 'wpcom-migration' ),
-				array( 'status' => 409 )
-			);
-		}
-
-		$enabled_at = Exporter::open_export_window();
-
-		if ( ! Exporter::is_export_window_open() ) {
-			return new WP_Error(
-				'wpcom_migration_window_not_opened',
-				__( 'Failed to open the export window.', 'wpcom-migration' ),
-				array( 'status' => 500 )
-			);
-		}
-
-		Exporter::record_event( 'window_opened', array( 'user_id' => get_current_user_id() ) );
-
-		return new WP_REST_Response(
-			array(
-				'enabled_at' => $enabled_at,
 				'export_url' => $this->export_url(),
 			),
 			200

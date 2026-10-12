@@ -223,28 +223,12 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				throw new RuntimeException( "Step '$step': unexpected export_url: " . wp_json_encode( $data ) );
 			}
 			$state = Exporter::get_state();
-			if ( ! $state['public_key_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': installing should store a valid key and leave the window closed: " . wp_json_encode( $state ) );
+			if ( ! $state['public_key_valid'] ) {
+				throw new RuntimeException( "Step '$step': installing should store a valid key: " . wp_json_encode( $state ) );
 			}
 			break;
 
-		case 'rest-enable-export-user-token':
-			$response = wpcom_migration_e2e_signed_rest_request( '/wpcom-migration/v1/reprint/enable-export', WPCOM_MIGRATION_E2E_USER_TOKEN, 1 );
-			wpcom_migration_e2e_expect_rest_status( $response, 200, $step );
-			$data = $response->get_data();
-			if ( ! isset( $data['enabled_at'] ) || ! is_int( $data['enabled_at'] ) || $data['enabled_at'] < time() - 60 ) {
-				throw new RuntimeException( "Step '$step': expected a fresh enabled_at, got: " . wp_json_encode( $data ) );
-			}
-			if ( ! isset( $data['export_url'] ) ) {
-				throw new RuntimeException( "Step '$step': enable-export must also carry export_url." );
-			}
-			$state = Exporter::get_state();
-			if ( ! $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': enabling should open the window: " . wp_json_encode( $state ) );
-			}
-			break;
-
-		case 'render-connected-and-enabled':
+		case 'render-connected-and-ready':
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Site ready to migrate', $step );
@@ -283,14 +267,6 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_rest_status( $response, 401, $step );
 			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $key_before ) {
 				throw new RuntimeException( "Step '$step': a refused request must not replace the key." );
-			}
-			break;
-
-		case 'swap-in-known-secret':
-			// request.php signs with a fixed secret; the random one never leaves
-			// Playground. The window opened through REST stays open.
-			if ( ! Exporter::store_secret( 'smoke-secret-0123456789abcdef0123456789abcdef' ) ) {
-				throw new RuntimeException( "Step '$step': could not store the known secret." );
 			}
 			break;
 
@@ -386,13 +362,14 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--success">Connected to WordPress.com</p>', $step );
-			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate.', $step );
+			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate. The migration runs from WordPress.com, so there&#8217;s nothing else to do here. Your site stays online and unchanged while it&#8217;s copied.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'e2e@example.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 's connection to WordPress.com.', $step );
+			wpcom_migration_e2e_expect_contains( $html, '&#8217;s connection to WordPress.com.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 
@@ -415,7 +392,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
  * determine_current_user runs Rest_Authentication (nonce, timestamp, token,
  * signature), then dispatches in-process. Only the HTTP hop is skipped.
  *
- * @param string $route        REST route, e.g. /wpcom-migration/v1/reprint/enable-export.
+ * @param string $route        REST route, e.g. /wpcom-migration/v1/reprint/install-public-key.
  * @param string $access_token "key.secret" for a blog token, "key.secret.user_id" for a user token.
  * @param int    $user_id      0 for a blog token.
  * @param array  $params       REST parameters.

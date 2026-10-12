@@ -232,7 +232,7 @@ class Connect_Page {
 				<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--quiet"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
 			</p>
 			<p class="wpcom-migration-description">
-				<?php esc_html_e( 'Removes this site\'s connection to WordPress.com.', 'wpcom-migration' ); ?>
+				<?php echo esc_html( wptexturize( __( 'Removes this site\'s connection to WordPress.com.', 'wpcom-migration' ) ) ); ?>
 			</p>
 		</form>
 		<?php
