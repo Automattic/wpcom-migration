@@ -48,7 +48,7 @@ class Settings_Page {
 	const MODE_BROKEN = 'broken';
 
 	/**
-	 * A credential is valid and the exporter is on.
+	 * A credential is valid, so the exporter is on.
 	 *
 	 * @var string
 	 */
@@ -60,13 +60,6 @@ class Settings_Page {
 	 * @var string
 	 */
 	const MODE_CONNECTED_WAITING = 'connected_waiting';
-
-	/**
-	 * WordPress.com installed a credential; the exporter is off; no user connection.
-	 *
-	 * @var string
-	 */
-	const MODE_PROVISIONED_WAITING = 'provisioned_waiting';
 
 	/**
 	 * Nothing set up yet.
@@ -262,16 +255,12 @@ class Settings_Page {
 			return self::MODE_BROKEN;
 		}
 
-		if ( $state['credential_valid'] && $state['window_open'] ) {
+		if ( $state['credential_valid'] ) {
 			return self::MODE_READY;
 		}
 
 		if ( $user_connected ) {
 			return self::MODE_CONNECTED_WAITING;
-		}
-
-		if ( $state['credential_valid'] ) {
-			return self::MODE_PROVISIONED_WAITING;
 		}
 
 		return self::MODE_NEEDS_CONNECTING;
@@ -307,8 +296,14 @@ class Settings_Page {
 
 			case self::MODE_READY:
 				$this->render_pill_and_heading( __( 'Site ready to migrate', 'wpcom-migration' ), 'info' );
-				$this->render_sentence( __( 'Your site is now ready to be copied by WordPress.com. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
-				$this->render_sentence( __( 'Keep this plugin active until the migration is done. We email you when it\'s finished.', 'wpcom-migration' ) );
+				$this->render_sentence(
+					sprintf(
+						/* translators: %s: the site's address, without the scheme. */
+						__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
+						self::site_address()
+					)
+				);
+				$this->render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 				if ( null !== $section ) {
 					$section->render_continue_button();
 				}
@@ -316,18 +311,16 @@ class Settings_Page {
 
 			case self::MODE_CONNECTED_WAITING:
 				$this->render_pill_and_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ), 'success' );
-				$this->render_ready_to_migrate();
+				$this->render_sentence(
+					sprintf(
+						/* translators: %s: the site's address, without the scheme. */
+						__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here.', 'wpcom-migration' ),
+						self::site_address()
+					)
+				);
 				if ( null !== $section ) {
 					$section->render_continue_button();
 					$section->render_disconnect_link();
-				}
-				return;
-
-			case self::MODE_PROVISIONED_WAITING:
-				$this->render_pill_and_heading( __( 'Set up by WordPress.com', 'wpcom-migration' ), 'info' );
-				$this->render_ready_to_migrate();
-				if ( null !== $section ) {
-					$section->render_continue_button();
 				}
 				return;
 
@@ -357,16 +350,12 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the sentence the two waiting modes share.
+	 * The site's address, without the scheme.
+	 *
+	 * @return string
 	 */
-	private function render_ready_to_migrate() {
-		$this->render_sentence(
-			sprintf(
-				/* translators: %s: the site's address, without the scheme. */
-				__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here.', 'wpcom-migration' ),
-				untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) )
-			)
-		);
+	private static function site_address() {
+		return untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) );
 	}
 
 	/**

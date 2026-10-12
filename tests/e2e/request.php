@@ -5,9 +5,9 @@
  *
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
- * Scenarios: open, closed, secret-hash-deleted, enabled-hash-deleted, screen,
- * provisioning-hmac, provisioning-key, connection, menu. The secret must match the one the matching
- * blueprint stores.
+ * Scenarios: secret, no-credential, secret-hash-deleted, screen,
+ * provisioning-hmac, provisioning-key, connection, menu. The secret must match
+ * the one the matching blueprint stores.
  *
  * @package wpcom-migration
  */
@@ -32,54 +32,54 @@ foreach ( array( 'class-envelope-signer.php', 'class-utils.php', 'class-hmac-cli
 require_once __DIR__ . '/provisioning-steps.php';
 
 switch ( $wpcom_migration_scenario ) {
-	case 'open':
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
+	case 'secret':
+		// A stored secret is all it takes: a signed request is served.
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
+
+		// Unsigned: refused, in the code the client maps to its message.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, array() );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403, 'missing_header' );
+
+		// A client from before Reprint 0.11 sends X-Auth-Content-Hash and is
+		// told to update.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, array_merge( wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ), array( 'X-Auth-Content-Hash: irrelevant' ) ) );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403, 'client_update_required' );
 		break;
 
 	case 'screen':
-		// The screen blueprint ends with the window open (secret valid,
-		// enabled); the same signed-preflight assertions prove the screen's
-		// form handlers left the exporter in a working state.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
-		break;
-
 	case 'menu':
 		// The blueprint's runPHP steps are the whole test; there is nothing
 		// to ask the site over HTTP.
 		break;
 
-	case 'closed':
-		// Unsigned with the window closed: the request falls through to
+	case 'no-credential':
+		// Nothing stored: signed or not, the request falls through to
 		// WordPress. The plain front page, no JSON, no export headers.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, array() );
-		wpcom_migration_e2e_expect_status( $response, 200 );
-		if ( false === stripos( $response['body'], '<html' ) ) {
-			wpcom_migration_e2e_fail( 'Unsigned request with the window closed did not return the front page: ' . substr( $response['body'], 0, 200 ) );
+		$unsigned = wpcom_migration_e2e_request( $wpcom_migration_endpoint, array() );
+		$signed   = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
+		foreach ( array(
+			'Unsigned' => $unsigned,
+			'Signed'   => $signed,
+		) as $label => $response ) {
+			wpcom_migration_e2e_expect_status( $response, 200 );
+			if ( false === stripos( $response['body'], '<html' ) ) {
+				wpcom_migration_e2e_fail( "$label request with no credential did not return the front page: " . substr( $response['body'], 0, 200 ) );
+			}
+			if ( isset( $response['headers']['access-control-allow-origin'] ) ) {
+				wpcom_migration_e2e_fail( "$label request with no credential carried export CORS headers." );
+			}
+			if ( isset( $response['headers']['content-type'] ) && false !== stripos( $response['headers']['content-type'], 'json' ) ) {
+				wpcom_migration_e2e_fail( "$label request with no credential answered JSON." );
+			}
 		}
-		if ( isset( $response['headers']['access-control-allow-origin'] ) ) {
-			wpcom_migration_e2e_fail( 'Unsigned request with the window closed carried export CORS headers.' );
-		}
-		if ( isset( $response['headers']['content-type'] ) && false !== stripos( $response['headers']['content-type'], 'json' ) ) {
-			wpcom_migration_e2e_fail( 'Unsigned request with the window closed answered JSON.' );
-		}
-
-		// Signed with the window closed: 409.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_error_json( $response, 409 );
 		break;
 
 	case 'secret-hash-deleted':
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
 		wpcom_migration_e2e_expect_status( $response, 503 );
 		wpcom_migration_e2e_expect_error_json( $response, 503 );
-		break;
-
-	case 'enabled-hash-deleted':
-		// A stamp without its hash reads as closed.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_error_json( $response, 409 );
 		break;
 
 	case 'provisioning-hmac':
@@ -88,13 +88,12 @@ switch ( $wpcom_migration_scenario ) {
 		// application password. All over HTTP with basic auth, as
 		// WordPress.com sends it.
 		$rotate_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret';
-		$enable_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/enable-export';
 
 		// The routes exist.
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
-		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key' ) as $route ) {
 			if ( ! isset( $json['routes'][ $route ] ) ) {
 				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
 			}
@@ -116,12 +115,6 @@ switch ( $wpcom_migration_scenario ) {
 		wpcom_migration_e2e_expect_status( $response, 501 );
 		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_key_auth_unsupported' );
 
-		// No secret stored yet: enable refuses rather than open a window
-		// nothing can ever answer.
-		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_credential' );
-
 		// An administrator rotates: a fresh 64-hex secret and the export URL.
 		$response = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 200 );
@@ -134,27 +127,11 @@ switch ( $wpcom_migration_scenario ) {
 		}
 		$rotated_secret = $json['secret'];
 
-		// Secret stored, window still closed: a signed request gets 409.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret ) );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_error_json( $response, 409 );
-
-		// Enable: the window opens.
-		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
-		wpcom_migration_e2e_expect_status( $response, 200 );
-		$json = wpcom_migration_e2e_expect_json( $response );
-		if ( ! isset( $json['enabled_at'] ) || ! is_int( $json['enabled_at'] ) || $json['enabled_at'] < time() - 60 ) {
-			wpcom_migration_e2e_fail( 'Enable did not return a fresh enabled_at: ' . $response['body'] );
-		}
-		if ( ! isset( $json['export_url'] ) ) {
-			wpcom_migration_e2e_fail( 'Enable must also carry export_url: ' . $response['body'] );
-		}
-
 		// The secret WordPress.com received serves a real export.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret ) );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret, $wpcom_migration_endpoint ) );
 
 		// Rotating again retires the old secret: a request signed with it is
-		// refused, while the new one still opens the window.
+		// refused, while the new one is served.
 		$response = wpcom_migration_e2e_request( $rotate_url, $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
@@ -163,19 +140,17 @@ switch ( $wpcom_migration_scenario ) {
 		}
 		$new_secret = $json['secret'];
 
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret ) );
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $rotated_secret, $wpcom_migration_endpoint ) );
 		wpcom_migration_e2e_expect_status( $response, 403 );
-		wpcom_migration_e2e_expect_error_json( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403, 'signature_mismatch' );
 
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $new_secret ) );
+		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $new_secret, $wpcom_migration_endpoint ) );
 		break;
 
 	case 'provisioning-key':
 		// WordPress.com provisions a site that verifies keys: it installs its
-		// public key, opens the window, and signs every export request with
-		// the private half.
+		// public key and signs every export request with the private half.
 		$install_url = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/install-public-key';
-		$enable_url  = $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/enable-export';
 
 		list( $private_key, $public_key ) = WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
 		$key_client                       = new WordPress\Reprint\Server\PublicKeyClient( $private_key );
@@ -203,11 +178,6 @@ switch ( $wpcom_migration_scenario ) {
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret', $admin_headers, 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 501 );
 		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_secret_auth_unsupported' );
-
-		// Nothing stored yet: enable refuses.
-		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_rest_error( $response, 'wpcom_migration_no_credential' );
 
 		// Not a key, a private key, and a key under 3072 bits: each refused
 		// with Reprint's reason.
@@ -237,14 +207,7 @@ switch ( $wpcom_migration_scenario ) {
 			wpcom_migration_e2e_fail( 'Install returned an unexpected export_url: ' . $response['body'] );
 		}
 
-		// Key stored, window still closed: a key-signed request gets 409.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
-		wpcom_migration_e2e_expect_status( $response, 409 );
-		wpcom_migration_e2e_expect_error_json( $response, 409 );
-
-		// Enable, and the key serves a real export.
-		$response = wpcom_migration_e2e_request( $enable_url, $admin_headers, 'POST' );
-		wpcom_migration_e2e_expect_status( $response, 200 );
+		// The key serves a real export.
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $key_client, $wpcom_migration_endpoint ) );
 
 		// Installing another key, sent as PEM, retires the first.
@@ -266,11 +229,10 @@ switch ( $wpcom_migration_scenario ) {
 
 		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_key_signed_headers( $second_client, $wpcom_migration_endpoint ) );
 
-		// A secret-signed request on a site with only a key: no secret is
-		// configured, which the client reads from a 503 not_configured.
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
-		wpcom_migration_e2e_expect_status( $response, 503 );
-		wpcom_migration_e2e_expect_error_json( $response, 503, 'not_configured' );
+		// A secret-signed request on a site that verifies keys is refused.
+		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
+		wpcom_migration_e2e_expect_status( $response, 403 );
+		wpcom_migration_e2e_expect_error_json( $response, 403, 'requires_key_auth' );
 		break;
 
 	case 'connection':
@@ -278,7 +240,7 @@ switch ( $wpcom_migration_scenario ) {
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1', array() );
 		wpcom_migration_e2e_expect_status( $response, 200 );
 		$json = wpcom_migration_e2e_expect_json( $response );
-		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key', '/wpcom-migration/v1/reprint/enable-export' ) as $route ) {
+		foreach ( array( '/wpcom-migration/v1/reprint/rotate-export-secret', '/wpcom-migration/v1/reprint/install-public-key' ) as $route ) {
 			if ( ! isset( $json['routes'][ $route ] ) ) {
 				wpcom_migration_e2e_fail( "Namespace index lacks $route: " . $response['body'] );
 			}
@@ -287,9 +249,6 @@ switch ( $wpcom_migration_scenario ) {
 		$response = wpcom_migration_e2e_request( $wpcom_migration_base_url . '/wp-json/wpcom-migration/v1/reprint/rotate-export-secret', array(), 'POST' );
 		wpcom_migration_e2e_expect_status( $response, 401 );
 		wpcom_migration_e2e_expect_rest_error( $response, 'rest_forbidden' );
-
-		// The window the REST route opened serves a real export.
-		wpcom_migration_e2e_assert_open( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret ) );
 		break;
 
 	default:
@@ -299,7 +258,7 @@ switch ( $wpcom_migration_scenario ) {
 fwrite( STDOUT, "Scenario '$wpcom_migration_scenario' passed.\n" );
 
 /**
- * Asserts a signed preflight request answers as the window being open.
+ * Asserts a signed preflight request is served.
  *
  * @param string   $url     Preflight endpoint URL.
  * @param string[] $headers Signature header lines for $url.
@@ -328,15 +287,16 @@ function wpcom_migration_e2e_assert_open( $url, array $headers ) {
 }
 
 /**
- * X-Auth-* header lines for an empty-bodied signed request.
+ * X-Auth-* header lines for a GET signed with the shared secret.
  *
  * @param string $secret The shared secret.
+ * @param string $url    The request URL; its path and query are signed.
  * @return string[]
  */
-function wpcom_migration_e2e_signed_headers( $secret ) {
+function wpcom_migration_e2e_signed_headers( $secret, $url ) {
 	$client = new Site_Export_HMAC_Client( $secret );
 	$lines  = array();
-	foreach ( $client->get_auth_headers( '' ) as $name => $value ) {
+	foreach ( $client->get_auth_headers( 'GET', $url ) as $name => $value ) {
 		$lines[] = $name . ': ' . $value;
 	}
 	return $lines;
@@ -472,8 +432,8 @@ function wpcom_migration_e2e_expect_json( array $response ) {
 }
 
 /**
- * Fails unless the body is the exporter's error JSON with the given code,
- * and the given reason when one is named.
+ * Fails unless the body is the exporter's error JSON with the given code and
+ * Reprint's auth_version, and the given reason when one is named.
  *
  * @param array       $response Response from wpcom_migration_e2e_request().
  * @param int         $code     Expected 'code' value.
@@ -483,6 +443,9 @@ function wpcom_migration_e2e_expect_error_json( array $response, $code, $reason 
 	$json = wpcom_migration_e2e_expect_json( $response );
 	if ( ! isset( $json['code'], $json['error'] ) || $code !== (int) $json['code'] ) {
 		wpcom_migration_e2e_fail( sprintf( 'Expected error JSON with code %d, got: %s', $code, $response['body'] ) );
+	}
+	if ( ! isset( $json['auth_version'] ) || 2 !== $json['auth_version'] ) {
+		wpcom_migration_e2e_fail( 'Expected error JSON with auth_version 2, got: ' . $response['body'] );
 	}
 	if ( null !== $reason && ( ! isset( $json['reason'] ) || $reason !== $json['reason'] ) ) {
 		wpcom_migration_e2e_fail( sprintf( 'Expected error JSON with reason %s, got: %s', $reason, $response['body'] ) );

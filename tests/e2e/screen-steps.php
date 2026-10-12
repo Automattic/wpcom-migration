@@ -88,13 +88,15 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-secret-saved':
 			$state = Exporter::get_state();
-			if ( ! $state['secret_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( 'Saving the secret should store a valid secret and leave the window closed: ' . wp_json_encode( $state ) );
+			if ( ! $state['secret_valid'] ) {
+				throw new RuntimeException( 'Saving the secret should store a valid secret: ' . wp_json_encode( $state ) );
 			}
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--info">Set up by WordPress.com</p>', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'is ready to migrate. The migration runs from WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--info">Site ready to migrate</p>', $step );
+			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate. The migration runs from WordPress.com, so there&#039;s nothing else to do here. Your site stays online and unchanged while it&#039;s copied.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#039;ll email you when it&#039;s finished.', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is now ready to be copied', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
@@ -102,10 +104,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-api-url"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, '<h2>Export secret</h2>', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Turn the exporter on', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Exporter disabled', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Shared secret', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Export window', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Remote API URL', $step );
 
 			$manual_html = wpcom_migration_e2e_render_manual( $manual );
@@ -114,7 +113,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, 'id="wpcom-migration-reprint-api-url"', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, esc_attr( home_url( '?' . Exporter::QUERY_VAR ) ), $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export secret</h2>', $step );
-			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, '<h2>Export URL</h2>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Remove secret', $step );
 			break;
@@ -161,7 +159,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			try {
 				$actions = array(
 					array( Manual_Page::SAVE_SECRET_ACTION, 'handle_save_secret', array( Manual_Page::SECRET_FIELD => 'attacker-secret' ) ),
-					array( Manual_Page::SAVE_ENABLED_ACTION, 'handle_save_enabled', array( Manual_Page::ENABLED_FIELD => '1' ) ),
 					array( Manual_Page::DISCARD_SECRET_ACTION, 'handle_discard_secret', array() ),
 				);
 				foreach ( $actions as $action ) {
@@ -182,8 +179,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 
 			$state = Exporter::get_state();
-			if ( 'smoke-secret-0123456789abcdef0123456789abcdef' !== get_option( Exporter::SECRET_OPTION ) || ! $state['secret_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( 'Non-administrator access changed exporter credentials or state.' );
+			if ( 'smoke-secret-0123456789abcdef0123456789abcdef' !== get_option( Exporter::SECRET_OPTION ) || ! $state['secret_valid'] ) {
+				throw new RuntimeException( 'Non-administrator access changed exporter credentials.' );
 			}
 			break;
 
@@ -202,43 +199,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Invalid: the site', $step );
 			break;
 
-		case 'enable':
-			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array( Manual_Page::ENABLED_FIELD => '1' ) );
-			$manual->handle_save_enabled();
-			break;
-
-		case 'assert-enabled':
-			$state = Exporter::get_state();
-			if ( ! $state['window_open'] ) {
-				throw new RuntimeException( 'Enabling should open the window: ' . wp_json_encode( $state ) );
-			}
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
-			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--info">Site ready to migrate</p>', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Your site is now ready to be copied by WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
-			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Set up by WordPress.com', $step );
-			break;
-
-		case 'disable':
-			wpcom_migration_e2e_post( Manual_Page::SAVE_ENABLED_ACTION, array() );
-			$manual->handle_save_enabled();
-			break;
-
-		case 'assert-disabled':
-			$state = Exporter::get_state();
-			if ( $state['window_open'] ) {
-				throw new RuntimeException( 'Disabling should close the window: ' . wp_json_encode( $state ) );
-			}
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
-			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Set up by WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Site ready to migrate', $step );
-			break;
-
 		case 'discard-secret':
 			wpcom_migration_e2e_post( Manual_Page::DISCARD_SECRET_ACTION, array() );
 			$manual->handle_discard_secret();
@@ -246,8 +206,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-secret-discarded':
 			$state = Exporter::get_state();
-			if ( $state['has_secret'] || $state['has_public_key'] || $state['window_open'] ) {
-				throw new RuntimeException( 'Removing the secret should delete it and close the window: ' . wp_json_encode( $state ) );
+			if ( $state['has_secret'] || $state['has_public_key'] ) {
+				throw new RuntimeException( 'Removing the secret should delete it: ' . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'discarded';
@@ -257,7 +217,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( "Step '$step': the notice should sit above the page heading." );
 			}
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
-			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Turn the exporter on', $step );
+			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
 			break;
 
 		case 'render-public-key-form':
@@ -291,17 +251,16 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'assert-public-key-enrolled':
 			$public_key = get_option( 'wpcom_migration_e2e_public_key' );
 			$state      = Exporter::get_state();
-			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['public_key_valid'] || $state['has_secret'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': expected the enrolled key, no secret, window closed: " . wp_json_encode( $state ) );
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['public_key_valid'] || $state['has_secret'] ) {
+				throw new RuntimeException( "Step '$step': expected the enrolled key and no secret: " . wp_json_encode( $state ) );
 			}
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_PROVISIONED_WAITING, $step );
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_saved';
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key saved.', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, '<code>' . \WordPress\Reprint\Server\Utils::public_key_fingerprint( $public_key ) . '</code>', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'value="' . Manual_Page::REMOVE_PUBLIC_KEY_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $manual_html, 'Turn the exporter on', $step );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'wpcom-migration-reprint-api-url', $step );
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'Remove secret', $step );
 			break;
@@ -313,8 +272,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-public-key-removed':
 			$state = Exporter::get_state();
-			if ( $state['has_public_key'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': removing the key should delete it and close the window: " . wp_json_encode( $state ) );
+			if ( $state['has_public_key'] ) {
+				throw new RuntimeException( "Step '$step': removing the key should delete it: " . wp_json_encode( $state ) );
 			}
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_removed';
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
@@ -324,9 +283,11 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-secret-removed-key-kept':
 			$state = Exporter::get_state();
-			if ( $state['has_secret'] || ! $state['public_key_valid'] || $state['window_open'] ) {
-				throw new RuntimeException( "Step '$step': removing the secret should keep the key and close the window: " . wp_json_encode( $state ) );
+			if ( $state['has_secret'] || ! $state['public_key_valid'] ) {
+				throw new RuntimeException( "Step '$step': removing the secret should keep the key: " . wp_json_encode( $state ) );
 			}
+			// The key alone keeps the exporter on.
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			break;
 
 		case 'invalidate-public-key':

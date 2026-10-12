@@ -48,23 +48,7 @@
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-enabled' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'disable' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-disabled' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-secret-saved' );"
 		},
 		{
 			"step": "runPHP",
@@ -93,14 +77,6 @@
 		{
 			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-public-key-enrolled' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'assert-enabled' );"
 		},
 		{
 			"step": "runPHP",
@@ -141,10 +117,6 @@
 		{
 			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'save-secret' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'enable' );"
 		},
 		{
 			"step": "runPHP",
