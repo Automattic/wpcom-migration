@@ -295,15 +295,8 @@ class Settings_Page {
 				return;
 
 			case self::MODE_READY:
-				$this->render_pill_and_heading( __( 'Site ready to migrate', 'wpcom-migration' ), 'info' );
-				$this->render_sentence(
-					sprintf(
-						/* translators: %s: the site's address, without the scheme. */
-						__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
-						self::site_address()
-					)
-				);
-				$this->render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
+				$this->render_pill_and_heading( __( 'Site ready to migrate', 'wpcom-migration' ), 'success' );
+				$this->render_ready_to_migrate();
 				if ( null !== $section ) {
 					$section->render_continue_button();
 				}
@@ -311,13 +304,7 @@ class Settings_Page {
 
 			case self::MODE_CONNECTED_WAITING:
 				$this->render_pill_and_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ), 'success' );
-				$this->render_sentence(
-					sprintf(
-						/* translators: %s: the site's address, without the scheme. */
-						__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here.', 'wpcom-migration' ),
-						self::site_address()
-					)
-				);
+				$this->render_ready_to_migrate();
 				if ( null !== $section ) {
 					$section->render_continue_button();
 					$section->render_disconnect_link();
@@ -350,12 +337,17 @@ class Settings_Page {
 	}
 
 	/**
-	 * The site's address, without the scheme.
-	 *
-	 * @return string
+	 * Renders the paragraphs the ready and connected modes share.
 	 */
-	private static function site_address() {
-		return untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) );
+	private function render_ready_to_migrate() {
+		$this->render_sentence(
+			sprintf(
+				/* translators: %s: the site's address, without the scheme. */
+				__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
+				untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) )
+			)
+		);
+		$this->render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 	}
 
 	/**
