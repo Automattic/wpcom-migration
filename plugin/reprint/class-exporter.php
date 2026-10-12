@@ -328,13 +328,17 @@ class Exporter {
 	/**
 	 * The state the screens render.
 	 *
+	 * The credential is the one this host verifies: the public key where
+	 * Reprint requires keys, the secret elsewhere. The other one, if stored,
+	 * counts for nothing.
+	 *
 	 * @return array {
 	 *     @type bool $has_secret       Whether a secret is stored.
 	 *     @type bool $secret_valid     Whether its hash matches under the current salt.
 	 *     @type bool $has_public_key   Whether a public key is stored.
 	 *     @type bool $public_key_valid Whether its hash matches under the current salt.
-	 *     @type bool $has_credential   Whether either is stored.
-	 *     @type bool $credential_valid Whether either is valid, which turns the exporter on.
+	 *     @type bool $has_credential   Whether the credential is stored.
+	 *     @type bool $credential_valid Whether it is valid, which turns the exporter on.
 	 * }
 	 */
 	public static function get_state() {
@@ -344,14 +348,15 @@ class Exporter {
 		$public_key       = get_option( self::PUBLIC_KEY_OPTION, '' );
 		$has_public_key   = is_string( $public_key ) && '' !== $public_key;
 		$public_key_valid = $has_public_key && self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
+		$key_auth         = Utils::key_auth_required();
 
 		return array(
 			'has_secret'       => $has_secret,
 			'secret_valid'     => $secret_valid,
 			'has_public_key'   => $has_public_key,
 			'public_key_valid' => $public_key_valid,
-			'has_credential'   => $has_secret || $has_public_key,
-			'credential_valid' => $secret_valid || $public_key_valid,
+			'has_credential'   => $key_auth ? $has_public_key : $has_secret,
+			'credential_valid' => $key_auth ? $public_key_valid : $secret_valid,
 		);
 	}
 

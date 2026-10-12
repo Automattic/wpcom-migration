@@ -315,6 +315,28 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
 			break;
 
+		case 'assert-other-credential-ignored':
+			// A credential this host does not verify, stored before the manual
+			// screen stopped offering it, must not read as ready.
+			if ( \WordPress\Reprint\Server\Utils::key_auth_required() ) {
+				$stored = Exporter::store_secret( $secret );
+			} else {
+				list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+				$stored               = Exporter::store_public_key( $public_key );
+			}
+			if ( ! $stored ) {
+				throw new RuntimeException( "Step '$step': could not store the other credential." );
+			}
+			$state = Exporter::get_state();
+			if ( $state['has_credential'] || $state['credential_valid'] ) {
+				throw new RuntimeException( "Step '$step': the other credential must count for nothing: " . wp_json_encode( $state ) );
+			}
+			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
+			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render( $page ), 'Site ready to migrate', $step );
+			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render_manual( $manual ), 'wpcom-migration-reprint-api-url', $step );
+			Exporter::discard_credentials();
+			break;
+
 		case 'assert-no-mode-headings':
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-mode', $step );
