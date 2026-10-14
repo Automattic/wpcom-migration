@@ -2,15 +2,22 @@ name: Build
 
 # A branch with an open pull request runs once, through pull_request; pushes
 # to trunk run on their own. A newer push to the same branch cancels the run
-# still going for the old one.
+# still going for the old one. Release calls it with a tag, to test the
+# commit it releases.
 on:
   push:
     branches:
       - trunk
   pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        description: Git ref to build and test. Empty means the commit that triggered the run.
+        type: string
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.ref || github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -19,6 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -65,6 +74,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -80,6 +91,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -95,3 +108,17 @@ jobs:
         run: unzip -q build/wpcom-migration.zip -d build
       - name: Run the e2e scenarios against the ZIP contents
         run: tests/e2e/run.sh build/wpcom-migration
+
+  release-scripts:
+    name: Release scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+      - name: Test the release scripts
+        run: tests/release/run.sh
