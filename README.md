@@ -80,16 +80,17 @@ composer test:release             # the release scripts
 
 Versions are two-part (`6.73`, `7.0`), and tags carry no `v`.
 
-Run *Tag release* from the Actions tab, on trunk, with `minor` (6.72 → 6.73), `major` (6.72 → 7.0), or `custom` and a version. It lists the pull requests squash-merged since the last release, writes the version and that list into `plugin/`, commits `Release X.Y` to trunk, and tags the commit. It refuses when nothing was merged, when the tag or the WordPress.org tag already exists, or when *Build* hasn't passed on trunk. Pull request titles become the changelog, so write them for the people who install the plugin.
+Run *Tag release* from the Actions tab, on trunk, with `minor` (6.72 → 6.73), `major` (6.72 → 7.0), or `custom` and a version. It lists the pull requests squash-merged since the last release, writes the version and that list into `plugin/`, commits `Release X.Y` to trunk, and tags the commit. It refuses when nothing was merged, when the tag or the WordPress.org tag already exists, or when *Build* hasn't passed on trunk. Pull request titles become the changelog, so write them for the people who install the plugin. Squash merges and merge commits both count. Rebase merges don't.
 
 *Release* follows on its own. It runs *Build* against the tag, checks the ZIP with `bin/check-release.php`, and creates the GitHub release with the ZIP and the changelog entry. *Deploy to WordPress.org* follows that. It checks the release ZIP again and commits it to SVN `trunk/` and `tags/X.Y/` with [10up/action-wordpress-plugin-deploy](https://github.com/10up/action-wordpress-plugin-deploy). The update is live once SVN accepts the commit.
 
-To retry a step, dispatch it from trunk with the tag. A dispatched *Deploy to WordPress.org* is a dry run that prints what it would commit. Uncheck `dry_run` to deploy. To redo a release whose code is broken, delete the tag, fix trunk, and run *Tag release* again. It computes the same version and replaces that version's changelog entry.
+To retry a step, dispatch it from trunk with the tag. A dispatched *Deploy to WordPress.org* is a dry run that prints what it would commit. Uncheck `dry_run` to deploy. It refuses a version that isn't newer than the Stable tag WordPress.org serves. To redo a release whose code is broken, delete the tag, fix trunk, and run *Tag release* again. It computes the same version and replaces that version's changelog entry.
 
 ### Setup
 
 Done once, by hand:
 
+- The tag of the last release published before this automation, `6.72`, is on origin. *Tag release* counts from the highest `X.Y` tag it finds.
 - Trunk has no classic branch protection, so *Tag release* can push with `GITHUB_TOKEN`. The `trunk` ruleset blocks deletion and force-push. Don't add ruleset rules that require pull requests, status checks or signed commits, or restrict updates. Each of them would block the release commit.
 - A WordPress.org account that doesn't own the plugin is a committer on it (the plugin's Advanced view → Committers). It has two-factor authentication on, and an SVN password from Profile → Account & Security.
 - The `wordpress.org` environment (Settings → Environments) allows deployments from `trunk` only. It holds that account's `SVN_USERNAME` and `SVN_PASSWORD`, and no other job can read them.

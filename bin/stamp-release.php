@@ -121,6 +121,9 @@ function wpcom_migration_stamp_bullets( $text ) {
 /**
  * Lists the lines outside vendor/ and the changelog that still carry a version.
  *
+ * Composer manifests and the header lines that name PHP or WordPress versions
+ * are skipped: their numbers can equal a release version by coincidence.
+ *
  * @param string                $dir     Plugin directory.
  * @param string                $version The version to look for.
  * @param array<string, string> $pending Contents about to be written, by path.
@@ -132,7 +135,7 @@ function wpcom_migration_stamp_leftovers( $dir, $version, $pending ) {
 		new RecursiveCallbackFilterIterator(
 			new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
 			static function ( $file ) {
-				return 'vendor' !== $file->getFilename();
+				return ! in_array( $file->getFilename(), array( 'vendor', 'composer.json', 'composer.lock' ), true );
 			}
 		)
 	);
@@ -149,7 +152,7 @@ function wpcom_migration_stamp_leftovers( $dir, $version, $pending ) {
 			$contents  = $changelog['head'] . $changelog['tail'];
 		}
 		foreach ( preg_split( '/\R/', $contents ) as $index => $line ) {
-			if ( preg_match( $pattern, $line ) ) {
+			if ( preg_match( $pattern, $line ) && ! preg_match( '/^\s*(Requires PHP|Requires at least|Tested up to):/', $line ) ) {
 				$found[] = sprintf( '%s:%d: %s', $path, $index + 1, trim( $line ) );
 			}
 		}

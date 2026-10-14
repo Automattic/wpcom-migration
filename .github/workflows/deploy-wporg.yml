@@ -79,6 +79,17 @@ jobs:
           unzip -q "$RUNNER_TEMP/release/wpcom-migration.zip" -d "$RUNNER_TEMP/release"
           php bin/check-release.php "$RUNNER_TEMP/release/wpcom-migration" "$TAG"
 
+      - name: Refuse to move WordPress.org backwards
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          published="$(curl -fsS https://plugins.svn.wordpress.org/wpcom-migration/trunk/readme.txt | sed -n 's/^Stable tag: *//p' | tr -d '\r')"
+          if ! bin/next-release-version.sh "$published" custom "$TAG" >/dev/null; then
+            echo "::error::WordPress.org serves $published. Deploying $TAG would not move it forward."
+            exit 1
+          fi
+
       - name: Deploy
         uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # 2.3.0
         with:

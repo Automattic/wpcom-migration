@@ -145,6 +145,14 @@ mkdir -p "$dir/vendor/some/package"
 printf 'Tested with %s\n' "$OLD" > "$dir/vendor/some/package/README"
 expect_true 'ignores vendor/' php "$BIN/stamp-release.php" "$dir" 99.1 "$WORK/bullets.txt"
 
+dir="$(plugin_copy php-collision)"
+cp "$REPO_ROOT/plugin/composer.json" "$dir/"
+printf '* Earlier\n' > "$WORK/earlier.txt"
+php "$BIN/stamp-release.php" "$dir" 7.4 "$WORK/earlier.txt" >/dev/null
+expect_true 'ignores Requires PHP, Tested up to and composer files' php "$BIN/stamp-release.php" "$dir" 7.5 "$WORK/bullets.txt"
+sed -i.bak 's/^Tested up to: .*/Tested up to: 7.5/' "$dir/readme.txt" && rm "$dir/readme.txt.bak"
+expect_true 'ignores Tested up to when it equals the old version' php "$BIN/stamp-release.php" "$dir" 7.6 "$WORK/bullets.txt"
+
 dir="$(plugin_copy missing-line)"
 grep -vF 'public $version' "$REPO_ROOT/plugin/info.php" > "$dir/info.php"
 expect_failure 'fails when a place is missing' 'info.php: expected exactly one line' \
@@ -247,6 +255,14 @@ git -C "$repo" tag 6.73
 expect_output 'prints nothing when nothing was merged' '' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
 commit "$repo" 'Fix the screen (#4)'
 expect_output 'skips release commits' '* Fix the screen' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
+git -C "$repo" checkout -q -b feature
+commit "$repo" 'Work in progress'
+git -C "$repo" checkout -q trunk
+commit "$repo" 'Tidy the screen (#6)'
+git -C "$repo" merge -q --no-ff -m 'Merge pull request #5 from Automattic/feature' -m 'Add the merged feature' feature
+expect_output 'takes a merge commit pull request from its title and keeps going' \
+    "$(printf '* Add the merged feature\n* Tidy the screen\n* Fix the screen')" \
+    in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
 expect_failure 'fails on an unknown ref' 'Unknown ref: 9.9' in_dir "$repo" "$BIN/release-changelog.sh" 9.9 HEAD
 
 # Summary
