@@ -166,6 +166,28 @@ grep -vFx '== Changelog ==' "$REPO_ROOT/plugin/readme.txt" > "$dir/readme.txt"
 expect_failure 'fails without a changelog section' '"== Changelog ==" line, found 0' \
     php "$BIN/stamp-release.php" "$dir" 99.1 "$WORK/bullets.txt"
 
+echo '# bin/check-release.php'
+
+dir="$(plugin_copy check)"
+php "$BIN/stamp-release.php" "$dir" 99.1 "$WORK/bullets.txt" >/dev/null
+expect_output 'passes on a stamped tree' 'Release check passed: 99.1' php "$BIN/check-release.php" "$dir" 99.1
+expect_failure 'fails on another version' 'wpcom_migration.php: "Version: 99.1" should carry 99.2' \
+    php "$BIN/check-release.php" "$dir" 99.2
+expect_failure 'rejects a three-part version' 'Not an X.Y version: 99.1.1' php "$BIN/check-release.php" "$dir" 99.1.1
+sed -i.bak "s/'99.1'/'$OLD'/" "$dir/info.php" && rm "$dir/info.php.bak"
+expect_failure 'names the one place that disagrees' "info.php: \"public \$version = '$OLD';\" should carry 99.1" \
+    php "$BIN/check-release.php" "$dir" 99.1
+expect_failure 'fails when the changelog is behind' "the first changelog entry is $OLD, expected 99.1" \
+    php "$BIN/check-release.php" "$(plugin_copy check-unstamped)" 99.1
+
+echo '# bin/release-notes.php'
+
+dir="$(plugin_copy notes)"
+php "$BIN/stamp-release.php" "$dir" 99.1 "$WORK/bullets.txt" >/dev/null
+expect_output 'prints the entry' "$(printf '* First change\n* Second change')" php "$BIN/release-notes.php" "$dir/readme.txt" 99.1
+expect_failure 'fails without an entry' 'readme.txt has no changelog entry for 98.0.' \
+    php "$BIN/release-notes.php" "$dir/readme.txt" 98.0
+
 # Summary
 
 if [ "$failures" -ne 0 ]; then
