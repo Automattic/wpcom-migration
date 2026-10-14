@@ -188,6 +188,67 @@ expect_output 'prints the entry' "$(printf '* First change\n* Second change')" p
 expect_failure 'fails without an entry' 'readme.txt has no changelog entry for 98.0.' \
     php "$BIN/release-notes.php" "$dir/readme.txt" 98.0
 
+echo '# bin/latest-release.sh'
+
+repo="$(new_repo latest)"
+commit "$repo" 'First'
+for tag in 0.1.0 1.0.1 2.0.0 6.65 6.72; do
+    git -C "$repo" tag "$tag"
+done
+expect_output 'ignores three-part tags' '6.72' in_dir "$repo" "$BIN/latest-release.sh"
+
+repo="$(new_repo latest-numeric)"
+commit "$repo" 'First'
+git -C "$repo" tag 6.9
+git -C "$repo" tag 6.10
+expect_output 'compares versions as numbers' '6.10' in_dir "$repo" "$BIN/latest-release.sh"
+
+repo="$(new_repo latest-none)"
+commit "$repo" 'First'
+git -C "$repo" tag 1.0.0
+expect_failure 'fails without an X.Y tag' 'No X.Y release tag found.' in_dir "$repo" "$BIN/latest-release.sh"
+
+echo '# bin/next-release-version.sh'
+
+expect_output 'minor' '6.73' "$BIN/next-release-version.sh" 6.72 minor
+expect_output 'minor past nine' '6.10' "$BIN/next-release-version.sh" 6.9 minor
+expect_output 'minor past ten' '6.11' "$BIN/next-release-version.sh" 6.10 minor
+expect_output 'major' '7.0' "$BIN/next-release-version.sh" 6.72 major
+expect_output 'custom' '6.80' "$BIN/next-release-version.sh" 6.72 custom 6.80
+expect_failure 'custom equal to the latest' 'must come after 6.72' "$BIN/next-release-version.sh" 6.72 custom 6.72
+expect_failure 'custom below the latest' 'must come after 6.72' "$BIN/next-release-version.sh" 6.72 custom 6.8
+expect_failure 'custom three-part' 'must look like X.Y' "$BIN/next-release-version.sh" 6.72 custom 6.73.1
+expect_failure 'custom with a v' 'must look like X.Y' "$BIN/next-release-version.sh" 6.72 custom v6.80
+expect_failure 'custom without a version' 'must look like X.Y' "$BIN/next-release-version.sh" 6.72 custom
+expect_failure 'unknown bump' 'Bump must be minor, major or custom' "$BIN/next-release-version.sh" 6.72 patch
+expect_failure 'bad latest' 'Latest version must look like X.Y' "$BIN/next-release-version.sh" 6.72.1 minor
+
+echo '# bin/release-changelog.sh'
+
+# Shaped like trunk: Jetpack history, then the wporg-mirror merge that
+# brought in the 6.72 tag, then this repository's pull requests.
+repo="$(new_repo changelog)"
+commit "$repo" 'Jetpack: unrelated change (#40167)'
+git -C "$repo" checkout -q --orphan wporg-mirror
+commit "$repo" 'Updating and Tagging 6.72 version'
+git -C "$repo" tag 6.72
+git -C "$repo" checkout -q trunk
+git -C "$repo" merge -q --allow-unrelated-histories --no-edit -m "Merge branch 'wporg-mirror' into trunk" wporg-mirror
+commit "$repo" 'Update README.md'
+commit "$repo" 'Add the export server (#1)'
+commit "$repo" 'Mention (#2) in the middle'
+commit "$repo" 'Provision with an application password (#3)'
+expect_output 'stops at the wporg-mirror merge and keeps only pull requests' \
+    "$(printf '* Provision with an application password\n* Add the export server')" \
+    in_dir "$repo" "$BIN/release-changelog.sh" 6.72 HEAD
+
+commit "$repo" 'Release 6.73'
+git -C "$repo" tag 6.73
+expect_output 'prints nothing when nothing was merged' '' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
+commit "$repo" 'Fix the screen (#4)'
+expect_output 'skips release commits' '* Fix the screen' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
+expect_failure 'fails on an unknown ref' 'Unknown ref: 9.9' in_dir "$repo" "$BIN/release-changelog.sh" 9.9 HEAD
+
 # Summary
 
 if [ "$failures" -ne 0 ]; then
