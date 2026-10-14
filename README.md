@@ -86,15 +86,6 @@ Run *Tag release* from the Actions tab, on trunk, with `minor` (6.72 → 6.73), 
 
 To retry a step, dispatch it from trunk with the tag. A dispatched *Deploy to WordPress.org* is a dry run that prints what it would commit. Uncheck `dry_run` to deploy. It refuses a version that isn't newer than the Stable tag WordPress.org serves. To redo a release whose code is broken, delete the tag, fix trunk, and run *Tag release* again. It computes the same version and replaces that version's changelog entry.
 
-### Setup
-
-Done once, by hand:
-
-- The tag of the last release published before this automation, `6.72`, is on origin. *Tag release* counts from the highest `X.Y` tag it finds.
-- Trunk has no classic branch protection, so *Tag release* can push with `GITHUB_TOKEN`. The `trunk` ruleset blocks deletion and force-push. Don't add ruleset rules that require pull requests, status checks or signed commits, or restrict updates. Each of them would block the release commit.
-- A WordPress.org account that doesn't own the plugin is a committer on it (the plugin's Advanced view → Committers). It has two-factor authentication on, and an SVN password from Profile → Account & Security.
-- The `wordpress.org` environment (Settings → Environments) allows deployments from `trunk` only. It holds that account's `SVN_USERNAME` and `SVN_PASSWORD`, and no other job can read them.
-
 ## Known limitations
 
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp` is active and loads first, it answers on `reprint-api` before this plugin runs.
