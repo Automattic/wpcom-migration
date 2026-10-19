@@ -34,6 +34,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      attestations: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -87,6 +88,10 @@ jobs:
         run: |
           set -euo pipefail
           gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern wpcom-migration.zip --dir "$RUNNER_TEMP/release"
+          # Only a ZIP that Release attested, running from trunk or a release tag.
+          gh attestation verify "$RUNNER_TEMP/release/wpcom-migration.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity-regex '^https://github\.com/Automattic/wpcom-migration/\.github/workflows/release\.yml@refs/(heads/trunk|tags/[0-9]+\.[0-9]+)$'
           unzip -q "$RUNNER_TEMP/release/wpcom-migration.zip" -d "$RUNNER_TEMP/release"
           php bin/check-release.php "$RUNNER_TEMP/release/wpcom-migration" "$TAG"
 
