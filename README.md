@@ -9,9 +9,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
-- `bin/stamp-release.php`, `bin/check-release.php`, `bin/release-notes.php`, `bin/release-lib.php` — write, check and read the release version and changelog. `wpcom_migration_release_locations()` in `bin/release-lib.php` lists every place the plugin carries its version.
-- `bin/latest-release.sh`, `bin/next-release-version.sh`, `bin/release-changelog.sh` — the latest release, the next version, and the changelog since a release.
-- `tests/release/run.sh` — tests the release scripts against throwaway git repositories.
+- `bin/*release*`, `bin/check-tag-on-trunk.sh`, `tests/release/` — the release tooling the workflows run, and its tests.
 - `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, two that drive the screens (with a public key, and with a shared secret), two that provision through the REST routes (with a public key, and with a shared secret on a host made to look like it lacks OpenSSL), one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
@@ -78,13 +76,9 @@ composer test:release             # the release scripts
 
 ## Releasing
 
-Versions are two-part (`6.73`, `7.0`), and tags carry no `v`.
+Run *Tag release* from the Actions tab with `minor`, `major` or a custom version. It commits the new version and its changelog to trunk and tags the commit. *Release* then builds and tests the tag and publishes a GitHub release, and *Deploy to WordPress.org* commits that release to the plugin directory. Each step can be retried by dispatching it with the tag.
 
-Run *Tag release* from the Actions tab, on trunk, with `minor` (6.72 → 6.73), `major` (6.72 → 7.0), or `custom` and a version. It lists the pull requests squash-merged since the last release, writes the version and that list into `plugin/`, commits `Release X.Y` to trunk, and tags the commit. It refuses when nothing was merged, when the tag or the WordPress.org tag already exists, or when *Build* hasn't passed on trunk. Pull request titles become the changelog, so write them for the people who install the plugin. Squash merges and merge commits both count. Rebase merges don't.
-
-*Release* follows on its own. It runs *Build* against the tag, checks the ZIP with `bin/check-release.php`, and creates the GitHub release with the ZIP and the changelog entry. *Deploy to WordPress.org* follows that. It checks the release ZIP again and commits it to SVN `trunk/` and `tags/X.Y/` with [10up/action-wordpress-plugin-deploy](https://github.com/10up/action-wordpress-plugin-deploy). The update is live once SVN accepts the commit.
-
-To retry a step, dispatch it from trunk with the tag. A dispatched *Deploy to WordPress.org* is a dry run that prints what it would commit. Uncheck `dry_run` to deploy. It refuses a version that isn't newer than the Stable tag WordPress.org serves. To redo a release whose code is broken, delete the tag, fix trunk, and run *Tag release* again. It computes the same version and replaces that version's changelog entry.
+The changelog is made from the titles of the pull requests merged since the last release, so write them for the people who install the plugin.
 
 ## Known limitations
 
