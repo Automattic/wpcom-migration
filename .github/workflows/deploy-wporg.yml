@@ -37,6 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - uses: shivammathur/setup-php@v2
@@ -68,6 +69,16 @@ jobs:
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Require the tag on trunk
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if ! message="$(bin/check-tag-on-trunk.sh "$TAG" origin/trunk 2>&1)"; then
+            echo "::error::$message"
+            exit 1
+          fi
+          echo "$message"
 
       - name: Download and check the release ZIP
         env:

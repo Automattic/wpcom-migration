@@ -29,6 +29,12 @@ jobs:
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
     steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: trunk
+          fetch-depth: 0
+          persist-credentials: false
+
       - uses: actions/download-artifact@v8
         if: github.event_name == 'workflow_run'
         with:
@@ -53,8 +59,12 @@ jobs:
             echo "::error::Not an X.Y release tag: '$tag'"
             exit 1
           fi
-          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --silent; then
-            echo "::error::Tag $tag does not exist."
+          if ! message="$(bin/check-tag-on-trunk.sh "$tag" origin/trunk 2>&1)"; then
+            echo "::error::$message"
+            exit 1
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A GitHub release for $tag already exists. Delete it before releasing $tag again."
             exit 1
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"

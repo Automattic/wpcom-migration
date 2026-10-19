@@ -211,10 +211,32 @@ git -C "$repo" tag 6.9
 git -C "$repo" tag 6.10
 expect_output 'compares versions as numbers' '6.10' in_dir "$repo" "$BIN/latest-release.sh"
 
+repo="$(new_repo latest-off-trunk)"
+commit "$repo" 'First'
+git -C "$repo" tag 6.72
+git -C "$repo" checkout -q -b feature
+commit "$repo" 'Off trunk'
+git -C "$repo" tag 6.80
+git -C "$repo" checkout -q trunk
+expect_output 'ignores tags outside the checked-out history' '6.72' in_dir "$repo" "$BIN/latest-release.sh"
+
 repo="$(new_repo latest-none)"
 commit "$repo" 'First'
 git -C "$repo" tag 1.0.0
 expect_failure 'fails without an X.Y tag' 'No X.Y release tag found.' in_dir "$repo" "$BIN/latest-release.sh"
+
+echo '# bin/check-tag-on-trunk.sh'
+
+repo="$(new_repo on-trunk)"
+commit "$repo" 'First'
+git -C "$repo" tag 6.72
+git -C "$repo" checkout -q -b feature
+commit "$repo" 'Off trunk'
+git -C "$repo" tag 6.80
+git -C "$repo" checkout -q trunk
+expect_output 'passes for a tag on trunk' 'Tag 6.72 is on trunk.' in_dir "$repo" "$BIN/check-tag-on-trunk.sh" 6.72 trunk
+expect_failure 'fails for a tag off trunk' 'Tag 6.80 is not in the history of trunk.' in_dir "$repo" "$BIN/check-tag-on-trunk.sh" 6.80 trunk
+expect_failure 'fails for a missing tag' 'Tag 9.9 does not exist.' in_dir "$repo" "$BIN/check-tag-on-trunk.sh" 9.9 trunk
 
 echo '# bin/next-release-version.sh'
 
