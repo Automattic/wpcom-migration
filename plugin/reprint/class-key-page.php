@@ -241,7 +241,7 @@ class Key_Page {
 			return;
 		}
 
-		$this->render_sentence( __( 'Copy the migration key from your site\'s Overview on WordPress.com and paste it here.', 'wpcom-migration' ) );
+		$this->render_sentence( __( 'Copy the migration key from WordPress.com and paste it here.', 'wpcom-migration' ) );
 
 		$state = Exporter::get_state();
 		if ( $state['has_public_key'] ) {
@@ -312,7 +312,7 @@ class Key_Page {
 
 		$notices = array(
 			'empty'           => __( 'Paste the migration key first.', 'wpcom-migration' ),
-			'invalid'         => __( 'That doesn\'t look like a migration key. Copy it again from your site\'s Overview on WordPress.com.', 'wpcom-migration' ),
+			'invalid'         => __( 'That doesn\'t look like a migration key. Copy it again from WordPress.com.', 'wpcom-migration' ),
 			'storage_failure' => __( 'The migration key couldn\'t be saved. Try again, or contact WordPress.com support.', 'wpcom-migration' ),
 		);
 

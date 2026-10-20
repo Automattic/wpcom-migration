@@ -147,7 +147,7 @@ body {
 	border: 1px solid var( --wpcom-migration-gray-10 );
 	font-family: monospace;
 	font-size: 13px;
-	resize: vertical;
+	resize: none;
 }
 
 /* Fix main content having extra padding on mobile. */

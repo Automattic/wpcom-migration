@@ -355,6 +355,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'render-key-page':
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect with a migration key', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Copy the migration key from WordPress.com and paste it here.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'name="' . Key_Page::KEY_FIELD . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'placeholder="Paste the migration key"', $step );
@@ -398,7 +399,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$_GET[ Key_Page::NOTICE_QUERY_ARG ] = 'invalid';
 			$html                               = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, 'look like a migration key', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Copy it again from your site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Copy it again from WordPress.com.', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
 			break;
 
