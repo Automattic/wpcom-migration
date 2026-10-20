@@ -9,6 +9,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
+- `bin/*release*`, `bin/check-tag-on-trunk.sh`, `tests/release/` — the release tooling the workflows run, and its tests.
 - `tests/e2e/` — Playground blueprints and request scripts: one scenario per credential state, two that drive the screens (with a public key, and with a shared secret), two that provision through the REST routes (with a public key, and with a shared secret on a host made to look like it lacks OpenSSL), one that drives the WordPress.com connection, one that checks the admin menu, and one that checks the menu on a network.
 
 ## Build
@@ -68,13 +69,18 @@ Which credential WordPress.com sets up depends on the host. Where `openssl_verif
 composer lint                     # PHPCS, WordPress Coding Standards
 composer lint:php:compat          # PHPCompatibility, testVersion 7.4-
 composer test:e2e                 # Playground e2e against build/wpcom-migration
+composer test:release             # the release scripts
 ```
 
 `lint:php:compat` checks the repository's own PHP against the 7.4 floor, including functions `php -l` cannot see; `vendor/` is each package's own job. PHPCompatibility 10 is pinned at a pre-release; move the constraint to `^10.0` when it ships.
 
-`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP; `php -l` the built tree on PHP 7.4 and 8.4; PHPCS and the compatibility lint; the Playground e2e scenarios against the ZIP.
+`.github/workflows/build.yml` runs on every push and pull request: build and upload the ZIP. `php -l` the built tree on PHP 7.4 and 8.4. PHPCS and the compatibility lint. The Playground e2e scenarios against the ZIP. The release script tests. *Release* also runs it against each release tag.
 
-Publishing to wp.org is not automated.
+## Releasing
+
+Run *Tag release* from the Actions tab with `minor`, `major` or a custom version. It commits the new version and its changelog to trunk and tags the commit. *Release* then builds and tests the tag and publishes a GitHub release. Each step can be retried by dispatching it with the tag.
+
+The changelog is made from the titles of the pull requests merged since the last release, so write them for the people who install the plugin.
 
 ## Known limitations
 

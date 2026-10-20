@@ -1,0 +1,135 @@
+name: Release
+
+# Runs Build against a release tag, then creates the GitHub release with the
+# ZIP Build tested. Tag release starts it. A tag pushed by hand starts it too.
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+'
+  workflow_run:
+    workflows: ['Tag release']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, as X.Y'
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  resolve:
+    name: Resolve the tag
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: trunk
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        if: github.event_name == 'workflow_run'
+        with:
+          name: release-tag
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/handoff
+
+      - name: Resolve
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          case "$GITHUB_EVENT_NAME" in
+            push) tag="$GITHUB_REF_NAME" ;;
+            workflow_dispatch) tag="$INPUT_TAG" ;;
+            workflow_run) tag="$(cat "$RUNNER_TEMP/handoff/release-tag")" ;;
+          esac
+          if ! [[ $tag =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not an X.Y release tag: '$tag'"
+            exit 1
+          fi
+          if ! message="$(bin/check-tag-on-trunk.sh "$tag" origin/trunk 2>&1)"; then
+            echo "::error::$message"
+            exit 1
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A GitHub release for $tag already exists. Delete it before releasing $tag again."
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "$tag" > "$RUNNER_TEMP/release-tag"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-tag
+          path: ${{ runner.temp }}/release-tag
+          if-no-files-found: error
+
+  ci:
+    name: Build
+    needs: resolve
+    permissions:
+      contents: read
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: refs/tags/${{ needs.resolve.outputs.tag }}
+
+  release:
+    name: Create the GitHub release
+    needs: [resolve, ci]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ needs.resolve.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ needs.resolve.outputs.tag }}
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: wpcom-migration
+          path: ${{ runner.temp }}/artifact
+
+      - name: Check the ZIP and take its notes
+        run: |
+          set -euo pipefail
+          unzip -q "$RUNNER_TEMP/artifact/wpcom-migration.zip" -d "$RUNNER_TEMP/unzipped"
+          php bin/check-release.php "$RUNNER_TEMP/unzipped/wpcom-migration" "$TAG"
+          php bin/release-notes.php "$RUNNER_TEMP/unzipped/wpcom-migration/readme.txt" "$TAG" > "$RUNNER_TEMP/notes.md"
+
+      # Records that this workflow produced these exact bytes.
+      - name: Attest the ZIP
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/artifact/wpcom-migration.zip
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$TAG" "$RUNNER_TEMP/artifact/wpcom-migration.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag

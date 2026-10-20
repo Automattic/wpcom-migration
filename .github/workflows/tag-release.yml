@@ -1,0 +1,123 @@
+name: Tag release
+
+# Commits the next version and its changelog to trunk and tags the commit.
+# Release follows on its own.
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump'
+        required: true
+        type: choice
+        default: minor
+        options:
+          - minor
+          - major
+          - custom
+      custom_version:
+        description: 'Version for a custom bump, as X.Y'
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Commit and tag the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Require trunk
+        if: github.ref != 'refs/heads/trunk'
+        run: |
+          echo "::error::Dispatch Tag release from trunk, not ${GITHUB_REF}."
+          exit 1
+
+      - uses: actions/checkout@v7
+        with:
+          ref: trunk
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Work out the version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump }}
+          CUSTOM_VERSION: ${{ inputs.custom_version }}
+        run: |
+          set -euo pipefail
+          latest="$(bin/latest-release.sh)"
+          version="$(bin/next-release-version.sh "$latest" "$BUMP" "$CUSTOM_VERSION")"
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version. The latest release is $latest."
+
+      - name: Generate the changelog
+        env:
+          LATEST: ${{ steps.version.outputs.latest }}
+        run: |
+          set -euo pipefail
+          bin/release-changelog.sh "$LATEST" HEAD > "$RUNNER_TEMP/changelog.txt"
+          if [ ! -s "$RUNNER_TEMP/changelog.txt" ]; then
+            echo "::error::No pull requests were merged since $LATEST. There is nothing to release."
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/changelog.txt"
+
+      - name: Check the version is free
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if git rev-parse --verify --quiet "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::Tag $VERSION already exists."
+            exit 1
+          fi
+          status="$(curl -s -o /dev/null -w '%{http_code}' "https://plugins.svn.wordpress.org/wpcom-migration/tags/$VERSION/")"
+          if [ "$status" != "404" ]; then
+            echo "::error::WordPress.org answered $status for tags/$VERSION, not 404. The version may already be published."
+            exit 1
+          fi
+
+      - name: Check Build passed on trunk
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse HEAD)"
+          passed="$(gh run list --workflow build.yml --commit "$sha" --status success --json databaseId --jq length)"
+          if [ "$passed" = "0" ]; then
+            echo "::error::Build has not passed on trunk at $sha. Wait for it to finish, or fix it, then dispatch again."
+            exit 1
+          fi
+
+      - name: Stamp, commit and tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          php bin/stamp-release.php plugin "$VERSION" "$RUNNER_TEMP/changelog.txt"
+          php bin/check-release.php plugin "$VERSION"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -q -am "Release $VERSION"
+          git tag "$VERSION"
+          # Both land or neither does. If trunk moved since the checkout, dispatch again.
+          git push --atomic origin HEAD:refs/heads/trunk "refs/tags/$VERSION"
+          echo "$VERSION" > "$RUNNER_TEMP/release-tag"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-tag
+          path: ${{ runner.temp }}/release-tag
+          if-no-files-found: error
