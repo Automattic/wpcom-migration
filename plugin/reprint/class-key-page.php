@@ -8,6 +8,8 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
+use InvalidArgumentException;
+use RuntimeException;
 use WordPress\Reprint\Server\Utils;
 
 /**
@@ -161,9 +163,12 @@ class Key_Page {
 			$this->redirect_with_notice( 'empty' );
 		}
 
-		$result = Exporter::enroll_public_key( $pasted_key );
-		if ( 'invalid' === $result || 'storage_failure' === $result ) {
-			$this->redirect_with_notice( $result );
+		try {
+			Exporter::enroll_public_key( $pasted_key );
+		} catch ( InvalidArgumentException $exception ) {
+			$this->redirect_with_notice( 'invalid' );
+		} catch ( RuntimeException $exception ) {
+			$this->redirect_with_notice( 'storage_failure' );
 		}
 
 		wp_safe_redirect( Settings_Page::page_url() );

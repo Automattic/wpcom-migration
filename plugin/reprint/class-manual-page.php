@@ -11,6 +11,7 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use InvalidArgumentException;
+use RuntimeException;
 use WordPress\Reprint\Server\Utils;
 
 /**
@@ -251,14 +252,15 @@ class Manual_Page {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in authorize().
 		$pasted_key = sanitize_textarea_field( wp_unslash( $_POST[ self::PUBLIC_KEY_FIELD ] ?? '' ) );
 
-		$notices = array(
-			'saved'           => 'key_saved',
-			'unchanged'       => 'key_unchanged',
-			'invalid'         => 'key_invalid',
-			'storage_failure' => 'key_storage_failure',
-		);
-		$result  = Exporter::enroll_public_key( $pasted_key );
-		$this->redirect_with_notice( $notices[ $result ] );
+		try {
+			$stored = Exporter::enroll_public_key( $pasted_key );
+		} catch ( InvalidArgumentException $exception ) {
+			$this->redirect_with_notice( 'key_invalid' );
+		} catch ( RuntimeException $exception ) {
+			$this->redirect_with_notice( 'key_storage_failure' );
+		}
+
+		$this->redirect_with_notice( $stored ? 'key_saved' : 'key_unchanged' );
 	}
 
 	/**

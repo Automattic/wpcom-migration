@@ -9,7 +9,7 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
-use InvalidArgumentException;
+use RuntimeException;
 use WordPress\Reprint\Server\HTTPServer;
 use WordPress\Reprint\Server\PublicKeyServer;
 use WordPress\Reprint\Server\RequestAuthenticator;
@@ -294,25 +294,23 @@ class Exporter {
 	 * Validates a pasted public key, stores it in place of any other and
 	 * records the enrollment.
 	 *
-	 * Does not check Utils::key_auth_required(). Callers do.
+	 * Does not check Utils::key_auth_required(). Callers do. A key that is
+	 * not usable throws PublicKeyServer's InvalidArgumentException.
 	 *
 	 * @param string $pasted_key The sanitized pasted key text.
-	 * @return string One of 'saved', 'unchanged', 'invalid' or 'storage_failure'.
+	 * @return bool True when the key was stored, false when it was already enrolled.
+	 * @throws RuntimeException When the key could not be stored.
 	 */
-	public static function enroll_public_key( $pasted_key ) {
-		try {
-			$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
-		} catch ( InvalidArgumentException $exception ) {
-			return 'invalid';
-		}
+	public static function enroll_public_key( $pasted_key ): bool {
+		$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
 
 		$state = self::get_state();
 		if ( $state['public_key_valid'] && get_option( self::PUBLIC_KEY_OPTION ) === $public_key ) {
-			return 'unchanged';
+			return false;
 		}
 
 		if ( ! self::store_public_key( $public_key ) ) {
-			return 'storage_failure';
+			throw new RuntimeException( 'The public key could not be stored.' );
 		}
 
 		self::record_event(
@@ -323,7 +321,7 @@ class Exporter {
 			)
 		);
 
-		return 'saved';
+		return true;
 	}
 
 	/**
