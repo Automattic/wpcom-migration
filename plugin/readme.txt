@@ -4,7 +4,7 @@ Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 6.72
+Stable tag: 6.73
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,20 @@ Whether you’re scaling your business, expanding your online presence, or simpl
 3. Next, click the Activate button. After activating, you can navigate to Migrate to WordPress.com in your admin area.
 
 == Changelog ==
+= 6.73 =
+* Automate releases without publishing to WordPress.org (yet)
+* Let administrators connect with a migration key
+* Update Reprint to 0.11.0 and drop the export window
+* Apply design tweaks to the Reprint migration screen
+* Reprint public key management
+* Let WordPress.com choose the plugin's main screen
+* Restrict manual Reprint export setup to administrators
+* Make the Reprint screen the plugin's one menu entry
+* Show the Reprint migration screen one mode at a time
+* Add the WordPress.com connection to the Reprint migration screen
+* Provision the exporter with an application password
+* Add the Reprint export server behind ?reprint-api-wpcom-migration
+
 = 6.72 =
 * Tweak: Added validation checks for input params.
 
