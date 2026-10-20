@@ -1,0 +1,118 @@
+name: Deploy to WordPress.org
+
+# Commits the GitHub release's ZIP to WordPress.org SVN trunk and tags/X.Y.
+# Release starts it. Dispatch it from trunk to retry. A dispatch is a dry run
+# unless dry_run is unchecked.
+on:
+  workflow_run:
+    workflows: ['Release']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, as X.Y'
+        required: true
+        type: string
+      dry_run:
+        description: 'Print what would be committed without committing'
+        type: boolean
+        default: true
+
+permissions: {}
+
+concurrency:
+  group: deploy-wporg
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to WordPress.org SVN
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: wordpress.org
+    permissions:
+      contents: read
+      actions: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - uses: actions/download-artifact@v8
+        if: github.event_name == 'workflow_run'
+        with:
+          name: release-tag
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/handoff
+
+      - name: Resolve the tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$(cat "$RUNNER_TEMP/handoff/release-tag")"
+          fi
+          if ! [[ $tag =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Not an X.Y release tag: '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Require the tag on trunk
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          if ! message="$(bin/check-tag-on-trunk.sh "$TAG" origin/trunk 2>&1)"; then
+            echo "::error::$message"
+            exit 1
+          fi
+          echo "$message"
+
+      - name: Download and check the release ZIP
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern wpcom-migration.zip --dir "$RUNNER_TEMP/release"
+          # Only a ZIP that Release attested, running from trunk or a release tag.
+          gh attestation verify "$RUNNER_TEMP/release/wpcom-migration.zip" \
+            --repo "$GITHUB_REPOSITORY" \
+            --cert-identity-regex '^https://github\.com/Automattic/wpcom-migration/\.github/workflows/release\.yml@refs/(heads/trunk|tags/[0-9]+\.[0-9]+)$'
+          unzip -q "$RUNNER_TEMP/release/wpcom-migration.zip" -d "$RUNNER_TEMP/release"
+          php bin/check-release.php "$RUNNER_TEMP/release/wpcom-migration" "$TAG"
+
+      - name: Refuse to move WordPress.org backwards
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          published="$(curl -fsS https://plugins.svn.wordpress.org/wpcom-migration/trunk/readme.txt | sed -n 's/^Stable tag: *//p' | tr -d '\r')"
+          if ! bin/next-release-version.sh "$published" custom "$TAG" >/dev/null; then
+            echo "::error::WordPress.org serves $published. Deploying $TAG would not move it forward."
+            exit 1
+          fi
+
+      - name: Deploy
+        uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2 # 2.3.0
+        with:
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: wpcom-migration
+          VERSION: ${{ steps.tag.outputs.tag }}
+          BUILD_DIR: ${{ runner.temp }}/release/wpcom-migration

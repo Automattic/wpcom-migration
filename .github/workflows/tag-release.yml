@@ -1,7 +1,7 @@
 name: Tag release
 
 # Commits the next version and its changelog to trunk and tags the commit.
-# Release follows on its own.
+# Release and Deploy to WordPress.org follow on their own.
 on:
   workflow_dispatch:
     inputs:
