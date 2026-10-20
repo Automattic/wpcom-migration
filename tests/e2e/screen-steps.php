@@ -370,7 +370,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'connect-key-empty':
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => "  \n" ) );
-			$key_page->handle_connect(); // Redirects and exits.
+			wpcom_migration_e2e_expect_redirect( $key_page, add_query_arg( Key_Page::NOTICE_QUERY_ARG, 'empty', Key_Page::page_url() ), $step );
 			break;
 
 		case 'assert-key-empty':
@@ -380,11 +380,17 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Paste the migration key first.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'notice-error', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
+
+			$_GET[ Key_Page::NOTICE_QUERY_ARG ] = 'storage_failure';
+			$html                               = wpcom_migration_e2e_render_key( $key_page );
+			wpcom_migration_e2e_expect_contains( $html, 'The migration key couldn&#8217;t be saved.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'notice-error', $step );
+			wpcom_migration_e2e_expect_plain_language( $html, $step );
 			break;
 
 		case 'connect-key-invalid':
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => 'not a key' ) );
-			$key_page->handle_connect();
+			wpcom_migration_e2e_expect_redirect( $key_page, add_query_arg( Key_Page::NOTICE_QUERY_ARG, 'invalid', Key_Page::page_url() ), $step );
 			break;
 
 		case 'assert-key-invalid':
@@ -403,7 +409,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			update_option( 'wpcom_migration_e2e_public_key', $public_key );
 			$pem = '  ' . str_replace( "\n", "\r\n", \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) . "\r\n";
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => $pem ) );
-			$key_page->handle_connect();
+			wpcom_migration_e2e_expect_redirect( $key_page, Settings_Page::page_url(), $step );
 			break;
 
 		case 'assert-key-connected':
@@ -417,6 +423,24 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'This site already has a migration key. Connecting replaces it.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'notice-warning', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
+
+			// Connecting the same key again changes nothing and records no event.
+			$installed = 0;
+			$counter   = static function ( $event ) use ( &$installed ) {
+				if ( 'public_key_installed' === $event ) {
+					++$installed;
+				}
+			};
+			add_action( 'wpcom_migration_reprint_export_event', $counter );
+			try {
+				wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+				wpcom_migration_e2e_expect_redirect( $key_page, Settings_Page::page_url(), $step );
+			} finally {
+				remove_action( 'wpcom_migration_reprint_export_event', $counter );
+			}
+			if ( 0 !== $installed ) {
+				throw new RuntimeException( "Step '$step': connecting the same key again recorded $installed public_key_installed event(s)." );
+			}
 			Exporter::discard_credentials();
 			break;
 
@@ -427,7 +451,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
-			$key_page->handle_connect();
+			wpcom_migration_e2e_expect_redirect( $key_page, Settings_Page::page_url(), $step );
 			break;
 
 		case 'assert-key-repaired':
@@ -462,6 +486,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Contact WordPress.com support', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Only an administrator can connect this site with a migration key.', $step );
+			wpcom_migration_e2e_expect_plain_language( $html, $step );
 
 			$die_handler     = static function () {
 				throw new RuntimeException( 'key access denied' );
@@ -496,7 +522,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'render-key-page-unsupported':
 			$html = wpcom_migration_e2e_render_key( $key_page );
-			wpcom_migration_e2e_expect_contains( $html, 'This site can', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This site can&#8217;t connect with a migration key', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Contact WordPress.com support', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Key_Page::KEY_FIELD, $step );
@@ -507,7 +533,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'connect-key-unsupported':
 			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
-			$key_page->handle_connect();
+			wpcom_migration_e2e_expect_redirect( $key_page, Key_Page::page_url(), $step );
 			break;
 
 		case 'assert-key-unsupported':
@@ -553,6 +579,38 @@ function wpcom_migration_e2e_render_key( Key_Page $page ) {
 	ob_start();
 	$page->render_page();
 	return ob_get_clean();
+}
+
+/**
+ * Runs the migration key form handler and fails unless it redirects to the
+ * expected location.
+ *
+ * @param Key_Page $page     The screen.
+ * @param string   $expected The expected redirect location.
+ * @param string   $step     Name of the step, for the error message.
+ * @throws RuntimeException When the handler returns or redirects elsewhere.
+ */
+function wpcom_migration_e2e_expect_redirect( Key_Page $page, $expected, $step ) {
+	$location = null;
+	$filter   = static function ( $url ) use ( &$location ) {
+		$location = $url;
+		throw new RuntimeException( 'key redirect' );
+	};
+	add_filter( 'wp_redirect', $filter );
+	try {
+		$page->handle_connect();
+		throw new RuntimeException( "Step '$step': the handler returned without redirecting." );
+	} catch ( RuntimeException $exception ) {
+		if ( 'key redirect' !== $exception->getMessage() ) {
+			throw $exception;
+		}
+	} finally {
+		remove_filter( 'wp_redirect', $filter );
+	}
+
+	if ( $expected !== $location ) {
+		throw new RuntimeException( "Step '$step': expected a redirect to $expected, got $location." );
+	}
 }
 
 /**

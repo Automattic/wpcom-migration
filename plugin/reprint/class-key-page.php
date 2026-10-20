@@ -230,6 +230,7 @@ class Key_Page {
 		}
 
 		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
+			$this->render_sentence( __( 'Only an administrator can connect this site with a migration key.', 'wpcom-migration' ) );
 			$this->render_back_link();
 			return;
 		}

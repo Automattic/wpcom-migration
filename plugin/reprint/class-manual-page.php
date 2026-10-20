@@ -247,8 +247,7 @@ class Manual_Page {
 			$this->redirect_with_notice( 'key_unsupported' );
 		}
 
-		// PublicKeyServer::assert_valid_public_key() is the real check; the
-		// sanitizer only cleans the pasted text.
+		// Enrollment is the real check. The sanitizer only cleans the pasted text.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in authorize().
 		$pasted_key = sanitize_textarea_field( wp_unslash( $_POST[ self::PUBLIC_KEY_FIELD ] ?? '' ) );
 
