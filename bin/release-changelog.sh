@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
 # Prints a changelog bullet for each pull request merged between two refs,
-# newest first. A squash merge counts when its subject ends in "(#NN)", and
-# a merge commit counts by the pull request title on its second line, so
-# release commits and direct pushes are left out. The walk follows first
-# parents and stops at a merge of unrelated histories: the merge that
-# joined the old wporg-mirror branch to trunk.
+# newest first. A squash merge counts when its subject ends in "(#NN)" and is
+# printed as is. A merge commit counts by the pull request title on its second
+# line, with its number added. Release commits and direct pushes are left
+# out. The walk follows first parents and stops at a merge of unrelated
+# histories: the merge that joined the old wporg-mirror branch to trunk.
 #
 # Usage: bin/release-changelog.sh <from> <to>
 #
@@ -29,13 +29,14 @@ while IFS=$'\t' read -r sha parents subject; do
         if ! git merge-base $parents >/dev/null; then
             break
         fi
-        if [[ $subject =~ ^Merge\ pull\ request\ \#[0-9]+\  ]]; then
+        if [[ $subject =~ ^Merge\ pull\ request\ \#([0-9]+)\  ]]; then
+            number="${BASH_REMATCH[1]}"
             title="$(git log -1 --format=%b "$sha" | sed -n '/[^[:space:]]/{p;q;}')"
             if [ -n "$title" ]; then
-                printf '* %s\n' "$title"
+                printf '* %s (#%s)\n' "$title" "$number"
             fi
         fi
-    elif [[ $subject =~ ^(.*[^[:space:]])[[:space:]]+\(#[0-9]+\)$ ]]; then
-        printf '* %s\n' "${BASH_REMATCH[1]}"
+    elif [[ $subject =~ \(#[0-9]+\)$ ]]; then
+        printf '* %s\n' "$subject"
     fi
 done < <(git log --first-parent --format='%H%x09%P%x09%s' "$1..$2")

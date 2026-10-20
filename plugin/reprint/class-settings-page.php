@@ -175,24 +175,33 @@ class Settings_Page {
 			return;
 		}
 
-		$plugin_data = get_file_data( $this->plugin_file, array( 'Version' => 'Version' ) );
+		self::enqueue_styles( $this->plugin_file );
+	}
+
+	/**
+	 * Enqueues the screen stylesheets, which Key_Page shares.
+	 *
+	 * @param string $plugin_file Absolute path of the plugin's main file.
+	 */
+	public static function enqueue_styles( $plugin_file ) {
+		$plugin_data = get_file_data( $plugin_file, array( 'Version' => 'Version' ) );
 		$version     = '' !== $plugin_data['Version'] ? $plugin_data['Version'] : false;
 
 		wp_enqueue_style(
 			'wpcom-migration-variables',
-			plugins_url( 'assets/css/variables.css', $this->plugin_file ),
+			plugins_url( 'assets/css/variables.css', $plugin_file ),
 			array(),
 			$version
 		);
 		wp_enqueue_style(
 			'wpcom-migration-fonts',
-			plugins_url( 'assets/css/fonts.css', $this->plugin_file ),
+			plugins_url( 'assets/css/fonts.css', $plugin_file ),
 			array(),
 			$version
 		);
 		wp_enqueue_style(
 			self::STYLE_HANDLE,
-			plugins_url( 'reprint/settings-page.css', $this->plugin_file ),
+			plugins_url( 'reprint/settings-page.css', $plugin_file ),
 			array( 'wpcom-migration-variables', 'wpcom-migration-fonts' ),
 			$version
 		);
@@ -319,8 +328,16 @@ class Settings_Page {
 				if ( null !== $section ) {
 					$section->render_connect_button();
 				}
+				$this->render_key_screen_link();
 				return;
 		}
+	}
+
+	/**
+	 * Renders the link to the migration key screen.
+	 */
+	private function render_key_screen_link() {
+		echo '<p class="wpcom-migration-description"><a href="' . esc_url( Key_Page::page_url() ) . '">' . esc_html( wptexturize( __( 'Can\'t connect? Use a migration key instead', 'wpcom-migration' ) ) ) . '</a></p>';
 	}
 
 	/**

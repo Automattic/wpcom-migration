@@ -47,6 +47,15 @@ body {
 	line-height: inherit;
 }
 
+/* Notices in the column line up with the text, not wp-admin's indent. */
+.wpcom-migration-container .notice {
+	margin: 16px 0;
+}
+
+.wpcom-migration-container .notice p {
+	margin: 0.5em 0;
+}
+
 .wpcom-migration-container a:not( .wpcom-migration-button ) {
 	color: var( --wpcom-migration-primary-bg );
 }
@@ -129,8 +138,29 @@ body {
 	line-height: 20px;
 }
 
+.wpcom-migration-label {
+	display: block;
+	margin-bottom: 8px;
+	color: var( --wpcom-migration-gray-100 );
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+.wpcom-migration-textarea {
+	display: block;
+	width: 100%;
+	box-sizing: border-box;
+	padding: 8px 12px;
+	border: 1px solid var( --wpcom-migration-gray-10 );
+	font-family: monospace;
+	font-size: 13px;
+	resize: none;
+}
+
 /* Fix main content having extra padding on mobile. */
-.toplevel_page_wpcom-migration-status.auto-fold #wpcontent {
+.auto-fold #wpcontent {
 	padding-left: 0;
 }
 

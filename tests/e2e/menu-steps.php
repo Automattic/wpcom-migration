@@ -9,6 +9,7 @@
  * @package wpcom-migration
  */
 
+use Automattic\WPCOM_Migration\Reprint\Key_Page;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
@@ -101,7 +102,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			break;
 
 		case 'screens-reachable':
-			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			break;
 
 		case 'old-screen-still-reachable':
@@ -125,6 +126,11 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			if ( ! has_action( $hook ) ) {
 				throw new RuntimeException( "The by-hand screen has no render callback: $hook" );
 			}
+
+			$hook = get_plugin_page_hookname( Key_Page::PAGE_SLUG, Settings_Page::PAGE_SLUG );
+			if ( ! isset( $GLOBALS['_registered_pages'][ $hook ] ) || ! has_action( $hook ) ) {
+				throw new RuntimeException( "The migration key screen is not a rendering registered page: $hook" );
+			}
 			break;
 
 		case 'suppressed':
@@ -133,7 +139,8 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up Reprint manually', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_title( Key_Page::PAGE_SLUG, __( 'Connect with a migration key', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			break;
 
 		case 'whitelabelled':
@@ -145,7 +152,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 					throw new RuntimeException( 'A brand with hide_from_menu should turn wpcom_migration_show_menu off.' );
 				}
 				// The brand drops the old screen entirely, as it always has.
-				wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
+				wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG ) );
 			} finally {
 				delete_option( 'wpcombrand' );
 			}
@@ -266,7 +273,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG ) );
 
 			if ( 0 !== (int) get_option( 'wpcom_migration_e2e_flag_requests', 0 ) ) {
 				throw new RuntimeException( 'A network should never ask for the main screen flag.' );
@@ -290,7 +297,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		case 'flag-blogvault':
 			wpcom_migration_e2e_assert_blogvault_main( $slugs, 'A blogvault answer' );
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			if ( 1 !== (int) get_option( 'wpcom_migration_e2e_flag_requests' ) ) {
 				throw new RuntimeException( 'Menu, Settings link and redirect should share one fetch.' );
 			}

@@ -10,6 +10,7 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use WordPress\Reprint\Server\HTTPServer;
+use WordPress\Reprint\Server\PublicKeyServer;
 use WordPress\Reprint\Server\RequestAuthenticator;
 use WordPress\Reprint\Server\Utils;
 
@@ -286,6 +287,40 @@ class Exporter {
 
 		return get_option( self::PUBLIC_KEY_OPTION ) === $public_key
 			&& self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
+	}
+
+	/**
+	 * Validates a pasted public key, stores it in place of any other and
+	 * records the enrollment.
+	 *
+	 * Does not check Utils::key_auth_required(). Callers do. A key that is
+	 * not usable throws PublicKeyServer's InvalidArgumentException.
+	 *
+	 * @param string $pasted_key The sanitized pasted key text.
+	 * @return bool True when the key was stored, false when it was already enrolled.
+	 * @throws Credential_Storage_Exception When the key could not be stored.
+	 */
+	public static function enroll_public_key( $pasted_key ): bool {
+		$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
+
+		$state = self::get_state();
+		if ( $state['public_key_valid'] && get_option( self::PUBLIC_KEY_OPTION ) === $public_key ) {
+			return false;
+		}
+
+		if ( ! self::store_public_key( $public_key ) ) {
+			throw new Credential_Storage_Exception( 'The public key could not be stored.' );
+		}
+
+		self::record_event(
+			'public_key_installed',
+			array(
+				'user_id' => get_current_user_id(),
+				'key_id'  => Utils::public_key_fingerprint( $public_key ),
+			)
+		);
+
+		return true;
 	}
 
 	/**
