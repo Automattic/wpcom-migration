@@ -11,7 +11,6 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use InvalidArgumentException;
-use WordPress\Reprint\Server\PublicKeyServer;
 use WordPress\Reprint\Server\Utils;
 
 /**
@@ -248,34 +247,19 @@ class Manual_Page {
 			$this->redirect_with_notice( 'key_unsupported' );
 		}
 
-		// PublicKeyServer::assert_valid_public_key() is the real check; the
-		// sanitizer only cleans the pasted text.
+		// Enrollment is the real check. The sanitizer only cleans the pasted text.
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Checked in authorize().
 		$pasted_key = sanitize_textarea_field( wp_unslash( $_POST[ self::PUBLIC_KEY_FIELD ] ?? '' ) );
 
 		try {
-			$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
+			$stored = Exporter::enroll_public_key( $pasted_key );
 		} catch ( InvalidArgumentException $exception ) {
 			$this->redirect_with_notice( 'key_invalid' );
-		}
-
-		$state = Exporter::get_state();
-		if ( $state['public_key_valid'] && get_option( Exporter::PUBLIC_KEY_OPTION ) === $public_key ) {
-			$this->redirect_with_notice( 'key_unchanged' );
-		}
-
-		if ( ! Exporter::store_public_key( $public_key ) ) {
+		} catch ( Credential_Storage_Exception $exception ) {
 			$this->redirect_with_notice( 'key_storage_failure' );
 		}
 
-		Exporter::record_event(
-			'public_key_installed',
-			array(
-				'user_id' => get_current_user_id(),
-				'key_id'  => Utils::public_key_fingerprint( $public_key ),
-			)
-		);
-		$this->redirect_with_notice( 'key_saved' );
+		$this->redirect_with_notice( $stored ? 'key_saved' : 'key_unchanged' );
 	}
 
 	/**

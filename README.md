@@ -5,7 +5,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `Key_Page` (the migration key screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
@@ -39,6 +39,8 @@ To activate a source checkout directly (without a build), run `composer install 
 `Settings_Page::mode()` picks the first that fits, top to bottom. *Go to WordPress.com* links to `https://my.wordpress.com/sites`; the `wpcom_migration_continue_url` filter changes that.
 
 `wp-admin/admin.php?page=wpcom-migration-manual` sets up Reprint by hand; see [Setting up Reprint manually](#setting-up-reprint-manually).
+
+`wp-admin/admin.php?page=wpcom-migration-key` is where an administrator pastes the migration key WordPress.com shows when the connection fails. The fresh-site mode links to it, and a pasted key leads back to the status screen as *Site ready to migrate*. On a host without OpenSSL it asks the administrator to contact support.
 
 `wp-admin/admin.php?page=wpcom-migration` is the BlogVault screen the plugin had before Reprint.
 

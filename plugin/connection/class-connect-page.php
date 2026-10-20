@@ -196,7 +196,7 @@ class Connect_Page {
 				<?php
 				printf(
 					/* translators: %s: link to the WordPress.com terms of service. */
-					esc_html__( 'By connecting, you agree to the %s', 'wpcom-migration' ),
+					esc_html__( 'By connecting, you agree to the %s.', 'wpcom-migration' ),
 					'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
 				);
 				?>
