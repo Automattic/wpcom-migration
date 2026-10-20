@@ -587,7 +587,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'render-key-page-unsupported':
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, 'This site can&#8217;t connect with a migration key', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Contact WordPress.com support', $step );
+			wpcom_migration_e2e_expect_contains( $html, '<a href="https://wordpress.com/help/" target="_blank" rel="noreferrer">Contact WordPress.com support</a> and say that you&#8217;re trying to migrate your site to WordPress.com but can&#8217;t paste the migration key.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Key_Page::KEY_FIELD, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect with your WordPress.com account instead', $step );

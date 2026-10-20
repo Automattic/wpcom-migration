@@ -240,7 +240,7 @@ class Key_Page {
 		}
 
 		if ( ! Utils::key_auth_required() ) {
-			$this->render_sentence( __( 'This site can\'t connect with a migration key. Contact WordPress.com support and we\'ll help you migrate it.', 'wpcom-migration' ) );
+			$this->render_support_sentence();
 			$this->render_back_link();
 			return;
 		}
@@ -305,6 +305,20 @@ class Key_Page {
 	 */
 	private function render_sentence( $text ) {
 		echo '<p class="wpcom-migration-guidance">' . esc_html( wptexturize( $text ) ) . '</p>';
+	}
+
+	/**
+	 * Renders what to tell WordPress.com support on a host that can't verify
+	 * a migration key.
+	 */
+	private function render_support_sentence() {
+		echo '<p class="wpcom-migration-guidance">';
+		printf(
+			/* translators: %s: link to WordPress.com support, reading "Contact WordPress.com support". */
+			esc_html( wptexturize( __( 'This site can\'t connect with a migration key. %s and say that you\'re trying to migrate your site to WordPress.com but can\'t paste the migration key.', 'wpcom-migration' ) ) ),
+			'<a href="https://wordpress.com/help/" target="_blank" rel="noreferrer">' . esc_html__( 'Contact WordPress.com support', 'wpcom-migration' ) . '</a>'
+		);
+		echo '</p>';
 	}
 
 	/**
