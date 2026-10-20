@@ -39,6 +39,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Use a migration key instead', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'By connecting, you agree to the', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
@@ -66,6 +68,8 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$bare = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 			$html = wpcom_migration_e2e_render( $bare );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Use a migration key instead', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
@@ -120,6 +124,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is now ready to be copied', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Use a migration key instead', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
@@ -215,6 +220,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Use a migration key instead', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
@@ -279,6 +285,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( "Step '$step': expected the enrolled key and no secret: " . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
+			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render( $page ), 'Use a migration key instead', $step );
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_saved';
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key saved.', $step );

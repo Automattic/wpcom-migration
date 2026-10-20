@@ -328,8 +328,16 @@ class Settings_Page {
 				if ( null !== $section ) {
 					$section->render_connect_button();
 				}
+				$this->render_key_screen_link();
 				return;
 		}
+	}
+
+	/**
+	 * Renders the link to the migration key screen.
+	 */
+	private function render_key_screen_link() {
+		echo '<p class="wpcom-migration-description"><a href="' . esc_url( Key_Page::page_url() ) . '">' . esc_html( wptexturize( __( 'Can\'t connect? Use a migration key instead', 'wpcom-migration' ) ) ) . '</a></p>';
 	}
 
 	/**

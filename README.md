@@ -40,6 +40,8 @@ To activate a source checkout directly (without a build), run `composer install 
 
 `wp-admin/admin.php?page=wpcom-migration-manual` sets up Reprint by hand; see [Setting up Reprint manually](#setting-up-reprint-manually).
 
+`wp-admin/admin.php?page=wpcom-migration-key` is where an administrator pastes the migration key WordPress.com shows when the connection fails. The fresh-site mode links to it, and a pasted key leads back to the status screen as *Site ready to migrate*. On a host without OpenSSL it asks the administrator to contact support.
+
 `wp-admin/admin.php?page=wpcom-migration` is the BlogVault screen the plugin had before Reprint.
 
 Until the WordPress.com side of Reprint ships, WordPress.com decides which of the Reprint and BlogVault screens is the main one: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/migration-plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after five minutes. The main screen gets the plugin's one sidebar row, the *Settings* link on the plugin list, and the activation redirect: every activation sends the administrator to it on their next wp-admin page load, except a bulk activation, which stays on the plugin list. The other screen stays reachable at its URL, as does the manual one. A brand whitelabelled with `hide` or `hide_from_menu` gets no sidebar row for either screen.
