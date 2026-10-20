@@ -269,21 +269,21 @@ commit "$repo" 'Add the export server (#1)'
 commit "$repo" 'Mention (#2) in the middle'
 commit "$repo" 'Provision with an application password (#3)'
 expect_output 'stops at the wporg-mirror merge and keeps only pull requests' \
-    "$(printf '* Provision with an application password\n* Add the export server')" \
+    "$(printf '* Provision with an application password (#3)\n* Add the export server (#1)')" \
     in_dir "$repo" "$BIN/release-changelog.sh" 6.72 HEAD
 
 commit "$repo" 'Release 6.73'
 git -C "$repo" tag 6.73
 expect_output 'prints nothing when nothing was merged' '' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
 commit "$repo" 'Fix the screen (#4)'
-expect_output 'skips release commits' '* Fix the screen' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
+expect_output 'skips release commits' '* Fix the screen (#4)' in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
 git -C "$repo" checkout -q -b feature
 commit "$repo" 'Work in progress'
 git -C "$repo" checkout -q trunk
 commit "$repo" 'Tidy the screen (#6)'
 git -C "$repo" merge -q --no-ff -m 'Merge pull request #5 from Automattic/feature' -m 'Add the merged feature' feature
 expect_output 'takes a merge commit pull request from its title and keeps going' \
-    "$(printf '* Add the merged feature\n* Tidy the screen\n* Fix the screen')" \
+    "$(printf '* Add the merged feature (#5)\n* Tidy the screen (#6)\n* Fix the screen (#4)')" \
     in_dir "$repo" "$BIN/release-changelog.sh" 6.73 HEAD
 expect_failure 'fails on an unknown ref' 'Unknown ref: 9.9' in_dir "$repo" "$BIN/release-changelog.sh" 9.9 HEAD
 
