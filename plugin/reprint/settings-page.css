@@ -47,6 +47,15 @@ body {
 	line-height: inherit;
 }
 
+/* Notices in the column line up with the text, not wp-admin's indent. */
+.wpcom-migration-container .notice {
+	margin: 16px 0;
+}
+
+.wpcom-migration-container .notice p {
+	margin: 0.5em 0;
+}
+
 .wpcom-migration-container a:not( .wpcom-migration-button ) {
 	color: var( --wpcom-migration-primary-bg );
 }

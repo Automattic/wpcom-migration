@@ -423,7 +423,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_key( $key_page );
-			wpcom_migration_e2e_expect_contains( $html, 'This site already has a migration key. Connecting replaces it.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This site already has a migration key. Connecting a new key replaces the current one.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'notice-warning', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
 

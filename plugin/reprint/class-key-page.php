@@ -249,7 +249,7 @@ class Key_Page {
 
 		$state = Exporter::get_state();
 		if ( $state['has_public_key'] ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site already has a migration key. Connecting replaces it.', 'wpcom-migration' ) . '</p></div>';
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site already has a migration key. Connecting a new key replaces the current one.', 'wpcom-migration' ) . '</p></div>';
 		}
 
 		$this->render_form();
