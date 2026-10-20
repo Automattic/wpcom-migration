@@ -43,6 +43,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'By connecting, you agree to the', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-pill', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
@@ -356,6 +357,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect with a migration key', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Copy the migration key from WordPress.com and paste it here.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'name="' . Key_Page::KEY_FIELD . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'placeholder="Paste the migration key"', $step );
@@ -490,34 +492,95 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Only an administrator can connect this site with a migration key.', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
 
-			$die_handler     = static function () {
-				throw new RuntimeException( 'key access denied' );
-			};
-			$die_filter      = static function () use ( $die_handler ) {
-				return $die_handler;
-			};
-			$redirect_filter = static function () {
-				throw new RuntimeException( 'The key action reached its redirect.' );
-			};
-			add_filter( 'wp_die_handler', $die_filter );
-			add_filter( 'wp_redirect', $redirect_filter );
 			try {
 				list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
 				wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
-				try {
-					$key_page->handle_connect();
-					throw new RuntimeException( 'The key action returned without denying access.' );
-				} catch ( RuntimeException $exception ) {
-					if ( 'key access denied' !== $exception->getMessage() ) {
-						throw $exception;
-					}
-				}
+				wpcom_migration_e2e_expect_key_denied( $key_page, $step );
 			} finally {
-				remove_filter( 'wp_die_handler', $die_filter );
-				remove_filter( 'wp_redirect', $redirect_filter );
 				wp_set_current_user( 1 );
 			}
 
+			wpcom_migration_e2e_expect_no_public_key( $step );
+			break;
+
+		case 'connect-key-storage-failure':
+			// The option refuses the write, as a full disk or a filter would.
+			add_filter(
+				'pre_update_option_' . Exporter::PUBLIC_KEY_OPTION,
+				static function ( $value, $old_value ) {
+					return $old_value;
+				},
+				10,
+				2
+			);
+			$installed = 0;
+			add_action(
+				Exporter::EVENT_ACTION,
+				static function ( $event ) use ( &$installed ) {
+					if ( 'public_key_installed' === $event ) {
+						++$installed;
+					}
+				}
+			);
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			wpcom_migration_e2e_expect_redirect( $key_page, add_query_arg( Key_Page::NOTICE_QUERY_ARG, 'storage_failure', Key_Page::page_url() ), $step );
+			if ( 0 !== $installed ) {
+				throw new RuntimeException( "Step '$step': a key that was not stored must record no event." );
+			}
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) === $public_key ) {
+				throw new RuntimeException( "Step '$step': the refused write must not store the key." );
+			}
+			Exporter::discard_credentials();
+			break;
+
+		case 'connect-key-listener-throws':
+			// Another plugin's event listener fails after the key is stored.
+			// That is not a storage failure, and must not be reported as one.
+			$listener = static function () {
+				throw new RuntimeException( 'listener failed' );
+			};
+			add_action( Exporter::EVENT_ACTION, $listener );
+			add_filter(
+				'wp_redirect',
+				static function ( $location ) {
+					throw new RuntimeException( 'The key action redirected to ' . $location );
+				}
+			);
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			try {
+				$key_page->handle_connect();
+				throw new RuntimeException( "Step '$step': the listener's exception was swallowed." );
+			} catch ( RuntimeException $exception ) {
+				if ( 'listener failed' !== $exception->getMessage() ) {
+					throw $exception;
+				}
+			}
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! Exporter::get_state()['public_key_valid'] ) {
+				throw new RuntimeException( "Step '$step': the key should be stored before the event fires." );
+			}
+			remove_action( Exporter::EVENT_ACTION, $listener );
+			Exporter::discard_credentials();
+			break;
+
+		case 'reject-key-bad-nonce':
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			$_POST['_wpnonce']    = 'not-a-nonce';
+			$_REQUEST['_wpnonce'] = 'not-a-nonce';
+			wpcom_migration_e2e_expect_key_denied( $key_page, $step );
+			wpcom_migration_e2e_expect_no_public_key( $step );
+			break;
+
+		case 'multisite-key-page':
+			$html = wpcom_migration_e2e_render_key( $key_page );
+			wpcom_migration_e2e_expect_contains( $html, 'runs on single sites only', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect with your WordPress.com account instead', $step );
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			wpcom_migration_e2e_expect_key_denied( $key_page, $step );
 			wpcom_migration_e2e_expect_no_public_key( $step );
 			break;
 
@@ -611,6 +674,38 @@ function wpcom_migration_e2e_expect_redirect( Key_Page $page, $expected, $step )
 
 	if ( $expected !== $location ) {
 		throw new RuntimeException( "Step '$step': expected a redirect to $expected, got $location." );
+	}
+}
+
+/**
+ * Fails unless the key screen's handler stops the current post with
+ * wp_die() before it stores or redirects.
+ *
+ * @param Key_Page $page The key screen.
+ * @param string   $step Name of the step, for the error message.
+ * @throws RuntimeException When the handler does not die.
+ */
+function wpcom_migration_e2e_expect_key_denied( Key_Page $page, $step ) {
+	$die_filter      = static function () {
+		return static function () {
+			throw new RuntimeException( 'key access denied' );
+		};
+	};
+	$redirect_filter = static function () use ( $step ) {
+		throw new RuntimeException( "Step '$step': the key action reached its redirect." );
+	};
+	add_filter( 'wp_die_handler', $die_filter );
+	add_filter( 'wp_redirect', $redirect_filter );
+	try {
+		$page->handle_connect();
+		throw new RuntimeException( "Step '$step': the key action returned without denying access." );
+	} catch ( RuntimeException $exception ) {
+		if ( 'key access denied' !== $exception->getMessage() ) {
+			throw $exception;
+		}
+	} finally {
+		remove_filter( 'wp_die_handler', $die_filter );
+		remove_filter( 'wp_redirect', $redirect_filter );
 	}
 }
 

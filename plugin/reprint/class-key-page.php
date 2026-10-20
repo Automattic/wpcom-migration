@@ -9,7 +9,6 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use InvalidArgumentException;
-use RuntimeException;
 use WordPress\Reprint\Server\Utils;
 
 /**
@@ -167,7 +166,7 @@ class Key_Page {
 			Exporter::enroll_public_key( $pasted_key );
 		} catch ( InvalidArgumentException $exception ) {
 			$this->redirect_with_notice( 'invalid' );
-		} catch ( RuntimeException $exception ) {
+		} catch ( Credential_Storage_Exception $exception ) {
 			$this->redirect_with_notice( 'storage_failure' );
 		}
 
@@ -283,7 +282,7 @@ class Key_Page {
 				<?php
 				printf(
 					/* translators: %s: link to the WordPress.com terms of service. */
-					esc_html__( 'By connecting, you agree to the %s', 'wpcom-migration' ),
+					esc_html__( 'By connecting, you agree to the %s.', 'wpcom-migration' ),
 					'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
 				);
 				?>

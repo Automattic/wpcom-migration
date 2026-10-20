@@ -11,7 +11,6 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 use InvalidArgumentException;
-use RuntimeException;
 use WordPress\Reprint\Server\Utils;
 
 /**
@@ -256,7 +255,7 @@ class Manual_Page {
 			$stored = Exporter::enroll_public_key( $pasted_key );
 		} catch ( InvalidArgumentException $exception ) {
 			$this->redirect_with_notice( 'key_invalid' );
-		} catch ( RuntimeException $exception ) {
+		} catch ( Credential_Storage_Exception $exception ) {
 			$this->redirect_with_notice( 'key_storage_failure' );
 		}
 
