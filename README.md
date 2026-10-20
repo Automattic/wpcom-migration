@@ -5,7 +5,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `Key_Page` (the migration key screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
