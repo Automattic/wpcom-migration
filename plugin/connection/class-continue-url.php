@@ -22,13 +22,6 @@ use Automattic\Jetpack\Connection\Client;
 class Continue_Url {
 
 	/**
-	 * The endpoint, relative to WordPress.com's wpcom/v2 API.
-	 *
-	 * @var string
-	 */
-	const PATH = '/migration-plugin/destination';
-
-	/**
 	 * Option holding { url, expires_at }.
 	 *
 	 * @var string
@@ -41,34 +34,6 @@ class Continue_Url {
 	 * @var string
 	 */
 	const DEFAULT_URL = 'https://my.wordpress.com/sites';
-
-	/**
-	 * Seconds to wait for the endpoint.
-	 *
-	 * @var int
-	 */
-	const TIMEOUT = 2;
-
-	/**
-	 * Seconds to keep an answer that came without a usable ttl.
-	 *
-	 * @var int
-	 */
-	const DEFAULT_TTL = 300;
-
-	/**
-	 * Shortest ttl honoured.
-	 *
-	 * @var int
-	 */
-	const MIN_TTL = 60;
-
-	/**
-	 * Longest ttl honoured.
-	 *
-	 * @var int
-	 */
-	const MAX_TTL = 86400;
 
 	/**
 	 * Seconds until the next attempt after a failed fetch.
@@ -150,14 +115,15 @@ class Continue_Url {
 	/**
 	 * Asks WordPress.com, as the current user when they are connected.
 	 *
-	 * @return array|null { url, ttl } with ttl clamped, or null when the
-	 *                    answer is missing or not understood.
+	 * @return array|null { url, ttl } with ttl 300 when missing and clamped
+	 *                    to a minute … a day, or null when the answer is
+	 *                    missing or not understood.
 	 */
 	private static function fetch() {
-		$path = add_query_arg( 'source_url', rawurlencode( home_url() ), self::PATH );
+		$path = add_query_arg( 'source_url', rawurlencode( home_url() ), '/migration-plugin/destination' );
 		$args = array(
 			'method'      => 'GET',
-			'timeout'     => self::TIMEOUT,
+			'timeout'     => 2,
 			// Each hop gets its own timeout; the endpoint never redirects.
 			'redirection' => 0,
 		);
@@ -175,11 +141,11 @@ class Continue_Url {
 			return null;
 		}
 
-		$ttl = isset( $body['ttl'] ) && is_int( $body['ttl'] ) ? $body['ttl'] : self::DEFAULT_TTL;
+		$ttl = isset( $body['ttl'] ) && is_int( $body['ttl'] ) ? $body['ttl'] : 300;
 
 		return array(
 			'url' => $body['url'],
-			'ttl' => max( self::MIN_TTL, min( self::MAX_TTL, $ttl ) ),
+			'ttl' => max( MINUTE_IN_SECONDS, min( DAY_IN_SECONDS, $ttl ) ),
 		);
 	}
 }
