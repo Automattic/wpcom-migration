@@ -56,24 +56,12 @@ switch ( $wpcom_migration_scenario ) {
 		break;
 
 	case 'no-credential':
-		// Nothing stored: signed or not, the request falls through to
-		// WordPress. The plain front page, no JSON, no export headers.
+		// Nothing stored: signed or not, the exporter says so.
 		$unsigned = wpcom_migration_e2e_request( $wpcom_migration_endpoint, array() );
 		$signed   = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
-		foreach ( array(
-			'Unsigned' => $unsigned,
-			'Signed'   => $signed,
-		) as $label => $response ) {
-			wpcom_migration_e2e_expect_status( $response, 200 );
-			if ( false === stripos( $response['body'], '<html' ) ) {
-				wpcom_migration_e2e_fail( "$label request with no credential did not return the front page: " . substr( $response['body'], 0, 200 ) );
-			}
-			if ( isset( $response['headers']['access-control-allow-origin'] ) ) {
-				wpcom_migration_e2e_fail( "$label request with no credential carried export CORS headers." );
-			}
-			if ( isset( $response['headers']['content-type'] ) && false !== stripos( $response['headers']['content-type'], 'json' ) ) {
-				wpcom_migration_e2e_fail( "$label request with no credential answered JSON." );
-			}
+		foreach ( array( $unsigned, $signed ) as $response ) {
+			wpcom_migration_e2e_expect_status( $response, 503 );
+			wpcom_migration_e2e_expect_error_json( $response, 503, 'wpcom_migration_no_credential' );
 		}
 		break;
 

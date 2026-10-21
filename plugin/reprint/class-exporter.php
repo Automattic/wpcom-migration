@@ -427,10 +427,9 @@ class Exporter {
 			return;
 		}
 
-		// Without a credential the request answers nothing, so a site that was
-		// never set up stays indistinguishable from one without the feature.
 		$state = self::get_state();
 		if ( ! $state['has_credential'] ) {
+			$this->error( 503, 'Export not set up: no export credential is stored on this site. Start the migration again on WordPress.com.', 'wpcom_migration_no_credential' );
 			return;
 		}
 
