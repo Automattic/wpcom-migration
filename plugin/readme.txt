@@ -4,7 +4,7 @@ Tags: migrate, migration, transfer, move, copy
 Requires at least: 4.0
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 6.73
+Stable tag: 6.74
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,12 @@ Whether you’re scaling your business, expanding your online presence, or simpl
 3. Next, click the Activate button. After activating, you can navigate to Migrate to WordPress.com in your admin area.
 
 == Changelog ==
+= 6.74 =
+* Deploy releases to WordPress.org (#15)
+* Return an error for sites with no credentials (#14)
+* Point "Go to WordPress.com" at the destination site (#18)
+* Include pull request numbers in the release changelog (#17)
+
 = 6.73 =
 * Automate releases without publishing to WordPress.org (yet)
 * Let administrators connect with a migration key
