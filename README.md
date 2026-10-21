@@ -80,7 +80,7 @@ composer test:release             # the release scripts
 
 ## Releasing
 
-Run *Tag release* from the Actions tab with `minor`, `major` or a custom version. It commits the new version and its changelog to trunk and tags the commit. *Release* then builds and tests the tag and publishes a GitHub release. Each step can be retried by dispatching it with the tag.
+Run *Tag release* from the Actions tab with `minor`, `major` or a custom version. It commits the new version and its changelog to trunk and tags the commit. *Release* then builds and tests the tag and publishes a GitHub release, and *Deploy to WordPress.org* commits that release to the plugin directory. Each step can be retried by dispatching it with the tag.
 
 The changelog is made from the titles of the pull requests merged since the last release, so write them for the people who install the plugin.
 
