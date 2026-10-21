@@ -197,8 +197,8 @@ class Connection {
 
 	/**
 	 * Removes this plugin from the connection and discards the Reprint
-	 * credentials. If no other plugin uses the connection, the site
-	 * disconnects from WordPress.com.
+	 * credentials and the stored destination URL. If no other plugin uses
+	 * the connection, the site disconnects from WordPress.com.
 	 */
 	public static function disconnect() {
 		$was_connected = self::is_site_connected();
@@ -208,6 +208,7 @@ class Connection {
 		}
 
 		Exporter::discard_credentials();
+		Continue_Url::forget();
 
 		if ( $was_connected ) {
 			self::record_event( 'disconnected', array( 'user_id' => get_current_user_id() ) );

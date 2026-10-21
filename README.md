@@ -37,7 +37,9 @@ To activate a source checkout directly (without a build), run `composer install 
 | Pill: *Connected to WordPress.com* | Logged in; no credential yet | *Go to WordPress.com*, a *Disconnect* link |
 | Log in with your WordPress.com account to connect this site | Fresh site | *Connect WordPress.com* |
 
-`Settings_Page::mode()` picks the first that fits, top to bottom. *Go to WordPress.com* links to `https://my.wordpress.com/sites`; the `wpcom_migration_continue_url` filter changes that.
+`Settings_Page::mode()` picks the first that fits, top to bottom. *Go to WordPress.com* links to `https://my.wordpress.com/sites`, and the `wpcom_migration_continue_url` filter changes that.
+
+When the site has a Jetpack connection, `Continue_Url` hooks that filter to link straight to the WordPress.com site this one is migrating into. It asks `GET https://public-api.wordpress.com/wpcom/v2/migration-plugin/destination?source_url=<home_url()>` for `{ "url", "ttl" }`, signed with the current user's token, or with the blog token when only the site is connected. The answer is kept in the `wpcom_migration_continue_url` option until the `ttl` runs out. A failed fetch keeps the stored answer and retries after five minutes. Disconnecting, deactivating or authorizing a user deletes the stored answer. A site with a credential but no Jetpack connection keeps the default link.
 
 `wp-admin/admin.php?page=wpcom-migration-manual` sets up Reprint by hand; see [Setting up Reprint manually](#setting-up-reprint-manually).
 

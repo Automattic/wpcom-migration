@@ -24,6 +24,10 @@
 		},
 		{
 			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-not-connected' );"
+		},
+		{
+			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'connect-registration-fails' );"
 		},
 		{
@@ -53,6 +57,26 @@
 		{
 			"step": "runPHP",
 			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'render-connected' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-matched' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-stored' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-failure-keeps-stored' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-authorized-forgets' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/connection-steps.php'; wpcom_migration_e2e_connection_step( 'continue-url-blog-token' );"
 		},
 		{
 			"step": "runPHP",
