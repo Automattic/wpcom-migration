@@ -8,6 +8,7 @@
 
 use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
+use Automattic\WPCOM_Migration\Continue_Url;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -33,6 +34,9 @@ if ( ! defined( 'WPCOM_MIGRATION_SLUG' ) ) {
 }
 
 Connection::init();
+
+add_filter( 'wpcom_migration_continue_url', array( Continue_Url::class, 'filter' ) );
+add_action( 'jetpack_client_authorized', array( Continue_Url::class, 'forget' ) );
 
 // Leaving the plugin leaves the connection; a secret WordPress.com installed
 // has no owner without it.

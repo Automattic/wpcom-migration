@@ -14,6 +14,7 @@ use Automattic\Jetpack\Connection\Plugin_Storage;
 use Automattic\Jetpack\Connection\Rest_Authentication;
 use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Connection;
+use Automattic\WPCOM_Migration\Continue_Url;
 use Automattic\WPCOM_Migration\Reprint\Exporter;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
@@ -378,6 +379,93 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $manual_html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			break;
 
+		case 'continue-url-not-connected':
+			// No connection, no signed request.
+			if ( Connect_Page::continue_url() !== Continue_Url::DEFAULT_URL ) {
+				throw new RuntimeException( "Step '$step': expected the default URL, got: " . Connect_Page::continue_url() );
+			}
+			wpcom_migration_e2e_expect_destination_requests( 0, $step );
+			break;
+
+		case 'continue-url-matched':
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"example.wordpress.com","url":"https://my.wordpress.com/sites/example.wordpress.com","ttl":3600}' );
+			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
+			$html   = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites/example.wordpress.com"', $step );
+			wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_destination_requests( $before + 1, $step );
+
+			$last = get_option( 'wpcom_migration_e2e_destination_last' );
+			wpcom_migration_e2e_expect_contains( $last['url'], '?source_url=' . rawurlencode( home_url() ) . '&', $step );
+			wpcom_migration_e2e_expect_contains( $last['url'], '&signature=', $step );
+			if ( 2 !== $last['timeout'] || 0 !== $last['redirection'] ) {
+				throw new RuntimeException( "Step '$step': expected a 2s timeout and no redirects: " . wp_json_encode( $last ) );
+			}
+
+			// The connected user asks.
+			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2euserkey%3A1%3A1&', $step );
+			$stored = get_option( Continue_Url::OPTION );
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['url'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
+				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
+			}
+			break;
+
+		case 'continue-url-stored':
+			// A later page load uses the stored answer without asking.
+			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
+			$html   = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites/example.wordpress.com"', $step );
+			wpcom_migration_e2e_expect_destination_requests( $before, $step );
+			break;
+
+		case 'continue-url-failure-keeps-stored':
+			$stored               = get_option( Continue_Url::OPTION );
+			$stored['expires_at'] = time() - 1;
+			update_option( Continue_Url::OPTION, $stored, false );
+			update_option( 'wpcom_migration_e2e_destination_response', 'fail' );
+			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
+			if ( 'https://my.wordpress.com/sites/example.wordpress.com' !== Connect_Page::continue_url() ) {
+				throw new RuntimeException( "Step '$step': a failed fetch should keep the stored URL, got: " . Connect_Page::continue_url() );
+			}
+			wpcom_migration_e2e_expect_destination_requests( $before + 1, $step );
+			$stored = get_option( Continue_Url::OPTION );
+			if ( abs( time() + Continue_Url::RETRY_AFTER - $stored['expires_at'] ) > 5 ) {
+				throw new RuntimeException( "Step '$step': a failed fetch should retry after RETRY_AFTER: " . wp_json_encode( $stored ) );
+			}
+			break;
+
+		case 'continue-url-authorized-forgets':
+			do_action( 'jetpack_client_authorized', WPCOM_MIGRATION_E2E_BLOG_ID );
+			if ( false !== get_option( Continue_Url::OPTION ) ) {
+				throw new RuntimeException( "Step '$step': authorizing should delete the stored answer." );
+			}
+			break;
+
+		case 'continue-url-blog-token':
+			// Only the site is connected: the blog token asks. The button is
+			// not shown in this mode, so ask for the URL directly.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"blog.wordpress.com","url":"https://my.wordpress.com/sites/blog.wordpress.com","ttl":3600}' );
+			$user_tokens = Jetpack_Options::get_option( 'user_tokens' );
+			Jetpack_Options::delete_option( 'user_tokens' );
+			if ( Connection::is_user_connected() || ! Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': expected site-connected and not user-connected." );
+			}
+			$url = Connect_Page::continue_url();
+			Jetpack_Options::update_option( 'user_tokens', $user_tokens );
+			if ( 'https://my.wordpress.com/sites/blog.wordpress.com' !== $url ) {
+				throw new RuntimeException( "Step '$step': expected the blog-token destination, got: " . $url );
+			}
+			$last = get_option( 'wpcom_migration_e2e_destination_last' );
+			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2eblogkey%3A1%3A0&', $step );
+			$stored = get_option( Continue_Url::OPTION );
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['url'] ) {
+				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
+			}
+			delete_option( 'wpcom_migration_e2e_destination_response' );
+			break;
+
 		default:
 			throw new RuntimeException( 'Unknown connection step: ' . $step );
 	}
@@ -456,6 +544,20 @@ function wpcom_migration_e2e_public_key() {
 function wpcom_migration_e2e_expect_rest_status( $response, $expected, $step ) {
 	if ( $expected !== $response->get_status() ) {
 		throw new RuntimeException( sprintf( "Step '%s': expected HTTP %d, got %d: %s", $step, $expected, $response->get_status(), wp_json_encode( $response->get_data() ) ) );
+	}
+}
+
+/**
+ * Fails unless the destination endpoint has been asked this many times.
+ *
+ * @param int    $expected Expected request count.
+ * @param string $step     Step name, for the message.
+ * @throws RuntimeException When the count differs.
+ */
+function wpcom_migration_e2e_expect_destination_requests( $expected, $step ) {
+	$count = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
+	if ( $expected !== $count ) {
+		throw new RuntimeException( "Step '$step': expected $expected destination request(s), got $count." );
 	}
 }
 
