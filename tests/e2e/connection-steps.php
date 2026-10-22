@@ -152,7 +152,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			if ( 0 !== strpos( $location, 'https://jetpack.wordpress.com/jetpack.authorize/' ) ) {
 				throw new RuntimeException( "Step '$step': expected a redirect to the authorize URL, got: " . var_export( $location, true ) );
 			}
-			if ( ! isset( $query['redirect_after_auth'], $query['skip_pricing'] ) || Connect_Page::page_url() !== $query['redirect_after_auth'] || '1' !== $query['skip_pricing'] ) {
+			if ( ! isset( $query['redirect_after_auth'], $query['skip_pricing'] ) || Connect_Page::return_url() !== $query['redirect_after_auth'] || '1' !== $query['skip_pricing'] ) {
 				throw new RuntimeException( "Step '$step': the authorize URL should return to the screen: " . $location );
 			}
 			delete_option( 'wpcom_migration_e2e_last_redirect' );
@@ -336,14 +336,14 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			// authorize URL and, with skip_pricing, goes straight there; a `from`
 			// starting with wpcom-migration would send the user to Calypso's
 			// migration flow instead.
-			$authorization_url = Connection::authorization_url( Connect_Page::page_url() );
+			$authorization_url = Connection::authorization_url( Connect_Page::return_url() );
 			if ( is_wp_error( $authorization_url ) ) {
 				throw new RuntimeException( "Step '$step': authorization_url() failed: " . $authorization_url->get_error_code() );
 			}
 			$query = array();
 			wp_parse_str( (string) wp_parse_url( $authorization_url, PHP_URL_QUERY ), $query );
-			if ( ! isset( $query['redirect_after_auth'] ) || Connect_Page::page_url() !== $query['redirect_after_auth'] ) {
-				throw new RuntimeException( "Step '$step': redirect_after_auth should be the screen URL, got: " . $authorization_url );
+			if ( ! isset( $query['redirect_after_auth'] ) || Connect_Page::return_url() !== $query['redirect_after_auth'] ) {
+				throw new RuntimeException( "Step '$step': redirect_after_auth should be the screen's return URL, got: " . $authorization_url );
 			}
 			if ( ! isset( $query['skip_pricing'] ) || '1' !== $query['skip_pricing'] ) {
 				throw new RuntimeException( "Step '$step': skip_pricing=1 is missing: " . $authorization_url );
@@ -354,8 +354,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			// The site's webhook, which WordPress.com calls, reads its own copy.
 			$redirect_uri_query = array();
 			wp_parse_str( (string) wp_parse_url( (string) ( $query['redirect_uri'] ?? '' ), PHP_URL_QUERY ), $redirect_uri_query );
-			if ( ! isset( $redirect_uri_query['redirect'] ) || Connect_Page::page_url() !== $redirect_uri_query['redirect'] ) {
-				throw new RuntimeException( "Step '$step': redirect_uri should carry the screen URL as redirect, got: " . $authorization_url );
+			if ( ! isset( $redirect_uri_query['redirect'] ) || Connect_Page::return_url() !== $redirect_uri_query['redirect'] ) {
+				throw new RuntimeException( "Step '$step': redirect_uri should carry the screen's return URL as redirect, got: " . $authorization_url );
 			}
 			break;
 
@@ -381,7 +381,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 
 		case 'continue-url-not-connected':
 			// No connection, no signed request.
-			if ( Connect_Page::continue_url() !== Continue_Url::DEFAULT_URL ) {
+			if ( 'https://my.wordpress.com/sites' !== Connect_Page::continue_url() ) {
 				throw new RuntimeException( "Step '$step': expected the default URL, got: " . Connect_Page::continue_url() );
 			}
 			wpcom_migration_e2e_expect_destination_requests( 0, $step );
@@ -406,7 +406,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			// The connected user asks.
 			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2euserkey%3A1%3A1&', $step );
 			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['url'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['destination'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
 				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
 			}
 			break;
@@ -460,9 +460,57 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$last = get_option( 'wpcom_migration_e2e_destination_last' );
 			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2eblogkey%3A1%3A0&', $step );
 			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['url'] ) {
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['destination'] ) {
 				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
 			}
+			delete_option( 'wpcom_migration_e2e_destination_response' );
+			break;
+
+		case 'return-unmatched':
+			// No match: the screen renders as usual.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":60}' );
+			wpcom_migration_e2e_return(); // Returns: no redirect.
+			if ( false !== get_option( 'wpcom_migration_e2e_last_redirect' ) ) {
+				throw new RuntimeException( "Step '$step': an unmatched answer must not redirect, got: " . get_option( 'wpcom_migration_e2e_last_redirect' ) );
+			}
+			wpcom_migration_e2e_expect_destination_requests( 1, $step );
+			if ( 'https://example.test/' !== Continue_Url::filter( 'https://example.test/' ) ) {
+				throw new RuntimeException( "Step '$step': without a match the filter should pass the URL through." );
+			}
+			if ( ! in_array( Connect_Page::CONNECTED_QUERY_ARG, wp_removable_query_args(), true ) ) {
+				throw new RuntimeException( "Step '$step': the return marker should be removed from the address bar." );
+			}
+			break;
+
+		case 'return-not-user-connected':
+			// Only the site is connected, as after a failed authorization: stay
+			// on the screen, which offers to connect again.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"example.wordpress.com","url":"https://my.wordpress.com/sites/example.wordpress.com","ttl":3600}' );
+			$user_tokens = Jetpack_Options::get_option( 'user_tokens' );
+			Jetpack_Options::delete_option( 'user_tokens' );
+			wpcom_migration_e2e_return(); // Returns: no redirect.
+			Jetpack_Options::update_option( 'user_tokens', $user_tokens );
+			if ( false !== get_option( 'wpcom_migration_e2e_last_redirect' ) ) {
+				throw new RuntimeException( "Step '$step': a user who is not connected must not be redirected." );
+			}
+			wpcom_migration_e2e_expect_destination_requests( 0, $step );
+			break;
+
+		case 'return-matched':
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"example.wordpress.com","url":"https://my.wordpress.com/sites/example.wordpress.com","ttl":3600}' );
+			wpcom_migration_e2e_return(); // Redirects and exits.
+			throw new RuntimeException( "Step '$step': a matched answer should redirect." );
+
+		case 'assert-return-matched':
+			$location = get_option( 'wpcom_migration_e2e_last_redirect' );
+			if ( 'https://my.wordpress.com/sites/example.wordpress.com' !== $location ) {
+				throw new RuntimeException( "Step '$step': expected a redirect to the destination, got: " . var_export( $location, true ) );
+			}
+			wpcom_migration_e2e_expect_destination_requests( 1, $step );
+			delete_option( 'wpcom_migration_e2e_last_redirect' );
 			delete_option( 'wpcom_migration_e2e_destination_response' );
 			break;
 
@@ -559,6 +607,34 @@ function wpcom_migration_e2e_expect_destination_requests( $expected, $step ) {
 	if ( $expected !== $count ) {
 		throw new RuntimeException( "Step '$step': expected $expected destination request(s), got $count." );
 	}
+}
+
+/**
+ * Lands on the screen the way WordPress.com sends the user back after
+ * authorizing, and runs the return handler. A redirect lands in an option for
+ * the next step, and the handler exits. Resets the destination request count
+ * and the last redirect first.
+ */
+function wpcom_migration_e2e_return() {
+	delete_option( 'wpcom_migration_e2e_last_redirect' );
+	update_option( 'wpcom_migration_e2e_destination_requests', 0 );
+
+	$_GET     = array(
+		'page'                            => Settings_Page::PAGE_SLUG,
+		Connect_Page::CONNECTED_QUERY_ARG => '1',
+	);
+	$_REQUEST = $_GET;
+
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+
+	add_filter(
+		'wp_redirect',
+		function ( $location ) {
+			update_option( 'wpcom_migration_e2e_last_redirect', $location );
+			return $location;
+		}
+	);
+	( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->handle_return();
 }
 
 /**

@@ -13,27 +13,20 @@ use Automattic\Jetpack\Connection\Client;
  * Asks WordPress.com which of its sites this site is migrating into and
  * points the screen's button there.
  *
- * Fetches { url, ttl } signed with the current user's token, or with the
- * blog token when only the site is connected, and stores it until it
- * expires. A failed fetch keeps the stored answer, or stores the default URL
- * when there is none, and retries after RETRY_AFTER. Without a connection, or
- * on a network, nothing is asked.
+ * Fetches { matched, url, ttl } signed with the current user's token, or
+ * with the blog token when only the site is connected, and stores the
+ * matched URL, or none, until it expires. A failed fetch keeps the stored
+ * answer and retries after RETRY_AFTER. Without a connection, or on a
+ * network, nothing is asked.
  */
 class Continue_Url {
 
 	/**
-	 * Option holding { url, expires_at }.
+	 * Option holding { destination, expires_at }.
 	 *
 	 * @var string
 	 */
 	const OPTION = 'wpcom_migration_continue_url';
-
-	/**
-	 * Where the button goes when WordPress.com knows no destination.
-	 *
-	 * @var string
-	 */
-	const DEFAULT_URL = 'https://my.wordpress.com/sites';
 
 	/**
 	 * Seconds until the next attempt after a failed fetch.
@@ -43,29 +36,38 @@ class Continue_Url {
 	const RETRY_AFTER = 300;
 
 	/**
-	 * The URL for this request, once known.
+	 * The destination for this request: a URL, null when there is none, or
+	 * false until looked up.
 	 *
-	 * @var string|null
+	 * @var string|null|false
 	 */
-	private static $url = null;
+	private static $destination = false;
 
 	/**
 	 * Filters wpcom_migration_continue_url.
 	 *
 	 * @param string $url The URL so far.
-	 * @return string The destination WordPress.com gave, or $url when not
-	 *                connected.
+	 * @return string The destination site's URL, or $url when there is none.
 	 */
 	public static function filter( $url ) {
+		return self::destination() ?? $url;
+	}
+
+	/**
+	 * The destination site's URL, when WordPress.com matched one.
+	 *
+	 * @return string|null
+	 */
+	public static function destination() {
 		if ( is_multisite() || ! Connection::is_site_connected() ) {
-			return $url;
+			return null;
 		}
 
-		if ( null === self::$url ) {
-			self::$url = self::lookup();
+		if ( false === self::$destination ) {
+			self::$destination = self::lookup();
 		}
 
-		return self::$url;
+		return self::$destination;
 	}
 
 	/**
@@ -74,50 +76,51 @@ class Continue_Url {
 	 * the connection.
 	 */
 	public static function forget() {
-		self::$url = null;
+		self::$destination = false;
 		delete_option( self::OPTION );
 	}
 
 	/**
-	 * The stored URL while it is fresh, else a fetched one.
+	 * The stored destination while it is fresh, else a fetched one.
 	 *
-	 * @return string
+	 * @return string|null
 	 */
 	private static function lookup() {
-		$stored     = get_option( self::OPTION );
-		$has_stored = is_array( $stored ) && isset( $stored['url'], $stored['expires_at'] ) && is_string( $stored['url'] );
-		$url        = $has_stored ? $stored['url'] : self::DEFAULT_URL;
+		$stored      = get_option( self::OPTION );
+		$has_stored  = is_array( $stored ) && array_key_exists( 'destination', $stored ) && isset( $stored['expires_at'] );
+		$destination = $has_stored && is_string( $stored['destination'] ) ? $stored['destination'] : null;
 
 		if ( $has_stored && (int) $stored['expires_at'] > time() ) {
-			return $url;
+			return $destination;
 		}
 
 		$answer = self::fetch();
 		if ( null === $answer ) {
 			$ttl = self::RETRY_AFTER;
 		} else {
-			$url = $answer['url'];
-			$ttl = $answer['ttl'];
+			$destination = $answer['destination'];
+			$ttl         = $answer['ttl'];
 		}
 
 		update_option(
 			self::OPTION,
 			array(
-				'url'        => $url,
-				'expires_at' => time() + $ttl,
+				'destination' => $destination,
+				'expires_at'  => time() + $ttl,
 			),
 			false
 		);
 
-		return $url;
+		return $destination;
 	}
 
 	/**
 	 * Asks WordPress.com, as the current user when they are connected.
 	 *
-	 * @return array|null { url, ttl } with ttl 300 when missing and clamped
-	 *                    to a minute … a day, or null when the answer is
-	 *                    missing or not understood.
+	 * @return array|null { destination, ttl }, destination null without a
+	 *                    match and ttl 300 when missing and clamped to a
+	 *                    minute … a day, or null when the answer is missing
+	 *                    or not understood.
 	 */
 	private static function fetch() {
 		$path = add_query_arg( 'source_url', rawurlencode( home_url() ), '/migration-plugin/destination' );
@@ -137,15 +140,23 @@ class Continue_Url {
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( ! is_array( $body ) || ! isset( $body['url'] ) || ! is_string( $body['url'] ) || '' === $body['url'] ) {
+		if ( ! is_array( $body ) || ! isset( $body['matched'] ) || ! is_bool( $body['matched'] ) ) {
 			return null;
+		}
+
+		$destination = null;
+		if ( $body['matched'] ) {
+			if ( ! isset( $body['url'] ) || ! is_string( $body['url'] ) || '' === $body['url'] ) {
+				return null;
+			}
+			$destination = $body['url'];
 		}
 
 		$ttl = isset( $body['ttl'] ) && is_int( $body['ttl'] ) ? $body['ttl'] : 300;
 
 		return array(
-			'url' => $body['url'],
-			'ttl' => max( MINUTE_IN_SECONDS, min( DAY_IN_SECONDS, $ttl ) ),
+			'destination' => $destination,
+			'ttl'         => max( MINUTE_IN_SECONDS, min( DAY_IN_SECONDS, $ttl ) ),
 		);
 	}
 }
