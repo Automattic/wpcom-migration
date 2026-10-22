@@ -381,7 +381,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 
 		case 'continue-url-not-connected':
 			// No connection, no signed request.
-			if ( Connect_Page::continue_url() !== Continue_Url::DEFAULT_URL ) {
+			if ( 'https://my.wordpress.com/sites' !== Connect_Page::continue_url() ) {
 				throw new RuntimeException( "Step '$step': expected the default URL, got: " . Connect_Page::continue_url() );
 			}
 			wpcom_migration_e2e_expect_destination_requests( 0, $step );
@@ -406,7 +406,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			// The connected user asks.
 			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2euserkey%3A1%3A1&', $step );
 			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['url'] || true !== $stored['matched'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['destination'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
 				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
 			}
 			break;
@@ -460,7 +460,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$last = get_option( 'wpcom_migration_e2e_destination_last' );
 			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2eblogkey%3A1%3A0&', $step );
 			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['url'] ) {
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['destination'] ) {
 				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
 			}
 			delete_option( 'wpcom_migration_e2e_destination_response' );
@@ -475,6 +475,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				throw new RuntimeException( "Step '$step': an unmatched answer must not redirect, got: " . get_option( 'wpcom_migration_e2e_last_redirect' ) );
 			}
 			wpcom_migration_e2e_expect_destination_requests( 1, $step );
+			if ( 'https://example.test/' !== Continue_Url::filter( 'https://example.test/' ) ) {
+				throw new RuntimeException( "Step '$step': without a match the filter should pass the URL through." );
+			}
 			if ( ! in_array( Connect_Page::CONNECTED_QUERY_ARG, wp_removable_query_args(), true ) ) {
 				throw new RuntimeException( "Step '$step': the return marker should be removed from the address bar." );
 			}
