@@ -48,6 +48,14 @@ class Connect_Page {
 	const CODE_QUERY_ARG = 'wpcom_migration_connect_code';
 
 	/**
+	 * Query argument marking the screen as where WordPress.com sends the user
+	 * back after authorizing.
+	 *
+	 * @var string
+	 */
+	const CONNECTED_QUERY_ARG = 'wpcom_migration_connected';
+
+	/**
 	 * Absolute path of the plugin's main file.
 	 *
 	 * @var string
@@ -65,6 +73,8 @@ class Connect_Page {
 		add_action( 'admin_post_' . self::CONNECT_ACTION, array( $this, 'handle_connect' ) );
 		add_action( 'admin_post_' . self::DISCONNECT_ACTION, array( $this, 'handle_disconnect' ) );
 		add_action( 'admin_page_access_denied', array( $this, 'handle_calypso_retry' ) );
+		add_action( 'admin_init', array( $this, 'handle_return' ) );
+		add_filter( 'removable_query_args', array( $this, 'removable_query_args' ) );
 	}
 
 	/**
@@ -74,6 +84,16 @@ class Connect_Page {
 	 */
 	public static function page_url() {
 		return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
+	}
+
+	/**
+	 * Where WordPress.com sends the user back after authorizing: the screen,
+	 * marked so handle_return() knows.
+	 *
+	 * @return string
+	 */
+	public static function return_url() {
+		return add_query_arg( self::CONNECTED_QUERY_ARG, '1', self::page_url() );
 	}
 
 	/**
@@ -90,7 +110,7 @@ class Connect_Page {
 	 * back here with the registration error code.
 	 */
 	private function send_to_wordpress_com() {
-		$authorization_url = Connection::authorization_url( self::page_url() );
+		$authorization_url = Connection::authorization_url( self::return_url() );
 
 		if ( is_wp_error( $authorization_url ) ) {
 			$this->redirect_with_notice( 'register_failed', $authorization_url->get_error_code() );
@@ -128,6 +148,45 @@ class Connect_Page {
 		}
 
 		$this->send_to_wordpress_com();
+	}
+
+	/**
+	 * Sends a user who has just connected on to their destination site on
+	 * WordPress.com, when WordPress.com matched one. Otherwise the screen
+	 * renders as usual. Authorizing deleted the stored answer, so this asks
+	 * WordPress.com afresh.
+	 */
+	public function handle_return() {
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- WordPress.com builds this URL; the handler only reads and redirects.
+		if ( ! isset( $_GET['page'], $_GET[ self::CONNECTED_QUERY_ARG ] ) || \Automattic\WPCOM_Migration\Reprint\Settings_Page::PAGE_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+		// phpcs:enable
+
+		if ( ! current_user_can( 'manage_options' ) || ! Connection::is_user_connected() ) {
+			return;
+		}
+
+		$destination = Continue_Url::destination();
+		if ( null === $destination ) {
+			return;
+		}
+
+		// Not wp_safe_redirect(): the destination is WordPress.com.
+		wp_redirect( $destination ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
+		exit;
+	}
+
+	/**
+	 * Drops the return marker from the address bar once the screen renders,
+	 * so a reload is a plain visit.
+	 *
+	 * @param string[] $args Query arguments wp-admin removes.
+	 * @return string[]
+	 */
+	public function removable_query_args( $args ) {
+		$args[] = self::CONNECTED_QUERY_ARG;
+		return $args;
 	}
 
 	/**
