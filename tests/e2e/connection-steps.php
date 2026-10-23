@@ -10,6 +10,7 @@
  * @package wpcom-migration
  */
 
+use Automattic\Jetpack\Connection\Manager;
 use Automattic\Jetpack\Connection\Plugin_Storage;
 use Automattic\Jetpack\Connection\Rest_Authentication;
 use Automattic\WPCOM_Migration\Connect_Page;
@@ -230,32 +231,31 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected-and-ready':
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Site ready to migrate', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connected to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected with a migration key.', $step );
 			break;
 
-		case 'render-broken-connected':
+		case 'render-stale-key-connected':
 			// Break the key, look, then mend it so the later steps still find
 			// a valid one.
 			$public_key = get_option( Exporter::PUBLIC_KEY_OPTION );
 			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_BROKEN, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'no longer matches this site', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'its security salts changed', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 			if ( ! Exporter::store_public_key( $public_key ) ) {
 				throw new RuntimeException( "Step '$step': could not restore the key." );
 			}
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_READY, $step );
 			break;
 
 		case 'rest-install-public-key-blog-token':
@@ -271,8 +271,103 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			break;
 
+		case 'disconnect-shared-connection':
+			// Jetpack also uses the connection, which disconnecting would
+			// leave, so the account line says it's shared and offers no
+			// disconnect.
+			Plugin_Storage::upsert( 'jetpack', array( 'name' => 'Jetpack' ) );
+			if ( array( 'Jetpack' ) !== Connection::other_connected_plugins() ) {
+				throw new RuntimeException( "Step '$step': expected Jetpack as the other plugin, got: " . wp_json_encode( Connection::other_connected_plugins() ) );
+			}
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'e2e@example.com · Shared with Jetpack', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
+
+			// More than one: a list, as the locale joins one.
+			Plugin_Storage::upsert( 'jetpack-boost', array( 'name' => 'Jetpack Boost' ) );
+			Plugin_Storage::upsert( 'akismet', array( 'name' => 'Akismet Anti-spam' ) );
+			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render_connect_page(), 'Shared with Jetpack, Jetpack Boost, and Akismet Anti-spam', $step );
+
+			// A disconnect posted from a page rendered before Jetpack joined
+			// keeps the connection and claims nothing.
+			$location = wpcom_migration_e2e_disconnect();
+			if ( Connect_Page::page_url() !== $location || ! Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': expected a plain redirect and the connection kept, got a redirect to $location." );
+			}
+			break;
+
+		case 'deactivation-cleans-up':
+			// Deactivating, which removing the plugin always comes after,
+			// deletes every user's stored destination and the site-wide option
+			// earlier versions kept.
+			set_transient( Continue_Url::TRANSIENT_PREFIX . '1', array( 'destination' => null ), HOUR_IN_SECONDS );
+			set_transient( Continue_Url::TRANSIENT_PREFIX . '2', array( 'destination' => null ), HOUR_IN_SECONDS );
+			update_option(
+				Continue_Url::LEGACY_OPTION,
+				array(
+					'destination' => null,
+					'expires_at'  => time(),
+				),
+				false
+			);
+			$hook = 'deactivate_' . plugin_basename( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
+			if ( ! has_action( $hook, array( Continue_Url::class, 'forget_all' ) ) ) {
+				throw new RuntimeException( "Step '$step': forget_all() should run on deactivation." );
+			}
+			Continue_Url::forget_all();
+			wp_cache_flush();
+			foreach ( array( '_transient_' . Continue_Url::TRANSIENT_PREFIX . '1', '_transient_timeout_' . Continue_Url::TRANSIENT_PREFIX . '2', Continue_Url::LEGACY_OPTION ) as $option ) {
+				if ( false !== get_option( $option ) ) {
+					throw new RuntimeException( "Step '$step': deactivating should delete $option." );
+				}
+			}
+			break;
+
+		case 'disconnect-from-jetpack':
+			// Jetpack's own disconnect removes the tokens but leaves the key,
+			// and the screen says the site is connected by its key alone.
+			if ( ! Exporter::store_public_key( wpcom_migration_e2e_public_key() ) ) {
+				throw new RuntimeException( "Step '$step': could not store a key." );
+			}
+			( new Manager( 'jetpack' ) )->disconnect_site( false );
+			$state = Exporter::get_state();
+			if ( ! $state['credential_valid'] || Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': expected the key kept and no connection: " . wp_json_encode( $state ) );
+			}
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
+			break;
+
+		case 'disconnect-only-connection':
+			// With the connection to itself, the plugin's disconnect removes it.
+			if ( ! Exporter::store_public_key( wpcom_migration_e2e_public_key() ) ) {
+				throw new RuntimeException( "Step '$step': could not store a key." );
+			}
+			$events = array();
+			add_action(
+				Connection::EVENT_ACTION,
+				static function ( $event ) use ( &$events ) {
+					$events[] = $event;
+				}
+			);
+			$location = wpcom_migration_e2e_disconnect();
+			if ( add_query_arg( Connect_Page::NOTICE_QUERY_ARG, 'disconnected', Connect_Page::page_url() ) !== $location ) {
+				throw new RuntimeException( "Step '$step': expected the disconnected notice, got a redirect to $location." );
+			}
+			// The key stays: only deactivating the plugin discards it.
+			if ( ! Exporter::get_state()['credential_valid'] || Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': expected the key kept and no connection." );
+			}
+			if ( array( 'disconnected' ) !== $events ) {
+				throw new RuntimeException( "Step '$step': expected one disconnected event, got: " . wp_json_encode( $events ) );
+			}
+			break;
+
 		case 'render-not-connected':
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_NEEDS_CONNECTING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
@@ -360,17 +455,16 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected':
-			wpcom_migration_e2e_expect_mode( Settings_Page::MODE_CONNECTED_WAITING, $step );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'wpcom-migration-pill--success">Connected to WordPress.com</p>', $step );
-			wpcom_migration_e2e_expect_contains( $html, untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) ) . ' is ready to migrate. The migration runs from WordPress.com, so there&#8217;s nothing else to do here. Your site stays online and unchanged while it&#8217;s copied.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it&#8217;s copied.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'e2e@example.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Go to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'e2e@example.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, '&#8217;s connection to WordPress.com.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 
@@ -405,9 +499,11 @@ function wpcom_migration_e2e_connection_step( $step ) {
 
 			// The connected user asks.
 			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2euserkey%3A1%3A1&', $step );
-			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['destination'] || abs( time() + 3600 - $stored['expires_at'] ) > 5 ) {
-				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
+			// Kept per user, for the answer's ttl.
+			$stored  = get_transient( 'wpcom_migration_continue_url_1' );
+			$expires = (int) get_option( '_transient_timeout_wpcom_migration_continue_url_1' );
+			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/example.wordpress.com' !== $stored['destination'] || abs( time() + 3600 - $expires ) > 5 ) {
+				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( array( $stored, $expires ) ) );
 			}
 			break;
 
@@ -419,34 +515,35 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_destination_requests( $before, $step );
 			break;
 
-		case 'continue-url-failure-keeps-stored':
-			$stored               = get_option( Continue_Url::OPTION );
-			$stored['expires_at'] = time() - 1;
-			update_option( Continue_Url::OPTION, $stored, false );
+		case 'continue-url-failure-falls-back':
+			// Once the answer runs out, a failed fetch leaves the default link
+			// and asks again after RETRY_AFTER.
+			delete_transient( Continue_Url::transient() );
 			update_option( 'wpcom_migration_e2e_destination_response', 'fail' );
 			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
-			if ( 'https://my.wordpress.com/sites/example.wordpress.com' !== Connect_Page::continue_url() ) {
-				throw new RuntimeException( "Step '$step': a failed fetch should keep the stored URL, got: " . Connect_Page::continue_url() );
+			if ( 'https://my.wordpress.com/sites' !== Connect_Page::continue_url() ) {
+				throw new RuntimeException( "Step '$step': a failed fetch should leave the default URL, got: " . Connect_Page::continue_url() );
 			}
 			wpcom_migration_e2e_expect_destination_requests( $before + 1, $step );
-			$stored = get_option( Continue_Url::OPTION );
-			if ( abs( time() + Continue_Url::RETRY_AFTER - $stored['expires_at'] ) > 5 ) {
-				throw new RuntimeException( "Step '$step': a failed fetch should retry after RETRY_AFTER: " . wp_json_encode( $stored ) );
+			$stored  = get_transient( Continue_Url::transient() );
+			$expires = (int) get_option( '_transient_timeout_' . Continue_Url::transient() );
+			if ( array( 'destination' => null ) !== $stored || abs( time() + Continue_Url::RETRY_AFTER - $expires ) > 5 ) {
+				throw new RuntimeException( "Step '$step': a failed fetch should store no destination until RETRY_AFTER: " . wp_json_encode( array( $stored, $expires ) ) );
 			}
 			break;
 
 		case 'continue-url-authorized-forgets':
 			do_action( 'jetpack_client_authorized', WPCOM_MIGRATION_E2E_BLOG_ID );
-			if ( false !== get_option( Continue_Url::OPTION ) ) {
+			if ( false !== get_transient( Continue_Url::transient() ) ) {
 				throw new RuntimeException( "Step '$step': authorizing should delete the stored answer." );
 			}
 			break;
 
-		case 'continue-url-blog-token':
-			// Only the site is connected: the blog token asks. The button is
-			// not shown in this mode, so ask for the URL directly.
+		case 'continue-url-site-only':
+			// Only the site is connected: nothing asks, since the screen links
+			// to WordPress.com only for a connected user.
 			Continue_Url::forget();
-			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"blog.wordpress.com","url":"https://my.wordpress.com/sites/blog.wordpress.com","ttl":3600}' );
+			delete_option( 'wpcom_migration_e2e_destination_last' );
 			$user_tokens = Jetpack_Options::get_option( 'user_tokens' );
 			Jetpack_Options::delete_option( 'user_tokens' );
 			if ( Connection::is_user_connected() || ! Connection::is_site_connected() ) {
@@ -454,16 +551,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			$url = Connect_Page::continue_url();
 			Jetpack_Options::update_option( 'user_tokens', $user_tokens );
-			if ( 'https://my.wordpress.com/sites/blog.wordpress.com' !== $url ) {
-				throw new RuntimeException( "Step '$step': expected the blog-token destination, got: " . $url );
+			if ( 'https://my.wordpress.com/sites' !== $url || false !== get_option( 'wpcom_migration_e2e_destination_last' ) ) {
+				throw new RuntimeException( "Step '$step': expected the default link and no request, got: " . $url );
 			}
-			$last = get_option( 'wpcom_migration_e2e_destination_last' );
-			wpcom_migration_e2e_expect_contains( $last['url'], '&token=e2eblogkey%3A1%3A0&', $step );
-			$stored = get_option( Continue_Url::OPTION );
-			if ( ! is_array( $stored ) || 'https://my.wordpress.com/sites/blog.wordpress.com' !== $stored['destination'] ) {
-				throw new RuntimeException( "Step '$step': unexpected stored answer: " . wp_json_encode( $stored ) );
-			}
-			delete_option( 'wpcom_migration_e2e_destination_response' );
 			break;
 
 		case 'return-unmatched':
@@ -664,6 +754,36 @@ function wpcom_migration_e2e_calypso_retry() {
 }
 
 /**
+ * Posts the disconnect form and returns where the handler redirects.
+ * WordPress.com is unreachable, so the deregister call is skipped.
+ *
+ * @return string|null
+ * @throws RuntimeException When the handler fails other than by redirecting.
+ */
+function wpcom_migration_e2e_disconnect() {
+	$location = null;
+	$filter   = static function ( $url ) use ( &$location ) {
+		$location = $url;
+		throw new RuntimeException( 'disconnect redirect' );
+	};
+	add_filter( 'jetpack_connection_disconnect_site_wpcom', '__return_false' );
+	add_filter( 'wp_redirect', $filter );
+	wpcom_migration_e2e_post( Connect_Page::DISCONNECT_ACTION, array() );
+	try {
+		( new Connect_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' ) )->handle_disconnect();
+	} catch ( RuntimeException $exception ) {
+		if ( 'disconnect redirect' !== $exception->getMessage() ) {
+			throw $exception;
+		}
+	} finally {
+		remove_filter( 'wp_redirect', $filter );
+		remove_filter( 'jetpack_connection_disconnect_site_wpcom', '__return_false' );
+	}
+
+	return $location;
+}
+
+/**
  * Renders the Reprint migration screen with the connection section, as the
  * bootstraps wire it.
  *
@@ -743,22 +863,6 @@ if ( ! function_exists( 'wpcom_migration_e2e_expect_not_contains' ) ) {
 	function wpcom_migration_e2e_expect_not_contains( $html, $needle, $step ) {
 		if ( false !== strpos( $html, $needle ) ) {
 			throw new RuntimeException( "Step '$step': expected not to find '$needle' in: " . substr( $html, 0, 400 ) );
-		}
-	}
-}
-
-if ( ! function_exists( 'wpcom_migration_e2e_expect_mode' ) ) {
-	/**
-	 * Fails unless the screen's mode is the one expected.
-	 *
-	 * @param string $expected One of Settings_Page::MODE_*.
-	 * @param string $step     Name of the step, for the error message.
-	 * @throws RuntimeException When the mode differs.
-	 */
-	function wpcom_migration_e2e_expect_mode( $expected, $step ) {
-		$mode = Settings_Page::mode( Exporter::get_state(), Connection::is_user_connected() );
-		if ( $expected !== $mode ) {
-			throw new RuntimeException( "Step '$step': expected mode '$expected', got '$mode'." );
 		}
 	}
 }
