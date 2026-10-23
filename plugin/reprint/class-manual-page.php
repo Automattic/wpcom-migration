@@ -150,8 +150,7 @@ class Manual_Page {
 	}
 
 	/**
-	 * Takes the screen out of the sidebar, along with the row WordPress adds
-	 * for the parent the first time it gains a child.
+	 * Takes the screen out of the sidebar: it's a debugging screen.
 	 *
 	 * Can't run in add_admin_menu(): admin.php finds a submenu page's parent
 	 * by scanning $submenu, and it does that before it lets the request in,
@@ -160,7 +159,6 @@ class Manual_Page {
 	 */
 	public function hide_submenu() {
 		remove_submenu_page( Settings_Page::PAGE_SLUG, self::PAGE_SLUG );
-		remove_submenu_page( Settings_Page::PAGE_SLUG, Settings_Page::PAGE_SLUG );
 	}
 
 	/**

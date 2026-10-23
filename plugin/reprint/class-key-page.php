@@ -33,6 +33,13 @@ class Key_Page {
 	const CONNECT_ACTION = 'wpcom_migration_connect_migration_key';
 
 	/**
+	 * The admin-post action that deletes the stored key.
+	 *
+	 * @var string
+	 */
+	const DELETE_ACTION = 'wpcom_migration_delete_migration_key';
+
+	/**
 	 * Name of the key textarea.
 	 *
 	 * @var string
@@ -70,6 +77,7 @@ class Key_Page {
 
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ), 21 );
 		add_action( 'admin_post_' . self::CONNECT_ACTION, array( $this, 'handle_connect' ) );
+		add_action( 'admin_post_' . self::DELETE_ACTION, array( $this, 'handle_delete' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		// Priority 1: before the Command Palette (priority 10) lists $submenu.
 		add_action( 'admin_enqueue_scripts', array( $this, 'hide_submenu' ), 1 );
@@ -86,6 +94,17 @@ class Key_Page {
 	}
 
 	/**
+	 * The stored migration key, or '' for none. A key that no longer matches
+	 * the site's salts counts as none, as does a secret on a host that
+	 * doesn't verify keys. The status screen's button reads it too.
+	 *
+	 * @return string
+	 */
+	public static function stored_key() {
+		return Utils::key_auth_required() && Exporter::get_state()['public_key_valid'] ? (string) get_option( Exporter::PUBLIC_KEY_OPTION ) : '';
+	}
+
+	/**
 	 * Registers the screen as a submenu of Settings_Page.
 	 *
 	 * Priority 21: Settings_Page creates the parent at 20.
@@ -93,8 +112,8 @@ class Key_Page {
 	public function add_admin_menu() {
 		$this->page_hook = add_submenu_page(
 			Settings_Page::PAGE_SLUG,
-			__( 'Connect with a migration key', 'wpcom-migration' ),
-			__( 'Connect with a migration key', 'wpcom-migration' ),
+			__( 'Migration Key', 'wpcom-migration' ),
+			__( 'Migration Key', 'wpcom-migration' ),
 			'manage_options',
 			self::PAGE_SLUG,
 			array( $this, 'render_page' )
@@ -102,8 +121,8 @@ class Key_Page {
 	}
 
 	/**
-	 * Takes the screen out of the sidebar, along with the row WordPress adds
-	 * for the parent the first time it gains a child.
+	 * Takes the screen out of the sidebar while the status screen doesn't
+	 * own the menu.
 	 *
 	 * Can't run in add_admin_menu(): admin.php finds a submenu page's parent
 	 * by scanning $submenu, and it does that before it lets the request in,
@@ -111,8 +130,9 @@ class Key_Page {
 	 * once that check has passed.
 	 */
 	public function hide_submenu() {
-		remove_submenu_page( Settings_Page::PAGE_SLUG, self::PAGE_SLUG );
-		remove_submenu_page( Settings_Page::PAGE_SLUG, Settings_Page::PAGE_SLUG );
+		if ( ! Settings_Page::owns_menu() ) {
+			remove_submenu_page( Settings_Page::PAGE_SLUG, self::PAGE_SLUG );
+		}
 	}
 
 	/**
@@ -175,6 +195,17 @@ class Key_Page {
 	}
 
 	/**
+	 * Deletes the stored key and redirects back with a result notice.
+	 */
+	public function handle_delete() {
+		$this->authorize( self::DELETE_ACTION );
+
+		Exporter::discard_public_key();
+
+		$this->redirect_with_notice( 'deleted' );
+	}
+
+	/**
 	 * Stops a form post that is not a nonce-carrying administrator request on
 	 * a single site.
 	 *
@@ -195,7 +226,7 @@ class Key_Page {
 	/**
 	 * Redirects back to the screen with a result code and exits.
 	 *
-	 * @param string $result One of empty, invalid or storage_failure.
+	 * @param string $result One of empty, deleted, invalid or storage_failure.
 	 */
 	private function redirect_with_notice( $result ) {
 		wp_safe_redirect( add_query_arg( self::NOTICE_QUERY_ARG, $result, self::page_url() ) );
@@ -210,6 +241,8 @@ class Key_Page {
 			return;
 		}
 
+		$key = self::stored_key();
+
 		// Where wp-admin puts notices: above the page, not inside the column.
 		echo '<div class="wpcom-migration-notices">';
 		$this->render_result_notice();
@@ -217,8 +250,8 @@ class Key_Page {
 		?>
 		<div class="wpcom-migration-container">
 			<main class="wpcom-migration-content">
-				<h1><?php echo esc_html__( 'Connect with a migration key', 'wpcom-migration' ); ?></h1>
-				<?php $this->render_body(); ?>
+				<h1><?php echo esc_html( '' !== $key ? __( 'Manage Migration Key', 'wpcom-migration' ) : __( 'Add Migration Key', 'wpcom-migration' ) ); ?></h1>
+				<?php $this->render_body( $key ); ?>
 			</main>
 		</div>
 		<?php
@@ -226,40 +259,46 @@ class Key_Page {
 
 	/**
 	 * Renders what fits the site and the user under the heading.
+	 *
+	 * @param string $key The stored key, or '' for none.
 	 */
-	private function render_body() {
+	private function render_body( $key ) {
 		if ( is_multisite() ) {
-			$this->render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
+			Settings_Page::render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
 			return;
 		}
 
 		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			$this->render_sentence( __( 'Only an administrator can connect this site with a migration key.', 'wpcom-migration' ) );
-			$this->render_back_link();
+			Settings_Page::render_sentence( __( 'Only an administrator can connect this site with a migration key.', 'wpcom-migration' ) );
 			return;
 		}
 
 		if ( ! Utils::key_auth_required() ) {
 			$this->render_support_sentence();
-			$this->render_back_link();
 			return;
 		}
 
-		$this->render_sentence( __( 'Copy the migration key from WordPress.com and paste it here.', 'wpcom-migration' ) );
-
-		$state = Exporter::get_state();
-		if ( $state['has_public_key'] ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'This site already has a migration key. Connecting a new key replaces the current one.', 'wpcom-migration' ) . '</p></div>';
+		if ( '' === $key ) {
+			Settings_Page::render_sentence( __( 'Copy the migration key from WordPress.com and paste it here.', 'wpcom-migration' ) );
+		} else {
+			Settings_Page::render_sentence(
+				/* translators: %s: a link reading "WordPress.com". */
+				__( 'This is the migration key from WordPress.com. Paste a new one to replace it, then continue on %s.', 'wpcom-migration' ),
+				Settings_Page::wordpress_com_link()
+			);
 		}
 
-		$this->render_form();
-		$this->render_back_link();
+		$this->render_form( $key );
 	}
 
 	/**
-	 * Renders the key form, with the terms it agrees to.
+	 * Renders the key form, with the terms it agrees to, and Delete next to
+	 * Save while a key is stored. Delete posts its own form, which sits
+	 * outside this one since forms can't nest.
+	 *
+	 * @param string $key The stored key, or '' for none.
 	 */
-	private function render_form() {
+	private function render_form( $key ) {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
@@ -269,42 +308,27 @@ class Key_Page {
 				<textarea id="wpcom-migration-key"
 					class="wpcom-migration-textarea"
 					name="<?php echo esc_attr( self::KEY_FIELD ); ?>"
-					rows="6"
+					rows="7"
 					placeholder="<?php esc_attr_e( 'Paste the migration key', 'wpcom-migration' ); ?>"
 					spellcheck="false"
 					autocomplete="off"
-					autocapitalize="off"></textarea>
+					autocapitalize="off"><?php echo esc_textarea( $key ); ?></textarea>
 			</p>
-			<p>
-				<button type="submit" class="wpcom-migration-button"><?php esc_html_e( 'Connect', 'wpcom-migration' ); ?></button>
-			</p>
-			<p class="wpcom-migration-description">
-				<?php
-				printf(
-					/* translators: %s: link to the WordPress.com terms of service. */
-					esc_html__( 'By connecting, you agree to the %s.', 'wpcom-migration' ),
-					'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
-				);
-				?>
-			</p>
+			<div class="wpcom-migration-actions">
+				<button type="submit" class="wpcom-migration-button"><?php esc_html_e( 'Save', 'wpcom-migration' ); ?></button>
+				<?php if ( '' !== $key ) : ?>
+					<button type="submit" form="wpcom-migration-delete-key" class="wpcom-migration-button wpcom-migration-button--secondary"><?php esc_html_e( 'Delete', 'wpcom-migration' ); ?></button>
+				<?php endif; ?>
+			</div>
+			<?php \Automattic\WPCOM_Migration\Connect_Page::render_terms(); ?>
 		</form>
+		<?php if ( '' !== $key ) : ?>
+			<form id="wpcom-migration-delete-key" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::DELETE_ACTION ); ?>" />
+				<?php wp_nonce_field( self::DELETE_ACTION ); ?>
+			</form>
+		<?php endif; ?>
 		<?php
-	}
-
-	/**
-	 * Renders the link to the screen that connects with a WordPress.com account.
-	 */
-	private function render_back_link() {
-		echo '<p class="wpcom-migration-description"><a href="' . esc_url( Settings_Page::page_url() ) . '">' . esc_html__( 'Connect with your WordPress.com account instead', 'wpcom-migration' ) . '</a></p>';
-	}
-
-	/**
-	 * Renders one paragraph.
-	 *
-	 * @param string $text Plain text.
-	 */
-	private function render_sentence( $text ) {
-		echo '<p class="wpcom-migration-guidance">' . esc_html( wptexturize( $text ) ) . '</p>';
 	}
 
 	/**
@@ -322,22 +346,24 @@ class Key_Page {
 	}
 
 	/**
-	 * Renders the error notice for the result of the last form post, if any.
+	 * Renders the notice for the result of the last form post, if any.
 	 */
 	private function render_result_notice() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- The fixed query value selects a read-only notice.
 		$result = sanitize_key( wp_unslash( $_GET[ self::NOTICE_QUERY_ARG ] ?? '' ) );
 
 		$notices = array(
-			'empty'           => __( 'Paste the migration key first.', 'wpcom-migration' ),
-			'invalid'         => __( 'That doesn\'t look like a migration key. Copy it again from WordPress.com.', 'wpcom-migration' ),
-			'storage_failure' => __( 'The migration key couldn\'t be saved. Try again, or contact WordPress.com support.', 'wpcom-migration' ),
+			'deleted'         => array( 'success', __( 'Migration key deleted.', 'wpcom-migration' ) ),
+			'empty'           => array( 'error', __( 'Paste the migration key first.', 'wpcom-migration' ) ),
+			'invalid'         => array( 'error', __( 'That doesn\'t look like a migration key. Copy it again from WordPress.com.', 'wpcom-migration' ) ),
+			'storage_failure' => array( 'error', __( 'The migration key couldn\'t be saved. Try again, or contact WordPress.com support.', 'wpcom-migration' ) ),
 		);
 
 		if ( ! isset( $notices[ $result ] ) ) {
 			return;
 		}
 
-		echo '<div class="notice notice-error inline is-dismissible"><p>' . esc_html( wptexturize( $notices[ $result ] ) ) . '</p></div>';
+		list( $type, $message ) = $notices[ $result ];
+		echo '<div class="notice notice-' . esc_attr( $type ) . ' inline is-dismissible"><p>' . esc_html( wptexturize( $message ) ) . '</p></div>';
 	}
 }

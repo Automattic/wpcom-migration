@@ -63,7 +63,7 @@ class Main_Screen {
 	 *
 	 * @var int
 	 */
-	const RETRY_AFTER = 300;
+	const RETRY_AFTER = HOUR_IN_SECONDS;
 
 	/**
 	 * The answer for this request, once known.
