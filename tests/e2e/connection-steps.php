@@ -228,6 +228,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			if ( ! $state['public_key_valid'] ) {
 				throw new RuntimeException( "Step '$step': installing should store a valid key: " . wp_json_encode( $state ) );
 			}
+			if ( 'api' !== Exporter::public_key_source() ) {
+				throw new RuntimeException( "Step '$step': a key installed through the route should be marked api." );
+			}
 			break;
 
 		case 'render-connected-and-ready':
@@ -338,7 +341,10 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
+			// The key sends the user on; connecting is still offered, as a secondary button.
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
 			break;
 

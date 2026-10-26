@@ -254,15 +254,17 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the login form as the screen's button. render_terms() renders
-	 * the terms it agrees to.
+	 * Renders the login form as one of the screen's buttons. render_terms()
+	 * renders the terms it agrees to.
+	 *
+	 * @param bool $secondary Whether another button is the primary one.
 	 */
-	public function render_connect_button() {
+	public function render_connect_button( $secondary = false ) {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
-			<button type="submit" class="wpcom-migration-button">
+			<button type="submit" class="wpcom-migration-button<?php echo $secondary ? ' wpcom-migration-button--secondary' : ''; ?>">
 				<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
 			</button>
 		</form>

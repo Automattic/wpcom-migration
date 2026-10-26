@@ -286,12 +286,15 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( "Step '$step': expected the enrolled key and no secret: " . wp_json_encode( $state ) );
 			}
 			// A key alone, not known to be the right one: no "ready" claim, the
-			// text sends the user on, and the button still offers the connection.
+			// text and the primary button send the user on, and a secondary
+			// button still offers the connection.
 			$html = wpcom_migration_e2e_render( $page );
 			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Migration key added. Head over to <a class="wpcom-migration-external-link" href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is ready to migrate', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_saved';
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
 			wpcom_migration_e2e_expect_contains( $manual_html, 'Public key saved.', $step );
@@ -356,6 +359,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'render-key-page':
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, '<h1>Add Migration Key</h1>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-back-link" href="' . esc_url( Settings_Page::page_url() ) . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Copy the migration key from WordPress.com and paste it here.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<textarea', $step );
@@ -424,6 +428,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			// The stored key shows, to replace or clear.
 			wpcom_migration_e2e_expect_contains( $html, '<h1>Manage Migration Key</h1>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Paste a new one to replace it, then continue on <a class="wpcom-migration-external-link" href="https://my.wordpress.com/sites"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'This key was installed by pasting it into wp-admin.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Key_Page::DELETE_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'form="wpcom-migration-delete-key"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'autocapitalize="off">' . esc_textarea( $public_key ) . '</textarea>', $step );

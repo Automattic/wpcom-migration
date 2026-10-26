@@ -32,7 +32,7 @@ To activate a source checkout directly (without a build), run `composer install 
 | | Not connected | Connected |
 |---|---|---|
 | Text | What gets copied; connect, or copy over the Migration Key. With a key stored: *Migration key added*, head over to WordPress.com (a link), keep the plugin active | The site is ready to migrate; keep the plugin active |
-| Primary button | *Connect WordPress.com* | *Continue on WordPress.com* |
+| Primary button | *Connect WordPress.com*, or *Continue on WordPress.com* once a key is stored, with *Connect WordPress.com* as a secondary button | *Continue on WordPress.com* |
 | Secondary button | *Add Migration Key*, or *Manage Migration Key* once one is stored | The same |
 | Below | The terms connecting agrees to | Their WordPress.com avatar, *Connected as <name>*, then their email and *Disconnect* (administrators only), or *Shared with Jetpack* when other active plugins use the connection (`Connection::other_connected_plugins()`, the connection package's own list), since disconnecting would leave it |
 
@@ -44,7 +44,7 @@ After authorizing, WordPress.com sends the user back to the screen with `wpcom_m
 
 `wp-admin/admin.php?page=wpcom-migration-manual` sets up Reprint by hand; see [Setting up Reprint manually](#setting-up-reprint-manually).
 
-`wp-admin/admin.php?page=wpcom-migration-key` is where an administrator pastes the migration key WordPress.com shows. The status screen's *Add Migration Key* / *Manage Migration Key* button leads to it. With a key stored, the field shows it: saving a new one replaces it and leads back to the status screen, and *Delete* removes it. On a host without OpenSSL it asks the administrator to contact support.
+`wp-admin/admin.php?page=wpcom-migration-key` is where an administrator pastes the migration key WordPress.com shows. The status screen's *Add Migration Key* / *Manage Migration Key* button leads to it. A link above the heading leads back to the status screen. With a key stored, the field shows it, along with whether WordPress.com installed it through the route or someone pasted it here (the `wpcom_migration_reprint_public_key_source` option). Saving a new one replaces it and leads back to the status screen, and *Delete* removes it. On a host without OpenSSL it asks the administrator to contact support.
 
 `wp-admin/admin.php?page=wpcom-migration` is the BlogVault screen the plugin had before Reprint.
 

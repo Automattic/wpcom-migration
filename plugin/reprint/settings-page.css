@@ -30,6 +30,14 @@ body {
 	text-underline-offset: 4px;
 }
 
+/* Above the heading: the key screen sits under the status screen. */
+.wpcom-migration-back-link {
+	display: inline-block;
+	margin-bottom: 16px;
+	font-size: 13px;
+	line-height: 20px;
+}
+
 .wpcom-migration-container h1 {
 	max-width: 440px;
 	margin: 0 0 16px;

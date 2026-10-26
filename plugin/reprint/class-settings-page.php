@@ -237,9 +237,9 @@ class Settings_Page {
 
 	/**
 	 * Renders what goes under the heading. A user connected to WordPress.com
-	 * is sent on to it; with a key stored, the text sends them on too, while
-	 * the button still offers the connection; anyone else is asked to connect
-	 * or to add the migration key. Either way the key button is there, adding
+	 * is sent on to it; with a key stored, the primary button sends them on
+	 * too, while a secondary one still offers the connection; anyone else is
+	 * asked to connect or to add the migration key. Either way the key button is there, adding
 	 * one or managing the one stored. A key that no longer matches the site's
 	 * salts counts as none: the user adds it again.
 	 */
@@ -277,6 +277,9 @@ class Settings_Page {
 		if ( null !== $section ) {
 			if ( $user_connected ) {
 				$section->render_continue_button();
+			} elseif ( $has_key ) {
+				$section->render_continue_button();
+				$section->render_connect_button( true );
 			} else {
 				$section->render_connect_button();
 			}

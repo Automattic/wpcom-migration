@@ -250,6 +250,7 @@ class Key_Page {
 		?>
 		<div class="wpcom-migration-container">
 			<main class="wpcom-migration-content">
+				<a class="wpcom-migration-back-link" href="<?php echo esc_url( Settings_Page::page_url() ); ?>"><?php echo is_rtl() ? '&rarr;' : '&larr;'; ?> <?php esc_html_e( 'Back to Connection page', 'wpcom-migration' ); ?></a>
 				<h1><?php echo esc_html( '' !== $key ? __( 'Manage Migration Key', 'wpcom-migration' ) : __( 'Add Migration Key', 'wpcom-migration' ) ); ?></h1>
 				<?php $this->render_body( $key ); ?>
 			</main>
@@ -286,9 +287,25 @@ class Key_Page {
 				__( 'This is the migration key from WordPress.com. Paste a new one to replace it, then continue on %s.', 'wpcom-migration' ),
 				Settings_Page::wordpress_com_link()
 			);
+			$this->render_source_sentence();
 		}
 
 		$this->render_form( $key );
+	}
+
+	/**
+	 * Renders where the stored key came from, when that was recorded.
+	 */
+	private function render_source_sentence() {
+		$sentences = array(
+			'api'    => __( 'This key was installed for you after connecting to WordPress.com.', 'wpcom-migration' ),
+			'pasted' => __( 'This key was installed by pasting it into wp-admin.', 'wpcom-migration' ),
+		);
+
+		$source = Exporter::public_key_source();
+		if ( isset( $sentences[ $source ] ) ) {
+			Settings_Page::render_sentence( $sentences[ $source ] );
+		}
 	}
 
 	/**

@@ -55,6 +55,15 @@ class Exporter {
 	const PUBLIC_KEY_HASH_OPTION = 'wpcom_migration_reprint_public_key_hash';
 
 	/**
+	 * Option holding how the public key got here: 'api' when WordPress.com
+	 * installed it through the REST route, 'pasted' when an administrator
+	 * pasted it into wp-admin.
+	 *
+	 * @var string
+	 */
+	const PUBLIC_KEY_SOURCE_OPTION = 'wpcom_migration_reprint_public_key_source';
+
+	/**
 	 * The options only this class may write.
 	 *
 	 * @var string[]
@@ -207,6 +216,7 @@ class Exporter {
 		foreach ( self::GUARDED_OPTIONS as $option ) {
 			$had_any = delete_option( $option ) || $had_any;
 		}
+		delete_option( self::PUBLIC_KEY_SOURCE_OPTION );
 
 		if ( $had_any ) {
 			self::record_event(
@@ -228,6 +238,7 @@ class Exporter {
 	 */
 	public static function discard_public_key() {
 		self::discard_credential( self::PUBLIC_KEY_OPTION, self::PUBLIC_KEY_HASH_OPTION, 'public_key_removed' );
+		delete_option( self::PUBLIC_KEY_SOURCE_OPTION );
 	}
 
 	/**
@@ -275,18 +286,31 @@ class Exporter {
 	 * returns. Saving a key leaves any secret in place.
 	 *
 	 * @param string $public_key The one-line public key.
+	 * @param string $source     'api' or 'pasted'. See PUBLIC_KEY_SOURCE_OPTION.
 	 * @return bool Whether the key and a matching hash are now stored.
 	 */
-	public static function store_public_key( $public_key ) {
+	public static function store_public_key( $public_key, $source = 'pasted' ) {
 		if ( ! is_string( $public_key ) || '' === $public_key ) {
 			return false;
 		}
 
 		self::write_option( self::PUBLIC_KEY_OPTION, $public_key );
 		self::write_option( self::PUBLIC_KEY_HASH_OPTION, self::compute_credential_hash( self::PUBLIC_KEY_HASH_OPTION, $public_key ) );
+		update_option( self::PUBLIC_KEY_SOURCE_OPTION, $source, false );
 
 		return get_option( self::PUBLIC_KEY_OPTION ) === $public_key
 			&& self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
+	}
+
+	/**
+	 * How the stored public key got here.
+	 *
+	 * @return string 'api', 'pasted', or '' for a key stored before the
+	 *                source was recorded.
+	 */
+	public static function public_key_source() {
+		$source = get_option( self::PUBLIC_KEY_SOURCE_OPTION, '' );
+		return in_array( $source, array( 'api', 'pasted' ), true ) ? $source : '';
 	}
 
 	/**
@@ -308,7 +332,7 @@ class Exporter {
 			return false;
 		}
 
-		if ( ! self::store_public_key( $public_key ) ) {
+		if ( ! self::store_public_key( $public_key, 'pasted' ) ) {
 			throw new Credential_Storage_Exception( 'The public key could not be stored.' );
 		}
 
