@@ -71,12 +71,14 @@ class Proxied_Redirect {
 		$plugin_data = get_file_data( $this->plugin_file, array( 'Version' => 'Version' ) );
 		$version     = '' !== $plugin_data['Version'] ? $plugin_data['Version'] : false;
 
+		// In the head, so the request starts before the screen renders. The
+		// script touches no DOM.
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			plugins_url( 'reprint/proxied-redirect.js', $this->plugin_file ),
 			array(),
 			$version,
-			true
+			false
 		);
 		wp_add_inline_script(
 			self::SCRIPT_HANDLE,

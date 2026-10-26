@@ -357,6 +357,9 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			if ( ! wp_script_is( Proxied_Redirect::SCRIPT_HANDLE ) ) {
 				throw new RuntimeException( 'With BlogVault main, its screen should get the redirect script.' );
 			}
+			if ( wp_scripts()->get_data( Proxied_Redirect::SCRIPT_HANDLE, 'group' ) ) {
+				throw new RuntimeException( 'The redirect script should load in the head, not the footer.' );
+			}
 			$config = implode( "\n", (array) wp_scripts()->get_data( Proxied_Redirect::SCRIPT_HANDLE, 'before' ) );
 			foreach ( array( Main_Screen::endpoint_url(), 'admin-post.php?action=' . Proxied_Redirect::PIN_ACTION ) as $expected ) {
 				if ( false === strpos( $config, trim( wp_json_encode( $expected ), '"' ) ) ) {
