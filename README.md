@@ -5,7 +5,7 @@ Source for the [Migrate to WordPress.com](https://wordpress.org/plugins/wpcom-mi
 ## Layout
 
 - `plugin/` — plugin source. The BlogVault tree plus `reprint/`, the Reprint export glue.
-- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `Key_Page` (the migration key screen), `REST_Controller` (provisioning routes), `bootstrap.php`.
+- `plugin/reprint/` — `Exporter` (the shared secret and public key, write veto, `?reprint-api-wpcom-migration`), `Settings_Page` (the Reprint migration screen), `Manual_Page` (the by-hand screen), `Key_Page` (the migration key screen), `REST_Controller` (provisioning routes), `Main_Screen` (which screen is main), `Proxied_Redirect` (sends Automattic-proxied users to the Reprint screen), `bootstrap.php`.
 - `plugin/connection/` — `Connection` (package setup, connect, disconnect), `Connect_Page` (the connection section of the screen), `bootstrap.php`.
 - `bin/build.sh` — writes `build/wpcom-migration/` and `build/wpcom-migration.zip`.
 - `bin/check-autoload-manifest.php` — asserts which classes the ZIP publishes through the Jetpack autoloader.
@@ -49,6 +49,8 @@ After authorizing, WordPress.com sends the user back to the screen with `wpcom_m
 `wp-admin/admin.php?page=wpcom-migration` is the BlogVault screen the plugin had before Reprint.
 
 Until the WordPress.com side of Reprint ships, WordPress.com decides which of the Reprint and BlogVault screens is the main one: `Main_Screen` asks `GET https://public-api.wordpress.com/wpcom/v2/migration-plugin-config` for `{ "main_screen": "reprint" | "blogvault", "ttl": <seconds> }` on the first wp-admin page load after its stored answer (`wpcom_migration_main_screen`) expires. The answer's `ttl` decides when to ask again (clamped to a minute … a day; five minutes when it has none), so WordPress.com can shorten it near a switch. A failed fetch keeps the stored answer, or uses `blogvault` when there is none, and retries after an hour. The main screen gets the plugin's one sidebar row, the *Settings* link on the plugin list, and the activation redirect: every activation sends the administrator to it on their next wp-admin page load, except a bulk activation, which stays on the plugin list. The other screen stays reachable at its URL, as does the manual one. The Reprint screen's row has two items under it, *Connection* (the status screen) and *Migration Key*, and it also takes the row while the user is on either of them with BlogVault main, so whoever reaches the new screens can move between them (`Settings_Page::owns_menu()`). A brand whitelabelled with `hide` or `hide_from_menu` gets no sidebar row for either screen.
+
+While BlogVault is main, `Proxied_Redirect` asks the same endpoint again from the browser on the BlogVault screen. WordPress.com answers `reprint` to requests that come through Automattic's proxy, which the site's own request never does. On that answer the script leads to an admin-post action that pins the Reprint screen as main for the site (`wpcom_migration_main_screen_pinned`) and opens it. A pinned site doesn't ask the endpoint. Activating or deactivating the plugin drops the pin along with the stored answer. Anyone else stays on the BlogVault screen, which the script never hides or delays.
 
 Networks never ask. On a network the BlogVault screen keeps its row in the network admin, and the *Settings* link and the activation redirect lead there; subsites get no row.
 
