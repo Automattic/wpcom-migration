@@ -34,25 +34,11 @@ class Exporter {
 	const SECRET_OPTION = 'wpcom_migration_reprint_secret';
 
 	/**
-	 * Option holding the HMAC of the secret under the site's auth salt.
-	 *
-	 * @var string
-	 */
-	const SECRET_HASH_OPTION = 'wpcom_migration_reprint_secret_hash';
-
-	/**
 	 * Option holding the enrolled public key, in one-line form.
 	 *
 	 * @var string
 	 */
 	const PUBLIC_KEY_OPTION = 'wpcom_migration_reprint_public_key';
-
-	/**
-	 * Option holding the HMAC of the public key under the site's auth salt.
-	 *
-	 * @var string
-	 */
-	const PUBLIC_KEY_HASH_OPTION = 'wpcom_migration_reprint_public_key_hash';
 
 	/**
 	 * Option holding how the public key got here: 'api' when WordPress.com
@@ -70,9 +56,17 @@ class Exporter {
 	 */
 	const GUARDED_OPTIONS = array(
 		self::SECRET_OPTION,
-		self::SECRET_HASH_OPTION,
 		self::PUBLIC_KEY_OPTION,
-		self::PUBLIC_KEY_HASH_OPTION,
+	);
+
+	/**
+	 * Options earlier versions kept, deleted along with the credentials.
+	 *
+	 * @var string[]
+	 */
+	const OBSOLETE_OPTIONS = array(
+		'wpcom_migration_reprint_secret_hash',
+		'wpcom_migration_reprint_public_key_hash',
 	);
 
 	/**
@@ -99,11 +93,9 @@ class Exporter {
 	/**
 	 * Registers the write veto and, on an export request, the handler.
 	 *
-	 * Runs at plugin-file load. The handler itself waits for plugins_loaded:
-	 * wp_salt() lives in pluggable.php, which WordPress requires after the
-	 * plugin files and before that action, and the credential hashes cannot be
-	 * checked without it. The lowest priority there is the earliest point the
-	 * request can be answered.
+	 * Runs at plugin-file load. The handler itself waits for plugins_loaded,
+	 * once pluggable.php has defined the functions it may call. The lowest
+	 * priority there is the earliest point the request can be answered.
 	 */
 	public static function maybe_init() {
 		self::protect_options();
@@ -119,10 +111,11 @@ class Exporter {
 	/**
 	 * Blocks writes to the export options from anywhere but this class.
 	 *
-	 * Whoever sets both can export the whole site, since they pick the secret
-	 * and can then sign their own requests. Allowed by where the write came
-	 * from, not by who is logged in: the usual arbitrary-option-write bug is a
-	 * form missing its nonce, running in an administrator's own session.
+	 * Whoever sets one can export the whole site, since they pick the
+	 * credential and can then sign their own requests. Allowed by where the
+	 * write came from, not by who is logged in: the usual arbitrary-option-write
+	 * bug is a form missing its nonce, running in an administrator's own
+	 * session.
 	 */
 	public static function protect_options() {
 		foreach ( self::GUARDED_OPTIONS as $option ) {
@@ -194,12 +187,12 @@ class Exporter {
 		 * Fires when the Reprint exporter serves, refuses, or changes state.
 		 *
 		 * A request the handler ignores fires nothing, and no event carries the
-		 * secret, a credential hash or the signature.
+		 * secret or the signature.
 		 *
 		 * @param string $event   One of export_served, export_refused,
 		 *                        secret_rotated, secret_removed,
 		 *                        public_key_installed, public_key_removed,
-		 *                        credentials_discarded, credential_hash_mismatch.
+		 *                        credentials_discarded.
 		 * @param array  $context Details of the event.
 		 */
 		do_action( 'wpcom_migration_reprint_export_event', $event, $context );
@@ -217,6 +210,9 @@ class Exporter {
 			$had_any = delete_option( $option ) || $had_any;
 		}
 		delete_option( self::PUBLIC_KEY_SOURCE_OPTION );
+		foreach ( self::OBSOLETE_OPTIONS as $option ) {
+			delete_option( $option );
+		}
 
 		if ( $had_any ) {
 			self::record_event(
@@ -230,38 +226,34 @@ class Exporter {
 	 * Discards the stored secret, leaving any public key in place.
 	 */
 	public static function discard_secret() {
-		self::discard_credential( self::SECRET_OPTION, self::SECRET_HASH_OPTION, 'secret_removed' );
+		self::discard_credential( self::SECRET_OPTION, 'secret_removed' );
 	}
 
 	/**
 	 * Discards the stored public key, leaving any secret in place.
 	 */
 	public static function discard_public_key() {
-		self::discard_credential( self::PUBLIC_KEY_OPTION, self::PUBLIC_KEY_HASH_OPTION, 'public_key_removed' );
+		self::discard_credential( self::PUBLIC_KEY_OPTION, 'public_key_removed' );
 		delete_option( self::PUBLIC_KEY_SOURCE_OPTION );
 	}
 
 	/**
-	 * Deletes one credential and its hash.
+	 * Deletes one credential.
 	 *
-	 * @param string $option      The credential's option.
-	 * @param string $hash_option The option holding its hash.
-	 * @param string $event       Event to report when anything was deleted.
+	 * @param string $option The credential's option.
+	 * @param string $event  Event to report when anything was deleted.
 	 */
-	private static function discard_credential( $option, $hash_option, $event ) {
-		$had_any = delete_option( $option );
-		$had_any = delete_option( $hash_option ) || $had_any;
-
-		if ( $had_any ) {
+	private static function discard_credential( $option, $event ) {
+		if ( delete_option( $option ) ) {
 			self::record_event( $event, array( 'user_id' => get_current_user_id() ) );
 		}
 	}
 
 	/**
-	 * Stores a shared secret together with its salt-keyed hash.
+	 * Stores a shared secret.
 	 *
 	 * @param string $secret The new secret.
-	 * @return bool Whether the secret and a matching hash are now stored.
+	 * @return bool Whether the secret is now stored.
 	 */
 	public static function store_secret( $secret ) {
 		if ( ! is_string( $secret ) || '' === $secret ) {
@@ -269,25 +261,21 @@ class Exporter {
 		}
 
 		self::write_option( self::SECRET_OPTION, $secret );
-		self::write_option( self::SECRET_HASH_OPTION, self::compute_credential_hash( self::SECRET_HASH_OPTION, $secret ) );
 
 		// Read back rather than trust update_option(): it reports false for an
-		// unchanged value, and re-saving the same secret after a salt change
-		// rewrites only the hash.
-		return get_option( self::SECRET_OPTION ) === $secret
-			&& self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret );
+		// unchanged value.
+		return get_option( self::SECRET_OPTION ) === $secret;
 	}
 
 	/**
-	 * Stores a public key together with its salt-keyed hash, replacing any
-	 * key stored before.
+	 * Stores a public key, replacing any key stored before.
 	 *
 	 * Takes the one-line form PublicKeyServer::assert_valid_public_key()
 	 * returns. Saving a key leaves any secret in place.
 	 *
 	 * @param string $public_key The one-line public key.
 	 * @param string $source     'api' or 'pasted'. See PUBLIC_KEY_SOURCE_OPTION.
-	 * @return bool Whether the key and a matching hash are now stored.
+	 * @return bool Whether the key is now stored.
 	 */
 	public static function store_public_key( $public_key, $source = 'pasted' ) {
 		if ( ! is_string( $public_key ) || '' === $public_key ) {
@@ -295,11 +283,12 @@ class Exporter {
 		}
 
 		self::write_option( self::PUBLIC_KEY_OPTION, $public_key );
-		self::write_option( self::PUBLIC_KEY_HASH_OPTION, self::compute_credential_hash( self::PUBLIC_KEY_HASH_OPTION, $public_key ) );
-		update_option( self::PUBLIC_KEY_SOURCE_OPTION, $source, false );
+		if ( get_option( self::PUBLIC_KEY_OPTION ) !== $public_key ) {
+			return false;
+		}
 
-		return get_option( self::PUBLIC_KEY_OPTION ) === $public_key
-			&& self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
+		update_option( self::PUBLIC_KEY_SOURCE_OPTION, $source, false );
+		return true;
 	}
 
 	/**
@@ -327,8 +316,7 @@ class Exporter {
 	public static function enroll_public_key( $pasted_key ): bool {
 		$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
 
-		$state = self::get_state();
-		if ( $state['public_key_valid'] && get_option( self::PUBLIC_KEY_OPTION ) === $public_key ) {
+		if ( get_option( self::PUBLIC_KEY_OPTION ) === $public_key ) {
 			return false;
 		}
 
@@ -348,43 +336,6 @@ class Exporter {
 	}
 
 	/**
-	 * Computes the HMAC binding a stored credential to the site's auth salt.
-	 *
-	 * Keyed with wp_salt() rather than AUTH_SALT, so sites still carrying the
-	 * sample placeholder salts can export at all. Accepted cost: wp_salt() then
-	 * stores its own salt in wp_options, where whoever can write the credential
-	 * can read it, so the hashes add no protection there.
-	 *
-	 * The option name prefixes the message, so copying one credential and
-	 * its hash into the other's options does not make a credential that
-	 * verifies.
-	 *
-	 * @param string     $hash_option The option the hash is stored in.
-	 * @param string|int $value       The stored value.
-	 * @return string
-	 */
-	private static function compute_credential_hash( $hash_option, $value ) {
-		return hash_hmac( 'sha256', $hash_option . "\0" . (string) $value, wp_salt( 'auth' ) );
-	}
-
-	/**
-	 * Whether the stored hash is the one the site's auth salt gives for a
-	 * stored credential.
-	 *
-	 * @param string     $hash_option The option the hash is stored in.
-	 * @param string|int $value       The stored value.
-	 * @return bool
-	 */
-	private static function credential_hash_matches( $hash_option, $value ) {
-		$stored_hash = get_option( $hash_option );
-		if ( ! is_string( $stored_hash ) ) {
-			return false;
-		}
-
-		return hash_equals( self::compute_credential_hash( $hash_option, $value ), $stored_hash );
-	}
-
-	/**
 	 * The state the screens render.
 	 *
 	 * The credential is the one this host verifies: the public key where
@@ -392,30 +343,22 @@ class Exporter {
 	 * counts for nothing.
 	 *
 	 * @return array {
-	 *     @type bool $has_secret       Whether a secret is stored.
-	 *     @type bool $secret_valid     Whether its hash matches under the current salt.
-	 *     @type bool $has_public_key   Whether a public key is stored.
-	 *     @type bool $public_key_valid Whether its hash matches under the current salt.
-	 *     @type bool $has_credential   Whether the credential is stored.
-	 *     @type bool $credential_valid Whether it is valid, which turns the exporter on.
+	 *     @type bool $has_secret     Whether a secret is stored.
+	 *     @type bool $has_public_key Whether a public key is stored.
+	 *     @type bool $has_credential Whether the credential is stored, which
+	 *                                turns the exporter on.
 	 * }
 	 */
 	public static function get_state() {
-		$secret           = get_option( self::SECRET_OPTION, '' );
-		$has_secret       = is_string( $secret ) && '' !== $secret;
-		$secret_valid     = $has_secret && self::credential_hash_matches( self::SECRET_HASH_OPTION, $secret );
-		$public_key       = get_option( self::PUBLIC_KEY_OPTION, '' );
-		$has_public_key   = is_string( $public_key ) && '' !== $public_key;
-		$public_key_valid = $has_public_key && self::credential_hash_matches( self::PUBLIC_KEY_HASH_OPTION, $public_key );
-		$key_auth         = Utils::key_auth_required();
+		$secret         = get_option( self::SECRET_OPTION, '' );
+		$has_secret     = is_string( $secret ) && '' !== $secret;
+		$public_key     = get_option( self::PUBLIC_KEY_OPTION, '' );
+		$has_public_key = is_string( $public_key ) && '' !== $public_key;
 
 		return array(
-			'has_secret'       => $has_secret,
-			'secret_valid'     => $secret_valid,
-			'has_public_key'   => $has_public_key,
-			'public_key_valid' => $public_key_valid,
-			'has_credential'   => $key_auth ? $has_public_key : $has_secret,
-			'credential_valid' => $key_auth ? $public_key_valid : $secret_valid,
+			'has_secret'     => $has_secret,
+			'has_public_key' => $has_public_key,
+			'has_credential' => Utils::key_auth_required() ? $has_public_key : $has_secret,
 		);
 	}
 
@@ -457,17 +400,9 @@ class Exporter {
 			return;
 		}
 
-		// A credential this class did not hash under the current salt is no
-		// credential at all, so it never reaches signature verification.
-		if ( ! $state['credential_valid'] ) {
-			self::record_event( 'credential_hash_mismatch' );
-			$this->error( 503, 'Export credential invalidated: the stored credential does not match this site\'s salts. Start the migration again on WordPress.com.' );
-			return;
-		}
-
-		$secret      = $state['secret_valid'] ? get_option( self::SECRET_OPTION ) : null;
+		$secret      = $state['has_secret'] ? get_option( self::SECRET_OPTION ) : null;
 		$public_keys = array();
-		if ( $state['public_key_valid'] ) {
+		if ( $state['has_public_key'] ) {
 			$public_key = get_option( self::PUBLIC_KEY_OPTION );
 
 			$public_keys[ Utils::public_key_fingerprint( $public_key ) ] = $public_key;

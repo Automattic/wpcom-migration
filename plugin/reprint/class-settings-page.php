@@ -239,9 +239,8 @@ class Settings_Page {
 	 * Renders what goes under the heading. A user connected to WordPress.com
 	 * is sent on to it; with a key stored, the primary button sends them on
 	 * too, while a secondary one still offers the connection; anyone else is
-	 * asked to connect or to add the migration key. Either way the key button is there, adding
-	 * one or managing the one stored. A key that no longer matches the site's
-	 * salts counts as none: the user adds it again.
+	 * asked to connect or to add the migration key. Either way the key button
+	 * is there, adding one or managing the one stored.
 	 */
 	private function render_body() {
 		if ( is_multisite() ) {

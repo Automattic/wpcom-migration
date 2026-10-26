@@ -33,7 +33,7 @@ PORT="${E2E_PORT:-9400}"
 BASE_URL="http://127.0.0.1:$PORT"
 PLAYGROUND_CLI="${PLAYGROUND_CLI:-npx --yes @wp-playground/cli@3.1.54}"
 # shellcheck disable=SC2206 # A space-separated scenario list, split on purpose.
-SCENARIOS=(${E2E_SCENARIOS:-secret no-credential secret-hash-deleted screen screen-hmac provisioning-hmac provisioning-key connection menu multisite})
+SCENARIOS=(${E2E_SCENARIOS:-secret no-credential screen screen-hmac provisioning-hmac provisioning-key connection menu multisite})
 
 for command_name in php npx; do
     if ! command -v "$command_name" >/dev/null 2>&1; then

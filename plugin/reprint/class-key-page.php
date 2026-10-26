@@ -94,14 +94,14 @@ class Key_Page {
 	}
 
 	/**
-	 * The stored migration key, or '' for none. A key that no longer matches
-	 * the site's salts counts as none, as does a secret on a host that
-	 * doesn't verify keys. The status screen's button reads it too.
+	 * The stored migration key, or '' for none. A secret on a host that
+	 * doesn't verify keys counts as none. The status screen's button reads it
+	 * too.
 	 *
 	 * @return string
 	 */
 	public static function stored_key() {
-		return Utils::key_auth_required() && Exporter::get_state()['public_key_valid'] ? (string) get_option( Exporter::PUBLIC_KEY_OPTION ) : '';
+		return Utils::key_auth_required() ? (string) get_option( Exporter::PUBLIC_KEY_OPTION, '' ) : '';
 	}
 
 	/**

@@ -225,7 +225,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				throw new RuntimeException( "Step '$step': unexpected export_url: " . wp_json_encode( $data ) );
 			}
 			$state = Exporter::get_state();
-			if ( ! $state['public_key_valid'] ) {
+			if ( ! $state['has_public_key'] ) {
 				throw new RuntimeException( "Step '$step': installing should store a valid key: " . wp_json_encode( $state ) );
 			}
 			if ( 'api' !== Exporter::public_key_source() ) {
@@ -243,22 +243,6 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connected with a migration key.', $step );
-			break;
-
-		case 'render-stale-key-connected':
-			// Break the key, look, then mend it so the later steps still find
-			// a valid one.
-			$public_key = get_option( Exporter::PUBLIC_KEY_OPTION );
-			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
-			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
-			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
-			if ( ! Exporter::store_public_key( $public_key ) ) {
-				throw new RuntimeException( "Step '$step': could not restore the key." );
-			}
 			break;
 
 		case 'rest-install-public-key-blog-token':
@@ -335,7 +319,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			}
 			( new Manager( 'jetpack' ) )->disconnect_site( false );
 			$state = Exporter::get_state();
-			if ( ! $state['credential_valid'] || Connection::is_site_connected() ) {
+			if ( ! $state['has_credential'] || Connection::is_site_connected() ) {
 				throw new RuntimeException( "Step '$step': expected the key kept and no connection: " . wp_json_encode( $state ) );
 			}
 			$html = wpcom_migration_e2e_render_connect_page();
@@ -365,7 +349,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				throw new RuntimeException( "Step '$step': expected the disconnected notice, got a redirect to $location." );
 			}
 			// The key stays: only deactivating the plugin discards it.
-			if ( ! Exporter::get_state()['credential_valid'] || Connection::is_site_connected() ) {
+			if ( ! Exporter::get_state()['has_credential'] || Connection::is_site_connected() ) {
 				throw new RuntimeException( "Step '$step': expected the key kept and no connection." );
 			}
 			if ( array( 'disconnected' ) !== $events ) {

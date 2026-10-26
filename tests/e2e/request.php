@@ -5,7 +5,7 @@
  *
  * Usage: php tests/e2e/request.php <base-url> <built-plugin-dir> <scenario>
  *
- * Scenarios: secret, no-credential, secret-hash-deleted, screen, screen-hmac,
+ * Scenarios: secret, no-credential, screen, screen-hmac,
  * provisioning-hmac, provisioning-key, connection, menu. The secret must match
  * the one the matching blueprint stores.
  *
@@ -63,12 +63,6 @@ switch ( $wpcom_migration_scenario ) {
 			wpcom_migration_e2e_expect_status( $response, 503 );
 			wpcom_migration_e2e_expect_error_json( $response, 503, 'wpcom_migration_no_credential' );
 		}
-		break;
-
-	case 'secret-hash-deleted':
-		$response = wpcom_migration_e2e_request( $wpcom_migration_endpoint, wpcom_migration_e2e_signed_headers( $wpcom_migration_secret, $wpcom_migration_endpoint ) );
-		wpcom_migration_e2e_expect_status( $response, 503 );
-		wpcom_migration_e2e_expect_error_json( $response, 503 );
 		break;
 
 	case 'provisioning-hmac':

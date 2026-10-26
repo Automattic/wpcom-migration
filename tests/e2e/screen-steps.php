@@ -115,7 +115,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 
 		case 'assert-secret-saved':
 			$state = Exporter::get_state();
-			if ( ! $state['secret_valid'] ) {
+			if ( ! $state['has_secret'] ) {
 				throw new RuntimeException( 'Saving the secret should store a valid secret: ' . wp_json_encode( $state ) );
 			}
 			$html = wpcom_migration_e2e_render( $page );
@@ -209,24 +209,9 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 
 			$state = Exporter::get_state();
-			if ( 'smoke-secret-0123456789abcdef0123456789abcdef' !== get_option( Exporter::SECRET_OPTION ) || ! $state['secret_valid'] ) {
+			if ( 'smoke-secret-0123456789abcdef0123456789abcdef' !== get_option( Exporter::SECRET_OPTION ) || ! $state['has_secret'] ) {
 				throw new RuntimeException( 'Non-administrator access changed exporter credentials.' );
 			}
-			break;
-
-		case 'invalidate-secret':
-			delete_option( Exporter::SECRET_HASH_OPTION );
-			$state = Exporter::get_state();
-			if ( ! $state['has_secret'] || $state['secret_valid'] ) {
-				throw new RuntimeException( 'Deleting the hash should leave the secret set but invalid: ' . wp_json_encode( $state ) );
-			}
-			// A key that no longer matches counts as none.
-			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
-			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Invalid: the site', $step );
 			break;
 
 		case 'discard-secret':
@@ -282,7 +267,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'assert-public-key-enrolled':
 			$public_key = get_option( 'wpcom_migration_e2e_public_key' );
 			$state      = Exporter::get_state();
-			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['public_key_valid'] || $state['has_secret'] ) {
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['has_public_key'] || $state['has_secret'] ) {
 				throw new RuntimeException( "Step '$step': expected the enrolled key and no secret: " . wp_json_encode( $state ) );
 			}
 			// A key alone, not known to be the right one: no "ready" claim, the
@@ -322,19 +307,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $manual_html, 'wpcom-migration-reprint-key-table', $step );
 			break;
 
-		case 'invalidate-public-key':
-			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
-			$state = Exporter::get_state();
-			if ( ! $state['has_public_key'] || $state['public_key_valid'] || $state['credential_valid'] ) {
-				throw new RuntimeException( "Step '$step': deleting the hash should leave the key set but invalid: " . wp_json_encode( $state ) );
-			}
-			// A key that no longer matches counts as none.
-			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Manage Migration Key', $step );
-			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render_key( $key_page ), get_option( Exporter::PUBLIC_KEY_OPTION ), $step );
-			break;
-
 		case 'assert-other-credential-ignored':
 			// A credential this host does not verify, stored before the manual
 			// screen stopped offering it, must not read as ready.
@@ -348,12 +320,22 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( "Step '$step': could not store the other credential." );
 			}
 			$state = Exporter::get_state();
-			if ( $state['has_credential'] || $state['credential_valid'] ) {
+			if ( $state['has_credential'] || $state['has_credential'] ) {
 				throw new RuntimeException( "Step '$step': the other credential must count for nothing: " . wp_json_encode( $state ) );
 			}
 			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render( $page ), 'Add Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render_manual( $manual ), 'wpcom-migration-reprint-api-url', $step );
+
+			// Discarding also clears the options earlier versions kept.
+			foreach ( Exporter::OBSOLETE_OPTIONS as $option ) {
+				update_option( $option, 'left-over', false );
+			}
 			Exporter::discard_credentials();
+			foreach ( Exporter::OBSOLETE_OPTIONS as $option ) {
+				if ( false !== get_option( $option ) ) {
+					throw new RuntimeException( "Step '$step': discarding should delete $option." );
+				}
+			}
 			break;
 
 		case 'render-key-page':
@@ -421,7 +403,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 		case 'assert-key-connected':
 			$public_key = get_option( 'wpcom_migration_e2e_public_key' );
 			$state      = Exporter::get_state();
-			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['public_key_valid'] ) {
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! $state['has_public_key'] ) {
 				throw new RuntimeException( "Step '$step': expected the connected key: " . wp_json_encode( $state ) );
 			}
 			$html = wpcom_migration_e2e_render_key( $key_page );
@@ -451,19 +433,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			if ( 0 !== $installed ) {
 				throw new RuntimeException( "Step '$step': connecting the same key again recorded $installed public_key_installed event(s)." );
 			}
-			Exporter::discard_credentials();
-			break;
-
-		case 'connect-key-repairs-broken':
-			list( , $stale_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
-			Exporter::store_public_key( $stale_key );
-			delete_option( Exporter::PUBLIC_KEY_HASH_OPTION );
-			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
-			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
-			wpcom_migration_e2e_expect_redirect( $key_page, Settings_Page::page_url(), $step );
-			break;
-
-		case 'assert-key-repaired':
 			Exporter::discard_credentials();
 			break;
 
@@ -562,7 +531,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 					throw $exception;
 				}
 			}
-			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! Exporter::get_state()['public_key_valid'] ) {
+			if ( get_option( Exporter::PUBLIC_KEY_OPTION ) !== $public_key || ! Exporter::get_state()['has_public_key'] ) {
 				throw new RuntimeException( "Step '$step': the key should be stored before the event fires." );
 			}
 			remove_action( Exporter::EVENT_ACTION, $listener );
@@ -586,7 +555,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			}
 			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => '' ) );
 			wpcom_migration_e2e_expect_redirect( $key_page, add_query_arg( Key_Page::NOTICE_QUERY_ARG, 'empty', Key_Page::page_url() ), $step );
-			if ( ! Exporter::get_state()['public_key_valid'] ) {
+			if ( ! Exporter::get_state()['has_public_key'] ) {
 				throw new RuntimeException( "Step '$step': an empty field must not remove the key." );
 			}
 
