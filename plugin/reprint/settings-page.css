@@ -30,6 +30,14 @@ body {
 	text-underline-offset: 4px;
 }
 
+/* Above the heading: the key screen sits under the status screen. */
+.wpcom-migration-back-link {
+	display: inline-block;
+	margin-bottom: 16px;
+	font-size: 13px;
+	line-height: 20px;
+}
+
 .wpcom-migration-container h1 {
 	max-width: 440px;
 	margin: 0 0 16px;
@@ -65,25 +73,6 @@ body {
 	text-decoration: none;
 }
 
-.wpcom-migration-container .wpcom-migration-pill {
-	display: inline-block;
-	margin: 0 0 16px;
-	padding: 2px 8px;
-	border-radius: 6px;
-	font-size: 12px;
-	line-height: 20px;
-}
-
-.wpcom-migration-pill--success {
-	color: #00450c;
-	background: #b8f5c8;
-}
-
-.wpcom-migration-pill--info {
-	color: #0b2a6f;
-	background: #dfe8fd;
-}
-
 .wpcom-migration-button {
 	display: inline-block;
 	margin: 0;
@@ -109,6 +98,49 @@ body {
 .wpcom-migration-button:focus {
 	color: var( --wpcom-migration-white );
 	background: var( --wpcom-migration-button-hover-color );
+}
+
+.wpcom-migration-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 12px;
+	margin: 24px 0 16px;
+}
+
+.wpcom-migration-container .wpcom-migration-button--secondary {
+	color: var( --wpcom-migration-primary-bg );
+	background: transparent;
+	box-shadow: inset 0 0 0 1px var( --wpcom-migration-primary-bg );
+}
+
+.wpcom-migration-container .wpcom-migration-button.wpcom-migration-button--secondary:hover,
+.wpcom-migration-container .wpcom-migration-button.wpcom-migration-button--secondary:focus {
+	color: var( --wpcom-migration-button-hover-color );
+	background: transparent;
+	box-shadow: inset 0 0 0 1px var( --wpcom-migration-button-hover-color );
+}
+
+/* Matches WordPress's ExternalLink component, as on WordPress.com. */
+.wpcom-migration-container a.wpcom-migration-external-link {
+	color: var( --wpcom-migration-primary-bg );
+	text-decoration: none;
+}
+
+.wpcom-migration-container a.wpcom-migration-external-link:hover,
+.wpcom-migration-container a.wpcom-migration-external-link:active {
+	color: var( --wpcom-migration-link-hover-color );
+}
+
+.wpcom-migration-external-link__contents {
+	text-decoration: underline;
+	text-underline-offset: 0.2em;
+	text-decoration-thickness: from-font;
+}
+
+.wpcom-migration-external-link__icon {
+	display: inline-block;
+	margin-inline-start: 4px;
+	line-height: 1;
 }
 
 .wpcom-migration-link {
@@ -160,6 +192,29 @@ body {
 }
 
 /* Fix main content having extra padding on mobile. */
+.wpcom-migration-account {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 16px 0;
+}
+
+.wpcom-migration-container .wpcom-migration-account p {
+	margin: 0;
+}
+
+.wpcom-migration-account__avatar {
+	flex: none;
+	border-radius: 50%;
+}
+
+.wpcom-migration-account__name {
+	color: var( --wpcom-migration-gray-100 );
+	font-size: 13px;
+	font-weight: 500;
+	line-height: 20px;
+}
+
 .auto-fold #wpcontent {
 	padding-left: 0;
 }

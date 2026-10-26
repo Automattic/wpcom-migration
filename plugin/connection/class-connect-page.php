@@ -2,8 +2,8 @@
 /**
  * The WordPress.com connection section of the Reprint migration screen.
  *
- * Modeled on Reprint\Settings_Page: admin-post handlers, nonces, and notices
- * carried back through query arguments.
+ * Admin-post handlers with nonces, and notices carried back through query
+ * arguments, as the key screen has too.
  *
  * @package wpcom-migration
  */
@@ -13,11 +13,18 @@ namespace Automattic\WPCOM_Migration;
 /**
  * WordPress.com connection section of the Reprint migration screen.
  *
- * Handles the connect and disconnect forms and supplies the login button, the
- * WordPress.com link and the disconnect link that Reprint\Settings_Page
- * places.
+ * Handles the connect and disconnect forms and supplies the buttons, the
+ * terms and the account line that Reprint\Settings_Page places.
  */
 class Connect_Page {
+
+	/**
+	 * The user's sites on WordPress.com, where the screen sends them when it
+	 * knows no better.
+	 *
+	 * @var string
+	 */
+	const SITES_URL = 'https://my.wordpress.com/sites';
 
 	/**
 	 * The admin-post action that starts the connection.
@@ -195,6 +202,14 @@ class Connect_Page {
 	public function handle_disconnect() {
 		$this->authorize( self::DISCONNECT_ACTION );
 
+		// The screen offers no disconnect while other plugins share the
+		// connection, which disconnecting would leave in place; a post from a
+		// page loaded before one joined changes nothing.
+		if ( array() !== Connection::other_connected_plugins() ) {
+			wp_safe_redirect( self::page_url() );
+			exit;
+		}
+
 		Connection::disconnect();
 
 		$this->redirect_with_notice( 'disconnected' );
@@ -239,28 +254,37 @@ class Connect_Page {
 	}
 
 	/**
-	 * Renders the login form, with the terms it agrees to.
+	 * Renders the login form as one of the screen's buttons. render_terms()
+	 * renders the terms it agrees to.
+	 *
+	 * @param bool $secondary Whether another button is the primary one.
 	 */
-	public function render_connect_button() {
+	public function render_connect_button( $secondary = false ) {
 		?>
 		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
-			<p>
-				<button type="submit" name="wpcom_migration_connect_submit" class="wpcom-migration-button">
-					<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
-				</button>
-			</p>
-			<p class="wpcom-migration-description">
-				<?php
-				printf(
-					/* translators: %s: link to the WordPress.com terms of service. */
-					esc_html__( 'By connecting, you agree to the %s.', 'wpcom-migration' ),
-					'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
-				);
-				?>
-			</p>
+			<button type="submit" class="wpcom-migration-button<?php echo $secondary ? ' wpcom-migration-button--secondary' : ''; ?>">
+				<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
+			</button>
 		</form>
+		<?php
+	}
+
+	/**
+	 * Renders the terms connecting agrees to. The key screen shares it.
+	 */
+	public static function render_terms() {
+		?>
+		<p class="wpcom-migration-description">
+			<?php
+			printf(
+				/* translators: %s: link to the WordPress.com terms of service. */
+				esc_html__( 'By connecting, you agree to the %s.', 'wpcom-migration' ),
+				'<a href="https://wordpress.com/tos/" target="_blank" rel="noreferrer">' . esc_html__( 'WordPress.com Terms of Service', 'wpcom-migration' ) . '</a>'
+			);
+			?>
+		</p>
 		<?php
 	}
 
@@ -270,30 +294,66 @@ class Connect_Page {
 	 */
 	public function render_continue_button() {
 		?>
-		<p>
-			<a class="wpcom-migration-button" target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
-				<?php esc_html_e( 'Go to WordPress.com', 'wpcom-migration' ); ?>
-				<svg class="wpcom-migration-button__icon" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><path d="M1.5 8.5l7-7M3 1.5h5.5V7" /></svg>
-			</a>
-		</p>
+		<a class="wpcom-migration-button" target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
+			<?php esc_html_e( 'Continue on WordPress.com', 'wpcom-migration' ); ?>
+			<svg class="wpcom-migration-button__icon" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><path d="M1.5 8.5l7-7M3 1.5h5.5V7" /></svg>
+		</a>
 		<?php
 	}
 
 	/**
-	 * Renders the disconnect form as a link, with what disconnecting does.
+	 * Renders the WordPress.com account the current user is connected as:
+	 * the avatar, the name, then on one line the email and either the
+	 * plugins the connection is shared with or, for an administrator, the
+	 * disconnect link. Disconnecting would leave a shared connection in
+	 * place, so it isn't offered then. Without the account's details it says
+	 * only that the user is connected.
 	 */
-	public function render_disconnect_link() {
+	public function render_account() {
+		$user        = Connection::connected_wpcom_user();
+		$name        = $user['display_name'] ?? $user['login'] ?? '';
+		$email       = $user['email'] ?? '';
+		$shared_with = Connection::other_connected_plugins();
+		$disconnect  = array() === $shared_with && in_array( 'administrator', wp_get_current_user()->roles, true );
+
+		$details = array();
+		if ( '' !== $email ) {
+			$details[] = esc_html( $email );
+		}
+		if ( array() !== $shared_with ) {
+			/* translators: %s: plugin names, e.g. "Jetpack" or "Jetpack and Jetpack Boost". */
+			$details[] = esc_html( sprintf( __( 'Shared with %s', 'wpcom-migration' ), wp_sprintf_l( '%l', $shared_with ) ) );
+		} elseif ( $disconnect ) {
+			// The button submits the form below, outside this paragraph.
+			$details[] = '<button type="submit" form="wpcom-migration-disconnect" class="wpcom-migration-link wpcom-migration-link--quiet">' . esc_html__( 'Disconnect', 'wpcom-migration' ) . '</button>';
+		}
 		?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-			<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
-			<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
-			<p>
-				<button type="submit" name="wpcom_migration_disconnect_submit" class="wpcom-migration-link wpcom-migration-link--quiet"><?php esc_html_e( 'Disconnect', 'wpcom-migration' ); ?></button>
-			</p>
-			<p class="wpcom-migration-description">
-				<?php echo esc_html( wptexturize( __( 'Removes this site\'s connection to WordPress.com.', 'wpcom-migration' ) ) ); ?>
-			</p>
-		</form>
+		<div class="wpcom-migration-account">
+			<?php
+			if ( '' !== $email ) {
+				echo get_avatar( $email, 40, '', '', array( 'class' => 'wpcom-migration-account__avatar' ) );
+			}
+			?>
+			<div>
+				<p class="wpcom-migration-account__name">
+					<?php
+					echo '' !== $name
+						/* translators: %s: the WordPress.com account's display name. */
+						? esc_html( sprintf( __( 'Connected as %s', 'wpcom-migration' ), $name ) )
+						: esc_html__( 'Connected to WordPress.com', 'wpcom-migration' );
+					?>
+				</p>
+				<?php if ( array() !== $details ) : ?>
+					<p class="wpcom-migration-description"><?php echo implode( ' · ', $details ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Each part is escaped above. ?></p>
+				<?php endif; ?>
+			</div>
+		</div>
+		<?php if ( $disconnect ) : ?>
+			<form id="wpcom-migration-disconnect" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::DISCONNECT_ACTION ); ?>" />
+				<?php wp_nonce_field( self::DISCONNECT_ACTION ); ?>
+			</form>
+		<?php endif; ?>
 		<?php
 	}
 
@@ -309,7 +369,7 @@ class Connect_Page {
 		 *
 		 * @param string $url Default: the user's sites on WordPress.com.
 		 */
-		return apply_filters( 'wpcom_migration_continue_url', 'https://my.wordpress.com/sites' );
+		return apply_filters( 'wpcom_migration_continue_url', self::SITES_URL );
 	}
 
 	/**

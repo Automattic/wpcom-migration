@@ -48,6 +48,14 @@ class WPCOMWPAdmin {
 		return class_exists('\Automattic\WPCOM_Migration\Reprint\Main_Screen') && \Automattic\WPCOM_Migration\Reprint\Main_Screen::is_reprint();
 	}
 
+	/**
+	 * Whether the Reprint screen has the sidebar row; see
+	 * Settings_Page::owns_menu(). False where the Reprint classes are absent.
+	 */
+	private function reprintOwnsMenu() {
+		return class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && \Automattic\WPCOM_Migration\Reprint\Settings_Page::owns_menu();
+	}
+
 	function removeAdminNotices() {
 		if (WPCOMHelper::getRawParam('REQUEST', 'page') === $this->bvinfo->plugname) {
 			remove_all_actions('admin_notices');
@@ -85,8 +93,9 @@ class WPCOMWPAdmin {
 			// toplevel_page_wpcom-migration hook suffix its stylesheet and
 			// notice handling key on. The network admin, where the Reprint
 			// screen doesn't run, keeps this row, and so does a single site
-			// while WordPress.com names this screen main.
-			if (!is_multisite() && $this->reprintIsMain()) {
+			// while WordPress.com names this screen main, unless the user is
+			// on the Reprint screens, which then own the menu.
+			if (!is_multisite() && ($this->reprintIsMain() || $this->reprintOwnsMenu())) {
 				remove_menu_page($this->bvinfo->plugname);
 				add_action('load-'.$hook, array($this, 'setScreenTitle'));
 			}

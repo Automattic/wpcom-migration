@@ -1,7 +1,7 @@
 <?php
 /**
- * Admin screen for the Reprint exporter: export secret, exporter, and the
- * WordPress.com connection.
+ * The Reprint migration screen: connect to WordPress.com or add the
+ * migration key, then continue on WordPress.com.
  *
  * Modeled on reprint-server-wp's SettingsPage.
  *
@@ -11,11 +11,8 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 /**
- * Renders wp-admin/admin.php?page=wpcom-migration-status one mode at a time,
- * handles its forms, and places the WordPress.com connection controls.
- *
- * Both forms post to admin-post.php rather than options.php: the Settings API
- * writes the option itself, and Exporter's write veto would discard it.
+ * Renders wp-admin/admin.php?page=wpcom-migration-status and places the
+ * WordPress.com connection controls, and owns the plugin's sidebar row.
  */
 class Settings_Page {
 
@@ -32,41 +29,6 @@ class Settings_Page {
 	 * @var string
 	 */
 	const STYLE_HANDLE = 'wpcom-migration-reprint-screen';
-
-	/**
-	 * The screen is not available: the site is a network.
-	 *
-	 * @var string
-	 */
-	const MODE_BLOCKED = 'blocked';
-
-	/**
-	 * A credential is stored but none matches the site's salts.
-	 *
-	 * @var string
-	 */
-	const MODE_BROKEN = 'broken';
-
-	/**
-	 * A credential is valid, so the exporter is on.
-	 *
-	 * @var string
-	 */
-	const MODE_READY = 'ready';
-
-	/**
-	 * The user is connected to WordPress.com; the migration has not started.
-	 *
-	 * @var string
-	 */
-	const MODE_CONNECTED_WAITING = 'connected_waiting';
-
-	/**
-	 * Nothing set up yet.
-	 *
-	 * @var string
-	 */
-	const MODE_NEEDS_CONNECTING = 'needs_connecting';
 
 	/**
 	 * Absolute path of the plugin's main file.
@@ -122,9 +84,8 @@ class Settings_Page {
 	}
 
 	/**
-	 * Registers the screen as the plugin's one sidebar entry, then takes the
-	 * row back out on a network, when the old screen's brand has asked for
-	 * no menu, or while WordPress.com names the old screen main. The screen
+	 * Registers the screen as the plugin's one sidebar entry, with Connection
+	 * as its first flyout row, unless owns_menu() says otherwise. The screen
 	 * stays reachable at its URL either way.
 	 */
 	public function add_admin_menu() {
@@ -137,6 +98,33 @@ class Settings_Page {
 			'dashicons-wordpress-alt'
 		);
 
+		if ( self::owns_menu() ) {
+			add_submenu_page(
+				self::PAGE_SLUG,
+				__( 'Migrate to WordPress.com', 'wpcom-migration' ),
+				__( 'Connection', 'wpcom-migration' ),
+				'manage_options',
+				self::PAGE_SLUG
+			);
+			return;
+		}
+
+		// Gone from $menu, the screen gets no flyout row of its own when the
+		// key and manual screens attach to it.
+		remove_menu_page( self::PAGE_SLUG );
+		add_action( 'load-' . $this->page_hook, array( $this, 'set_title' ) );
+	}
+
+	/**
+	 * Whether the screen gets the plugin's sidebar row, with Connection and
+	 * Migration Key under it: while WordPress.com names it main, and while
+	 * the user is on it or the key screen, so whoever reached the new
+	 * screens can move between them. Never on a network. The old screen
+	 * gives up its row whenever this one has it.
+	 *
+	 * @return bool
+	 */
+	public static function owns_menu() {
 		/**
 		 * Filters whether the screen gets a sidebar row. The screen stays
 		 * reachable at its URL either way.
@@ -146,12 +134,14 @@ class Settings_Page {
 		 *
 		 * @param bool $show Whether the screen gets a sidebar row.
 		 */
-		if ( apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite() && Main_Screen::is_reprint() ) {
-			return;
+		if ( ! apply_filters( 'wpcom_migration_show_menu', true ) || is_multisite() ) {
+			return false;
 		}
 
-		remove_menu_page( self::PAGE_SLUG );
-		add_action( 'load-' . $this->page_hook, array( $this, 'set_title' ) );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Comparing the page slug selects a display behaviour.
+		$page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
+
+		return Main_Screen::is_reprint() || in_array( $page, array( self::PAGE_SLUG, Key_Page::PAGE_SLUG ), true );
 	}
 
 	/**
@@ -222,16 +212,13 @@ class Settings_Page {
 	}
 
 	/**
-	 * Renders the screen: one centred column holding the mode.
+	 * Renders the screen: one centred column.
 	 */
 	public function render_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		$state          = Exporter::get_state();
-		$user_connected = null !== $this->connection_section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
-		$mode           = self::mode( $state, $user_connected );
 		if ( null !== $this->connection_section ) {
 			// Where wp-admin puts notices: above the page, not inside the column.
 			echo '<div class="wpcom-migration-notices">';
@@ -241,138 +228,105 @@ class Settings_Page {
 		?>
 		<div class="wpcom-migration-container">
 			<main class="wpcom-migration-content">
-				<?php $this->render_mode( $mode, $user_connected ); ?>
+				<h1><?php esc_html_e( 'Migrate your site to WordPress.com', 'wpcom-migration' ); ?></h1>
+				<?php $this->render_body(); ?>
 			</main>
 		</div>
 		<?php
 	}
 
 	/**
-	 * Which mode the screen is in: the first of the MODE_* cases that fits,
-	 * checked in the order they are declared.
-	 *
-	 * @param array $state          Exporter::get_state().
-	 * @param bool  $user_connected Whether the current user is connected to WordPress.com.
-	 * @return string One of the MODE_* constants.
+	 * Renders what goes under the heading. A user connected to WordPress.com
+	 * is sent on to it; with a key stored, the primary button sends them on
+	 * too, while a secondary one still offers the connection; anyone else is
+	 * asked to connect or to add the migration key. Either way the key button is there, adding
+	 * one or managing the one stored. A key that no longer matches the site's
+	 * salts counts as none: the user adds it again.
 	 */
-	public static function mode( array $state, $user_connected ) {
+	private function render_body() {
 		if ( is_multisite() ) {
-			return self::MODE_BLOCKED;
+			self::render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
+			return;
 		}
 
-		if ( $state['has_credential'] && ! $state['credential_valid'] ) {
-			return self::MODE_BROKEN;
+		$section        = $this->connection_section;
+		$user_connected = null !== $section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
+		$has_key        = '' !== Key_Page::stored_key();
+
+		if ( $user_connected ) {
+			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
+			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
+		} elseif ( $has_key ) {
+			// The key is stored, not known to be the right one, so this doesn't claim the site is ready.
+			self::render_sentence(
+				/* translators: %s: a link reading "WordPress.com". */
+				__( 'Migration key added. Head over to %s to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
+				self::wordpress_com_link()
+			);
+			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
+		} else {
+			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
+			self::render_sentence(
+				/* translators: %s: a link reading "WordPress.com". */
+				__( 'Log in with your WordPress.com account to connect this site, or copy over the Migration Key. Then start the migration on %s.', 'wpcom-migration' ),
+				self::wordpress_com_link()
+			);
 		}
 
-		if ( $state['credential_valid'] ) {
-			return self::MODE_READY;
+		echo '<div class="wpcom-migration-actions">';
+		if ( null !== $section ) {
+			if ( $user_connected ) {
+				$section->render_continue_button();
+			} elseif ( $has_key ) {
+				$section->render_continue_button();
+				$section->render_connect_button( true );
+			} else {
+				$section->render_connect_button();
+			}
+		}
+		echo '<a class="wpcom-migration-button wpcom-migration-button--secondary" href="' . esc_url( Key_Page::page_url() ) . '">'
+			. esc_html( $has_key ? __( 'Manage Migration Key', 'wpcom-migration' ) : __( 'Add Migration Key', 'wpcom-migration' ) )
+			. '</a>';
+		echo '</div>';
+
+		if ( null === $section ) {
+			return;
 		}
 
 		if ( $user_connected ) {
-			return self::MODE_CONNECTED_WAITING;
-		}
-
-		return self::MODE_NEEDS_CONNECTING;
-	}
-
-	/**
-	 * Renders the mode: a status pill where one fits, the heading, where the
-	 * site stands, and the controls that fit. Connection controls render only
-	 * when a section is attached.
-	 *
-	 * @param string $mode           One of the MODE_* constants.
-	 * @param bool   $user_connected Whether the current user is connected to WordPress.com.
-	 */
-	private function render_mode( $mode, $user_connected ) {
-		$section = $this->connection_section;
-
-		switch ( $mode ) {
-			case self::MODE_BLOCKED:
-				$this->render_pill_and_heading();
-				$this->render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
-				return;
-
-			case self::MODE_BROKEN:
-				$this->render_pill_and_heading();
-				$this->render_sentence( __( 'The export credential no longer matches this site — its security salts changed. Start the migration again on WordPress.com.', 'wpcom-migration' ) );
-				if ( null !== $section && $user_connected ) {
-					$section->render_continue_button();
-					$section->render_disconnect_link();
-				} elseif ( null !== $section ) {
-					$section->render_connect_button();
-				}
-				return;
-
-			case self::MODE_READY:
-				$this->render_pill_and_heading( __( 'Site ready to migrate', 'wpcom-migration' ), 'success' );
-				$this->render_ready_to_migrate();
-				if ( null !== $section ) {
-					$section->render_continue_button();
-				}
-				return;
-
-			case self::MODE_CONNECTED_WAITING:
-				$this->render_pill_and_heading( __( 'Connected to WordPress.com', 'wpcom-migration' ), 'success' );
-				$this->render_ready_to_migrate();
-				if ( null !== $section ) {
-					$section->render_continue_button();
-					$section->render_disconnect_link();
-				}
-				return;
-
-			case self::MODE_NEEDS_CONNECTING:
-			default:
-				$this->render_pill_and_heading();
-				$this->render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
-				$this->render_sentence( __( 'Log in with your WordPress.com account to connect this site. Nothing is copied until you start the migration on WordPress.com.', 'wpcom-migration' ) );
-				if ( null !== $section ) {
-					$section->render_connect_button();
-				}
-				$this->render_key_screen_link();
-				return;
+			$section->render_account();
+		} else {
+			\Automattic\WPCOM_Migration\Connect_Page::render_terms();
 		}
 	}
 
 	/**
-	 * Renders the link to the migration key screen.
-	 */
-	private function render_key_screen_link() {
-		echo '<p class="wpcom-migration-description"><a href="' . esc_url( Key_Page::page_url() ) . '">' . esc_html( wptexturize( __( 'Can\'t connect? Use a migration key instead', 'wpcom-migration' ) ) ) . '</a></p>';
-	}
-
-	/**
-	 * Renders the heading, with a status pill above it when given one.
+	 * Renders one paragraph. The key screen shares it.
 	 *
-	 * @param string $pill Pill text, or '' for none.
-	 * @param string $tone success (green) or info (blue).
+	 * @param string $text Plain text, with %s where $link goes when given one.
+	 * @param string $link Escaped HTML for the %s, or '' for none.
 	 */
-	private function render_pill_and_heading( $pill = '', $tone = 'info' ) {
-		if ( '' !== $pill ) {
-			echo '<p class="wpcom-migration-pill wpcom-migration-pill--' . esc_attr( $tone ) . '">' . esc_html( $pill ) . '</p>';
+	public static function render_sentence( $text, $link = '' ) {
+		$html = esc_html( wptexturize( $text ) );
+		if ( '' !== $link ) {
+			$html = sprintf( $html, $link );
 		}
-		echo '<h1>' . esc_html__( 'Migrate your site to WordPress.com', 'wpcom-migration' ) . '</h1>';
+
+		echo '<p class="wpcom-migration-guidance">' . $html . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped above.
 	}
 
 	/**
-	 * Renders the paragraphs the ready and connected modes share.
-	 */
-	private function render_ready_to_migrate() {
-		$this->render_sentence(
-			sprintf(
-				/* translators: %s: the site's address, without the scheme. */
-				__( '%s is ready to migrate. The migration runs from WordPress.com, so there\'s nothing else to do here. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
-				untrailingslashit( preg_replace( '#^https?://#i', '', home_url() ) )
-			)
-		);
-		$this->render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
-	}
-
-	/**
-	 * Renders one paragraph of the mode.
+	 * A link reading "WordPress.com" to the user's sites there, in a new tab,
+	 * marked the way WordPress's ExternalLink component marks one, for a user
+	 * with no button leading there, such as one who only pasted a key. It
+	 * asks WordPress.com nothing. The key screen shares it.
 	 *
-	 * @param string $text Plain text.
+	 * @return string Escaped HTML.
 	 */
-	private function render_sentence( $text ) {
-		echo '<p class="wpcom-migration-guidance">' . esc_html( wptexturize( $text ) ) . '</p>';
+	public static function wordpress_com_link() {
+		return '<a class="wpcom-migration-external-link" href="' . esc_url( \Automattic\WPCOM_Migration\Connect_Page::SITES_URL ) . '" target="_blank" rel="noreferrer">'
+			. '<span class="wpcom-migration-external-link__contents">WordPress.com</span>'
+			. '<span class="wpcom-migration-external-link__icon" aria-label="' . esc_attr__( '(opens in a new tab)', 'wpcom-migration' ) . '">' . ( is_rtl() ? '&#8598;' : '&#8599;' ) . '</span>'
+			. '</a>';
 	}
 }

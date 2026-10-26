@@ -54,6 +54,10 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	if ( 'flag-blogvault' === $step ) {
 		wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
 	}
+	if ( 'flag-blogvault-on-new-screen' === $step ) {
+		wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+		$_GET['page'] = Key_Page::PAGE_SLUG;
+	}
 	if ( 'flag-failure-fresh' === $step ) {
 		wpcom_migration_e2e_flag_setup( 'fail' );
 	}
@@ -96,9 +100,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 				throw new RuntimeException( 'Expected one sidebar row for the Reprint screen, got: ' . wp_json_encode( $slugs ) );
 			}
 
-			if ( ! empty( $GLOBALS['submenu'][ Settings_Page::PAGE_SLUG ] ) ) {
-				throw new RuntimeException( 'The Reprint screen should draw no flyout: ' . wp_json_encode( $GLOBALS['submenu'][ Settings_Page::PAGE_SLUG ] ) );
-			}
+			wpcom_migration_e2e_assert_flyout( 'The Reprint screen' );
 			break;
 
 		case 'screens-reachable':
@@ -139,7 +141,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up Reprint manually', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_title( Key_Page::PAGE_SLUG, __( 'Connect with a migration key', 'wpcom-migration' ) );
+			wpcom_migration_e2e_assert_title( Key_Page::PAGE_SLUG, __( 'Migration Key', 'wpcom-migration' ) );
 			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			break;
 
@@ -303,6 +305,16 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
+		case 'flag-blogvault-on-new-screen':
+			// Whoever reached the new screens stays in them: the Reprint row,
+			// with its flyout, takes the old screen's place.
+			do_action( 'admin_enqueue_scripts', '' );
+			if ( array( Settings_Page::PAGE_SLUG ) !== $slugs ) {
+				throw new RuntimeException( 'On the key screen, expected the Reprint row alone, got: ' . wp_json_encode( $slugs ) );
+			}
+			wpcom_migration_e2e_assert_flyout( 'On the key screen, the Reprint screen' );
+			break;
+
 		case 'flag-failure-fresh':
 			wpcom_migration_e2e_assert_blogvault_main( $slugs, 'A failed first fetch' );
 			break;
@@ -350,6 +362,27 @@ function wpcom_migration_e2e_menu_slugs() {
 	sort( $slugs );
 
 	return $slugs;
+}
+
+/**
+ * Asserts the Reprint row's flyout: Connection, then Migration Key.
+ *
+ * @param string $label What is checked, for messages.
+ * @throws RuntimeException When an expectation fails.
+ */
+function wpcom_migration_e2e_assert_flyout( $label ) {
+	$rows = array();
+	foreach ( (array) ( $GLOBALS['submenu'][ Settings_Page::PAGE_SLUG ] ?? array() ) as $item ) {
+		$rows[ $item[2] ] = $item[0];
+	}
+
+	$expected = array(
+		Settings_Page::PAGE_SLUG => 'Connection',
+		Key_Page::PAGE_SLUG      => 'Migration Key',
+	);
+	if ( $expected !== $rows ) {
+		throw new RuntimeException( "$label should draw Connection and Migration Key, got: " . wp_json_encode( $rows ) );
+	}
 }
 
 /**

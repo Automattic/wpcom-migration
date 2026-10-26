@@ -157,7 +157,7 @@ class REST_Controller extends WP_REST_Controller {
 			);
 		}
 
-		if ( ! Exporter::store_public_key( $public_key ) ) {
+		if ( ! Exporter::store_public_key( $public_key, 'api' ) ) {
 			return new WP_Error(
 				'wpcom_migration_public_key_not_stored',
 				__( 'Failed to persist the public key.', 'wpcom-migration' ),

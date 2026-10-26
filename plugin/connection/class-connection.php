@@ -10,7 +10,6 @@ namespace Automattic\WPCOM_Migration;
 use Automattic\Jetpack\Config;
 use Automattic\Jetpack\Connection\Manager;
 use Automattic\Jetpack\Connection\Rest_Authentication;
-use Automattic\WPCOM_Migration\Reprint\Exporter;
 use WP_Error;
 
 /**
@@ -57,6 +56,10 @@ class Connection {
 	 * @param int $blog_id The WordPress.com blog ID.
 	 */
 	public static function on_user_authorized( $blog_id ) {
+		// Fetches and caches the account's name and email here, on the way
+		// back from WordPress.com, rather than while the screen renders.
+		self::connected_wpcom_user();
+
 		self::record_event(
 			'user_authorized',
 			array(
@@ -196,9 +199,32 @@ class Connection {
 	}
 
 	/**
-	 * Removes this plugin from the connection and discards the Reprint
-	 * credentials and the stored destination URL. If no other plugin uses
-	 * the connection, the site disconnects from WordPress.com.
+	 * Names of the other active plugins that use the connection, such as
+	 * Jetpack. While there are any, disconnect() leaves the connection: it
+	 * asks the package the same question before removing it.
+	 *
+	 * @return string[]
+	 */
+	public static function other_connected_plugins() {
+		$plugins = self::manager()->get_connected_plugins();
+		if ( ! is_array( $plugins ) ) {
+			return array();
+		}
+
+		unset( $plugins[ WPCOM_MIGRATION_SLUG ] );
+
+		$names = array();
+		foreach ( $plugins as $slug => $plugin ) {
+			$names[] = isset( $plugin['name'] ) && '' !== $plugin['name'] ? $plugin['name'] : $slug;
+		}
+
+		return $names;
+	}
+
+	/**
+	 * Disconnects the site from WordPress.com unless another plugin, such as
+	 * Jetpack, uses the connection, and forgets the stored destination URL.
+	 * The migration key stays: only deactivating the plugin discards it.
 	 */
 	public static function disconnect() {
 		$was_connected = self::is_site_connected();
@@ -207,10 +233,9 @@ class Connection {
 			self::manager()->remove_connection();
 		}
 
-		Exporter::discard_credentials();
 		Continue_Url::forget();
 
-		if ( $was_connected ) {
+		if ( $was_connected && ! self::is_site_connected() ) {
 			self::record_event( 'disconnected', array( 'user_id' => get_current_user_id() ) );
 		}
 	}
