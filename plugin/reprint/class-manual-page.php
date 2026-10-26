@@ -211,8 +211,7 @@ class Manual_Page {
 			$this->redirect_with_notice( 'not_configured' );
 		}
 
-		$state = Exporter::get_state();
-		if ( $state['secret_valid'] && get_option( Exporter::SECRET_OPTION ) === $secret ) {
+		if ( get_option( Exporter::SECRET_OPTION ) === $secret ) {
 			$this->redirect_with_notice( 'unchanged' );
 		}
 
@@ -330,7 +329,7 @@ class Manual_Page {
 			$this->render_secret_form( $state );
 		}
 
-		if ( $state['credential_valid'] ) {
+		if ( $state['has_credential'] ) {
 			$this->render_api_url();
 		}
 
@@ -355,7 +354,7 @@ class Manual_Page {
 	 * @param array $state Exporter::get_state().
 	 */
 	private function render_secret_form( array $state ) {
-		$stored_secret = $state['secret_valid'] ? (string) get_option( Exporter::SECRET_OPTION, '' ) : '';
+		$stored_secret = $state['has_secret'] ? (string) get_option( Exporter::SECRET_OPTION, '' ) : '';
 		?>
 		<h2><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></h2>
 		<p><?php esc_html_e( 'Paste the secret supplied by WordPress.com.', 'wpcom-migration' ); ?></p>
