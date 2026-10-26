@@ -10,7 +10,9 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Key_Page;
+use Automattic\WPCOM_Migration\Reprint\Main_Screen;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
+use Automattic\WPCOM_Migration\Reprint\Proxied_Redirect;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 require_once __DIR__ . '/flag-steps.php';
@@ -76,7 +78,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	// These steps drive admin_menu themselves, with $pagenow and
 	// $plugin_page set the way admin.php sets them; the shared fire below
 	// would just be redone with the wrong globals.
-	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) {
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first', 'proxied-script', 'proxied-pin', 'proxied-pin-refused' ), true ) ) {
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
@@ -344,9 +346,117 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
+		case 'proxied-script':
+			// While BlogVault is main, its screen asks again from the browser.
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+			do_action( 'admin_enqueue_scripts', Settings_Page::PAGE_SLUG );
+			if ( wp_script_is( Proxied_Redirect::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'Only the BlogVault screen should get the redirect script.' );
+			}
+			do_action( 'admin_enqueue_scripts', Proxied_Redirect::BLOGVAULT_HOOK );
+			if ( ! wp_script_is( Proxied_Redirect::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'With BlogVault main, its screen should get the redirect script.' );
+			}
+			$config = implode( "\n", (array) wp_scripts()->get_data( Proxied_Redirect::SCRIPT_HANDLE, 'before' ) );
+			foreach ( array( Main_Screen::endpoint_url(), 'admin-post.php?action=' . Proxied_Redirect::PIN_ACTION ) as $expected ) {
+				if ( false === strpos( $config, trim( wp_json_encode( $expected ), '"' ) ) ) {
+					throw new RuntimeException( "The script's config should carry $expected, got: $config" );
+				}
+			}
+
+			// With Reprint main, there is nowhere to send anyone.
+			wp_dequeue_script( Proxied_Redirect::SCRIPT_HANDLE );
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"reprint","ttl":300}' );
+			do_action( 'admin_enqueue_scripts', Proxied_Redirect::BLOGVAULT_HOOK );
+			if ( wp_script_is( Proxied_Redirect::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'With Reprint main, the BlogVault screen should get no redirect script.' );
+			}
+			break;
+
+		case 'proxied-pin-refused':
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+			$outcome = wpcom_migration_e2e_pin( 'not-a-nonce' );
+			if ( 'died' !== $outcome || get_option( Main_Screen::PINNED_OPTION ) ) {
+				throw new RuntimeException( 'A pin without a valid nonce should be refused, got: ' . wp_json_encode( $outcome ) );
+			}
+			break;
+
+		case 'proxied-pin':
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+			Main_Screen::is_reprint();
+			$outcome = wpcom_migration_e2e_pin( wp_create_nonce( Proxied_Redirect::PIN_ACTION ) );
+			if ( Settings_Page::page_url() !== $outcome ) {
+				throw new RuntimeException( 'Pinning should open the Reprint screen, got: ' . wp_json_encode( $outcome ) );
+			}
+
+			// A later request, with the stored blogvault answer still fresh,
+			// treats Reprint as main and asks nothing more.
+			wpcom_migration_e2e_reset_main_screen_memo();
+			wpcom_migration_e2e_fire_admin_menu_for( 'index.php' );
+			if ( array( Settings_Page::PAGE_SLUG ) !== wpcom_migration_e2e_menu_slugs() ) {
+				throw new RuntimeException( 'A pinned site should give the Reprint screen the sidebar row, got: ' . wp_json_encode( wpcom_migration_e2e_menu_slugs() ) );
+			}
+			if ( 1 !== (int) get_option( 'wpcom_migration_e2e_flag_requests' ) ) {
+				throw new RuntimeException( 'A pinned site should not ask for the flag again.' );
+			}
+
+			Main_Screen::forget();
+			if ( false !== get_option( Main_Screen::PINNED_OPTION ) ) {
+				throw new RuntimeException( 'forget() should drop the pin.' );
+			}
+			break;
+
 		default:
 			throw new RuntimeException( 'Unknown menu step: ' . $step );
 	}
+}
+
+/**
+ * Runs the pin handler as admin-post.php would with the given nonce.
+ *
+ * @param string $nonce The _wpnonce to send.
+ * @return string Where the handler redirected, or 'died' when it refused.
+ */
+function wpcom_migration_e2e_pin( $nonce ) {
+	$_GET     = array(
+		'action'   => Proxied_Redirect::PIN_ACTION,
+		'_wpnonce' => $nonce,
+	);
+	$_REQUEST = $_GET;
+
+	// Both ways out of the handler end the request; turn them into
+	// exceptions so the step can look at the outcome.
+	$redirect = function ( $location ) {
+		throw new UnexpectedValueException( $location );
+	};
+	$die      = function () {
+		return function () {
+			throw new UnexpectedValueException( 'died' );
+		};
+	};
+	add_filter( 'wp_redirect', $redirect );
+	add_filter( 'wp_die_handler', $die );
+
+	try {
+		do_action( 'admin_post_' . Proxied_Redirect::PIN_ACTION );
+		$outcome = 'returned';
+	} catch ( UnexpectedValueException $exception ) {
+		$outcome = $exception->getMessage();
+	}
+
+	remove_filter( 'wp_redirect', $redirect );
+	remove_filter( 'wp_die_handler', $die );
+
+	return $outcome;
+}
+
+/**
+ * Clears Main_Screen's per-request answer, as a new request would.
+ */
+function wpcom_migration_e2e_reset_main_screen_memo() {
+	$property = new ReflectionProperty( Main_Screen::class, 'is_reprint' );
+	$property->setAccessible( true );
+	$property->setValue( null, null );
 }
 
 /**
