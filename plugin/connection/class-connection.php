@@ -26,6 +26,14 @@ class Connection {
 	const EVENT_ACTION = 'wpcom_migration_connection_event';
 
 	/**
+	 * The `from` WordPress.com's authorize page gets: a standard entry-point
+	 * name (lowercase, underscores, no hyphens).
+	 *
+	 * @var string
+	 */
+	const OAUTH_ENTRY_POINT = 'wpcom_migration';
+
+	/**
 	 * Tells the connection package about this plugin and hooks REST
 	 * authentication.
 	 *
@@ -45,25 +53,18 @@ class Connection {
 		);
 		Rest_Authentication::init();
 
-		add_action( 'jetpack_client_authorized', array( __CLASS__, 'on_user_authorized' ) );
+		add_action( 'jetpack_user_authorized', array( __CLASS__, 'on_user_authorized' ) );
 		add_action( 'jetpack_client_authorize_error', array( __CLASS__, 'on_authorize_error' ) );
 	}
 
 	/**
-	 * Records the package's success event after the user returns from
-	 * WordPress.com.
-	 *
-	 * @param int $blog_id The WordPress.com blog ID.
+	 * Records the package's success event once the user's token is stored.
 	 */
-	public static function on_user_authorized( $blog_id ) {
-		// Fetches and caches the account's name and email here, on the way
-		// back from WordPress.com, rather than while the screen renders.
-		self::connected_wpcom_user();
-
+	public static function on_user_authorized() {
 		self::record_event(
 			'user_authorized',
 			array(
-				'blog_id' => (int) $blog_id,
+				'blog_id' => (int) self::blog_id(),
 				'user_id' => get_current_user_id(),
 			)
 		);
@@ -183,8 +184,7 @@ class Connection {
 			self::record_event( 'site_registered', array( 'user_id' => get_current_user_id() ) );
 		}
 
-		// `from` tells WordPress.com which plugin sent the user.
-		$authorization_url = $manager->get_authorization_url( wp_get_current_user(), $return_url, WPCOM_MIGRATION_SLUG );
+		$authorization_url = $manager->get_authorization_url( wp_get_current_user(), $return_url, self::OAUTH_ENTRY_POINT );
 
 		// WordPress.com's authorize page sends the browser back to
 		// redirect_after_auth; without skip_pricing it goes to the Jetpack
