@@ -48,7 +48,6 @@ The changelog is made from the titles of the pull requests merged since the last
 ## Known limitations
 
 - The reprint client appends `&reprint-api` to any URL that lacks it. If `reprint-server-wp`, the canonical Reprint WordPress plugin from the [Reprint repository](https://github.com/WordPress/reprint), is active and loads first, it answers on `reprint-api` before this plugin runs.
-- WordPress.com installs the plugin from wordpress.org by slug, so the version with the exporter must be published there before WordPress.com can install it.
 
 ## Security
 
