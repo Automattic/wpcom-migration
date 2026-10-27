@@ -418,9 +418,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'authorization-url-returns-to-screen':
 			// Calypso's authorize page, not the site's webhook, decides where the
 			// browser lands afterwards. It reads redirect_after_auth from the
-			// authorize URL and, with skip_pricing, goes straight there; a `from`
-			// starting with wpcom-migration would send the user to Calypso's
-			// migration flow instead.
+			// authorize URL and, with skip_pricing, goes straight there. `from`
+			// names this plugin as the source.
 			$authorization_url = Connection::authorization_url( Connect_Page::return_url() );
 			if ( is_wp_error( $authorization_url ) ) {
 				throw new RuntimeException( "Step '$step': authorization_url() failed: " . $authorization_url->get_error_code() );
@@ -433,8 +432,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			if ( ! isset( $query['skip_pricing'] ) || '1' !== $query['skip_pricing'] ) {
 				throw new RuntimeException( "Step '$step': skip_pricing=1 is missing: " . $authorization_url );
 			}
-			if ( isset( $query['from'] ) && 0 === strpos( $query['from'], 'wpcom-migration' ) ) {
-				throw new RuntimeException( "Step '$step': a wpcom-migration `from` diverts the user to Calypso's migration flow: " . $authorization_url );
+			if ( ! isset( $query['from'] ) || 'wpcom-migration' !== $query['from'] ) {
+				throw new RuntimeException( "Step '$step': from=wpcom-migration is missing: " . $authorization_url );
 			}
 			// The site's webhook, which WordPress.com calls, reads its own copy.
 			$redirect_uri_query = array();

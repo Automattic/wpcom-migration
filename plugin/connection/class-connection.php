@@ -183,12 +183,12 @@ class Connection {
 			self::record_event( 'site_registered', array( 'user_id' => get_current_user_id() ) );
 		}
 
-		$authorization_url = $manager->get_authorization_url( wp_get_current_user(), $return_url );
+		// `from` tells WordPress.com which plugin sent the user.
+		$authorization_url = $manager->get_authorization_url( wp_get_current_user(), $return_url, WPCOM_MIGRATION_SLUG );
 
 		// WordPress.com's authorize page sends the browser back to
 		// redirect_after_auth; without skip_pricing it goes to the Jetpack
-		// plans page first. No `from`: a wpcom-migration one diverts to
-		// Calypso's migration flow.
+		// plans page first.
 		return add_query_arg(
 			array(
 				'redirect_after_auth' => rawurlencode( $return_url ),
