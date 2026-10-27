@@ -39,17 +39,6 @@ Deactivating the plugin disconnects it and discards the credentials.
 
 Until the WordPress.com side of Reprint ships, WordPress.com decides whether the Reprint or the BlogVault screen is the main one, which gets the sidebar row and the activation redirect. The other stays reachable at its URL. Reprint can't migrate a network, so on multisite only the BlogVault screen is offered.
 
-## Checks
-
-```sh
-composer lint                     # PHPCS, WordPress Coding Standards
-composer lint:php:compat          # PHPCompatibility, testVersion 7.4-
-composer test:e2e                 # Playground e2e against build/wpcom-migration
-composer test:release             # the release scripts
-```
-
-CI runs all of these on every push and pull request, and `php -l` on the built tree under PHP 7.4 and 8.4.
-
 ## Releasing
 
 Run *Tag release* from the Actions tab with `minor`, `major` or a custom version. It commits the new version and its changelog to trunk and tags the commit. *Release* then builds and tests the tag and publishes a GitHub release, and *Deploy to WordPress.org* commits that release to the plugin directory. Each step can be retried by dispatching it with the tag.
