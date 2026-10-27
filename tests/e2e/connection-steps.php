@@ -156,6 +156,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			if ( ! isset( $query['redirect_after_auth'], $query['skip_pricing'] ) || Connect_Page::return_url() !== $query['redirect_after_auth'] || '1' !== $query['skip_pricing'] ) {
 				throw new RuntimeException( "Step '$step': the authorize URL should return to the screen: " . $location );
 			}
+			if ( ! isset( $query['from'] ) || Connection::OAUTH_ENTRY_POINT !== $query['from'] ) {
+				throw new RuntimeException( "Step '$step': from should be " . Connection::OAUTH_ENTRY_POINT . ': ' . $location );
+			}
 			delete_option( 'wpcom_migration_e2e_last_redirect' );
 			break;
 
@@ -418,9 +421,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'authorization-url-returns-to-screen':
 			// Calypso's authorize page, not the site's webhook, decides where the
 			// browser lands afterwards. It reads redirect_after_auth from the
-			// authorize URL and, with skip_pricing, goes straight there; a `from`
-			// starting with wpcom-migration would send the user to Calypso's
-			// migration flow instead.
+			// authorize URL and, for a standard entry-point name in `from`, goes
+			// straight there.
 			$authorization_url = Connection::authorization_url( Connect_Page::return_url() );
 			if ( is_wp_error( $authorization_url ) ) {
 				throw new RuntimeException( "Step '$step': authorization_url() failed: " . $authorization_url->get_error_code() );
@@ -433,8 +435,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			if ( ! isset( $query['skip_pricing'] ) || '1' !== $query['skip_pricing'] ) {
 				throw new RuntimeException( "Step '$step': skip_pricing=1 is missing: " . $authorization_url );
 			}
-			if ( isset( $query['from'] ) && 0 === strpos( $query['from'], 'wpcom-migration' ) ) {
-				throw new RuntimeException( "Step '$step': a wpcom-migration `from` diverts the user to Calypso's migration flow: " . $authorization_url );
+			if ( ! isset( $query['from'] ) || Connection::OAUTH_ENTRY_POINT !== $query['from'] ) {
+				throw new RuntimeException( "Step '$step': from should be " . Connection::OAUTH_ENTRY_POINT . ': ' . $authorization_url );
 			}
 			// The site's webhook, which WordPress.com calls, reads its own copy.
 			$redirect_uri_query = array();
@@ -523,7 +525,10 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'continue-url-authorized-forgets':
-			do_action( 'jetpack_client_authorized', WPCOM_MIGRATION_E2E_BLOG_ID );
+			// Every connect fires jetpack_user_authorized: the normal one, where
+			// WordPress.com calls remote_authorize, and the webhook fallback.
+			set_transient( Continue_Url::transient(), array( 'destination' => null ), MINUTE_IN_SECONDS );
+			do_action( 'jetpack_user_authorized' );
 			if ( false !== get_transient( Continue_Url::transient() ) ) {
 				throw new RuntimeException( "Step '$step': authorizing should delete the stored answer." );
 			}

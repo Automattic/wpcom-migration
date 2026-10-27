@@ -36,7 +36,7 @@ if ( ! defined( 'WPCOM_MIGRATION_SLUG' ) ) {
 Connection::init();
 
 add_filter( 'wpcom_migration_continue_url', array( Continue_Url::class, 'filter' ) );
-add_action( 'jetpack_client_authorized', array( Continue_Url::class, 'forget' ) );
+add_action( 'jetpack_user_authorized', array( Continue_Url::class, 'forget' ) );
 
 // Leaving the plugin leaves the connection, and forgets every user's stored destination.
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Connection::class, 'disconnect' ) );
