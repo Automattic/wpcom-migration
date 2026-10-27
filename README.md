@@ -24,7 +24,7 @@ The build writes `build/wpcom-migration/` and `build/wpcom-migration.zip`. The p
 
 ## How a migration works
 
-WordPress.com copies the site with Reprint. The plugin runs Reprint's exporter, which answers WordPress.com's export requests once WordPress.com has given it a credential: a public key where the host has OpenSSL, a shared secret elsewhere. WordPress.com hands over the credential in one of three ways:
+WordPress.com copies the site with [Reprint](https://github.com/WordPress/reprint). The plugin runs Reprint's exporter, which answers WordPress.com's export requests once WordPress.com has given it a credential: a public key where the host has OpenSSL, a shared secret elsewhere. WordPress.com hands over the credential in one of three ways:
 
 - **Application password** — where the site offers them. WordPress.com asks the administrator for one, installs the plugin itself, sets up the exporter, and revokes the password when it's done.
 - **Jetpack connection** — everywhere else. The administrator installs the plugin and connects it to WordPress.com from its screen. A site that already runs Jetpack shares that connection.
