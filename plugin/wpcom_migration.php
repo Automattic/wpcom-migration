@@ -5,7 +5,7 @@ Plugin URI: https://www.wordpress.com
 Description: The easiest way to migrate your site to WordPress.com.
 Author: WordPress.com
 Author URI: https://www.wordpress.com
-Version: 6.75
+Version: 6.76
 Requires PHP: 7.4
 Network: True
 License: GPLv2 or later
