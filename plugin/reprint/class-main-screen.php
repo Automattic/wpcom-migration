@@ -12,8 +12,7 @@ namespace Automattic\WPCOM_Migration\Reprint;
  * expires, and answers whether the Reprint screen is the main one.
  *
  * A failed fetch keeps the stored answer, or stores blogvault when there is
- * none, and retries after RETRY_AFTER. A site pinned to Reprint asks
- * nothing. Multisite is always blogvault.
+ * none, and retries after RETRY_AFTER. Multisite is always blogvault.
  */
 class Main_Screen {
 
@@ -30,13 +29,6 @@ class Main_Screen {
 	 * @var string
 	 */
 	const OPTION = 'wpcom_migration_main_screen';
-
-	/**
-	 * Option set when Proxied_Redirect pins the Reprint screen as main.
-	 *
-	 * @var string
-	 */
-	const PINNED_OPTION = 'wpcom_migration_main_screen_pinned';
 
 	/**
 	 * Seconds to wait for the endpoint.
@@ -92,29 +84,19 @@ class Main_Screen {
 		}
 
 		if ( null === self::$is_reprint ) {
-			self::$is_reprint = (bool) get_option( self::PINNED_OPTION ) || 'reprint' === self::main_screen();
+			self::$is_reprint = 'reprint' === self::main_screen();
 		}
 
 		return self::$is_reprint;
 	}
 
 	/**
-	 * Makes the Reprint screen main on this site, whatever WordPress.com
-	 * answers, until forget().
-	 */
-	public static function pin() {
-		self::$is_reprint = true;
-		update_option( self::PINNED_OPTION, true, false );
-	}
-
-	/**
-	 * Deletes the stored answer and the pin, so the next check asks again.
-	 * Runs on activation and deactivation.
+	 * Deletes the stored answer, so the next check asks again. Runs on
+	 * activation and deactivation.
 	 */
 	public static function forget() {
 		self::$is_reprint = null;
 		delete_option( self::OPTION );
-		delete_option( self::PINNED_OPTION );
 	}
 
 	/**
@@ -152,25 +134,15 @@ class Main_Screen {
 	}
 
 	/**
-	 * The flag endpoint with this plugin's version in its query.
-	 *
-	 * @return string
-	 */
-	public static function endpoint_url() {
-		$plugin_data = get_file_data( dirname( __DIR__ ) . '/wpcom_migration.php', array( 'Version' => 'Version' ) );
-
-		return add_query_arg( 'plugin_version', rawurlencode( $plugin_data['Version'] ), self::ENDPOINT );
-	}
-
-	/**
 	 * Asks WordPress.com.
 	 *
 	 * @return array|null { main_screen, ttl } with ttl clamped, or null when
 	 *                    the answer is missing or not understood.
 	 */
 	private static function fetch() {
-		$response = wp_remote_get(
-			self::endpoint_url(),
+		$plugin_data = get_file_data( dirname( __DIR__ ) . '/wpcom_migration.php', array( 'Version' => 'Version' ) );
+		$response    = wp_remote_get(
+			add_query_arg( 'plugin_version', rawurlencode( $plugin_data['Version'] ), self::ENDPOINT ),
 			array(
 				'timeout'     => self::TIMEOUT,
 				// Each hop gets its own timeout; the endpoint never redirects.
