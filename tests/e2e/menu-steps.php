@@ -10,7 +10,9 @@
  */
 
 use Automattic\WPCOM_Migration\Reprint\Key_Page;
+use Automattic\WPCOM_Migration\Reprint\Main_Screen;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
+use Automattic\WPCOM_Migration\Reprint\Proxied_Notice;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 require_once __DIR__ . '/flag-steps.php';
@@ -76,7 +78,7 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	// These steps drive admin_menu themselves, with $pagenow and
 	// $plugin_page set the way admin.php sets them; the shared fire below
 	// would just be redone with the wrong globals.
-	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first' ), true ) ) {
+	if ( ! in_array( $step, array( 'screens-reachable', 'old-screen-title', 'flag-redirect-first', 'proxied-script' ), true ) ) {
 		// phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- Core's own menu globals; this test builds them by hand.
 		$GLOBALS['menu']              = array();
 		$GLOBALS['submenu']           = array();
@@ -341,6 +343,33 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			$admin->initHandler();
 			if ( $admin->mainUrl() !== $captured ) {
 				throw new RuntimeException( 'The first redirect after activation should follow the fetched answer, got: ' . wp_json_encode( $captured ) );
+			}
+			break;
+
+		case 'proxied-script':
+			// While BlogVault is main, its screen asks again from the browser.
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"blogvault","ttl":300}' );
+			do_action( 'admin_enqueue_scripts', Settings_Page::PAGE_SLUG );
+			if ( wp_script_is( Proxied_Notice::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'Only the BlogVault screen should get the notice script.' );
+			}
+			do_action( 'admin_enqueue_scripts', Proxied_Notice::BLOGVAULT_HOOK );
+			if ( ! wp_script_is( Proxied_Notice::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'With BlogVault main, its screen should get the notice script.' );
+			}
+			$config = implode( "\n", (array) wp_scripts()->get_data( Proxied_Notice::SCRIPT_HANDLE, 'before' ) );
+			foreach ( array( Main_Screen::ENDPOINT, Settings_Page::page_url() ) as $expected ) {
+				if ( false === strpos( $config, trim( wp_json_encode( $expected ), '"' ) ) ) {
+					throw new RuntimeException( "The script's config should carry $expected, got: $config" );
+				}
+			}
+
+			// With Reprint main, there is nowhere to send anyone.
+			wp_dequeue_script( Proxied_Notice::SCRIPT_HANDLE );
+			wpcom_migration_e2e_flag_setup( '{"main_screen":"reprint","ttl":300}' );
+			do_action( 'admin_enqueue_scripts', Proxied_Notice::BLOGVAULT_HOOK );
+			if ( wp_script_is( Proxied_Notice::SCRIPT_HANDLE ) ) {
+				throw new RuntimeException( 'With Reprint main, the BlogVault screen should get no notice script.' );
 			}
 			break;
 
