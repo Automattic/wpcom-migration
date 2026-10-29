@@ -43,6 +43,9 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		throw new RuntimeException( 'User 1 cannot manage_options.' );
 	}
 
+	// runPHP is no page load; the activation redirect only fires on a GET.
+	$_SERVER['REQUEST_METHOD'] = 'GET';
+
 	if ( 'suppressed' === $step ) {
 		add_filter( 'wpcom_migration_show_menu', '__return_false', 99 );
 	}
@@ -202,6 +205,67 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			if ( false === strpos( $captured, 'page=' . Settings_Page::PAGE_SLUG ) ) {
 				throw new RuntimeException( 'The activation redirect does not land on the Reprint screen: ' . $captured );
+			}
+			break;
+
+		case 'activation-redirect-waits-for-ajax':
+		case 'activation-redirect-waits-for-post':
+			if ( 'activation-redirect-waits-for-ajax' === $step ) {
+				add_filter( 'wp_doing_ajax', '__return_true' );
+			} else {
+				$_SERVER['REQUEST_METHOD'] = 'POST';
+			}
+			$captured = null;
+			add_filter(
+				'wp_redirect',
+				function ( $location ) use ( &$captured ) {
+					$captured = $location;
+					return '';
+				}
+			);
+			update_option( 'wpcomredirect', 'yes' );
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+
+			if ( null !== $captured ) {
+				throw new RuntimeException( 'A request that shows no screen should not redirect, got: ' . $captured );
+			}
+			if ( 'yes' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'A request that shows no screen should leave the redirect for the next page load.' );
+			}
+			update_option( 'wpcomredirect', 'no' );
+			break;
+
+		case 'activation-redirect-runs-early':
+			$early = $GLOBALS['wp_filter']['admin_init']->callbacks[1] ?? array();
+			$found = false;
+			foreach ( $early as $callback ) {
+				if ( is_array( $callback['function'] ) && $callback['function'][0] instanceof WPCOMWPAdmin && 'initHandler' === $callback['function'][1] ) {
+					$found = true;
+				}
+			}
+			if ( ! $found ) {
+				throw new RuntimeException( 'The activation redirect should run on admin_init at priority 1.' );
+			}
+			break;
+
+		case 'activation-redirect-script-fallback':
+			// The filter blocks the redirect, as a plugin's own filter might.
+			add_filter( 'wp_redirect', '__return_empty_string' );
+			update_option( 'wpcomredirect', 'yes' );
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+
+			if ( 'no' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'A blocked redirect should still use up the flag.' );
+			}
+			ob_start();
+			do_action( 'admin_print_scripts' );
+			$output = ob_get_clean();
+			if ( false === strpos( $output, 'window.location.replace' ) || false === strpos( $output, 'page=' . Settings_Page::PAGE_SLUG ) ) {
+				throw new RuntimeException( 'A blocked redirect should print a script to the Reprint screen, got: ' . $output );
 			}
 			break;
 

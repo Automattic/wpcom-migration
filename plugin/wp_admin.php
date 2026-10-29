@@ -7,6 +7,7 @@ class WPCOMWPAdmin {
 	public $siteinfo;
 	public $bvinfo;
 	public $bvapi;
+	private $redirectScriptUrl;
 
 	function __construct($settings, $siteinfo, $bvapi = null) {
 		$this->settings = $settings;
@@ -67,15 +68,53 @@ class WPCOMWPAdmin {
 		if (!current_user_can('activate_plugins'))
 			return;
 
-		if ($this->bvinfo->isActivateRedirectSet()) {
-			$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
-			// A bulk activation lands on the plugin list; it stays there.
-			if (!wp_doing_ajax() && !isset($_GET['activate-multi'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				if (wp_redirect($this->migrationScreenUrl())) {
-					exit;
-				}
-			}
+		if (!$this->bvinfo->isActivateRedirectSet())
+			return;
+
+		// Heartbeat, other plugins' AJAX calls and background requests run
+		// admin_init too, often before the user's next page load. The flag
+		// waits for a request that can show a screen.
+		if (!$this->isScreenRequest())
+			return;
+
+		$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
+
+		// A bulk activation lands on the plugin list; it stays there.
+		if (isset($_GET['activate-multi'])) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			return;
+
+		$url = $this->migrationScreenUrl();
+		if (!headers_sent() && wp_redirect($url)) {
+			exit;
 		}
+
+		// Stray output sent the headers, or a wp_redirect filter blocked the
+		// redirect: the page sends the browser on instead.
+		$this->redirectScriptUrl = $url;
+		add_action('admin_print_scripts', array($this, 'printRedirectScript'));
+	}
+
+	/**
+	 * Whether this admin_init belongs to a normal admin page load.
+	 */
+	private function isScreenRequest() {
+		global $pagenow;
+
+		if (wp_doing_ajax() || wp_doing_cron())
+			return false;
+		if (in_array($pagenow, array('admin-post.php', 'async-upload.php'), true))
+			return false;
+		if ('GET' !== strtoupper((string) WPCOMHelper::getRawParam('SERVER', 'REQUEST_METHOD')))
+			return false;
+		// Thickbox and plugin-information modals.
+		if (defined('IFRAME_REQUEST'))
+			return false;
+
+		return true;
+	}
+
+	public function printRedirectScript() {
+		echo '<script>window.location.replace(' . wp_json_encode($this->redirectScriptUrl) . ');</script>' . "\n";
 	}
 
 	public function menu() {

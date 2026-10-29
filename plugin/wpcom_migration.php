@@ -80,7 +80,8 @@ if (defined('WP_CLI') && WP_CLI) {
 if (is_admin()) {
 	require_once dirname( __FILE__ ) . '/wp_admin.php';
 	$wpadmin = new WPCOMWPAdmin($bvsettings, $bvsiteinfo);
-	add_action('admin_init', array($wpadmin, 'initHandler'));
+	// Ahead of other plugins' admin_init redirects.
+	add_action('admin_init', array($wpadmin, 'initHandler'), 1);
 	add_filter('all_plugins', array($wpadmin, 'initWhitelabel'));
 	add_filter('plugin_row_meta', array($wpadmin, 'hidePluginDetails'), 10, 2);
 	##HEALTH_INFO_HOOK##
