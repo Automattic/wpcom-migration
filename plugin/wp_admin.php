@@ -117,10 +117,11 @@ class WPCOMWPAdmin {
 	private function isScreenRequest() {
 		global $pagenow;
 
-		if (wp_doing_ajax() || wp_doing_cron()) {
+		// Also async-upload.php, which defines DOING_AJAX.
+		if (wp_doing_ajax()) {
 			return false;
 		}
-		if (in_array($pagenow, array('admin-post.php', 'async-upload.php'), true)) {
+		if ('admin-post.php' === $pagenow) {
 			return false;
 		}
 		if ('GET' !== strtoupper((string) WPCOMHelper::getRawParam('SERVER', 'REQUEST_METHOD'))) {
