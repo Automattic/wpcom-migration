@@ -68,20 +68,23 @@ class WPCOMWPAdmin {
 		if (!current_user_can('activate_plugins'))
 			return;
 
-		if (!$this->bvinfo->isActivateRedirectSet())
+		if (!$this->bvinfo->isActivateRedirectSet()) {
 			return;
+		}
 
 		// Heartbeat, other plugins' AJAX calls and background requests run
 		// admin_init too, often before the user's next page load. The flag
 		// waits for a request that can show a screen.
-		if (!$this->isScreenRequest())
+		if (!$this->isScreenRequest()) {
 			return;
+		}
 
 		$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
 
 		// A bulk activation lands on the plugin list; it stays there.
-		if (isset($_GET['activate-multi'])) // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if (isset($_GET['activate-multi'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 			return;
+		}
 
 		$url = $this->migrationScreenUrl();
 		if (!headers_sent() && wp_redirect($url)) {
