@@ -100,15 +100,19 @@ class WPCOMWPAdmin {
 	private function isScreenRequest() {
 		global $pagenow;
 
-		if (wp_doing_ajax() || wp_doing_cron())
+		if (wp_doing_ajax() || wp_doing_cron()) {
 			return false;
-		if (in_array($pagenow, array('admin-post.php', 'async-upload.php'), true))
+		}
+		if (in_array($pagenow, array('admin-post.php', 'async-upload.php'), true)) {
 			return false;
-		if ('GET' !== strtoupper((string) WPCOMHelper::getRawParam('SERVER', 'REQUEST_METHOD')))
+		}
+		if ('GET' !== strtoupper((string) WPCOMHelper::getRawParam('SERVER', 'REQUEST_METHOD'))) {
 			return false;
+		}
 		// Thickbox and plugin-information modals.
-		if (defined('IFRAME_REQUEST'))
+		if (defined('IFRAME_REQUEST')) {
 			return false;
+		}
 
 		return true;
 	}
