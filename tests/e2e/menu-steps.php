@@ -9,6 +9,7 @@
  * @package wpcom-migration
  */
 
+use Automattic\WPCOM_Migration\Connect_Page;
 use Automattic\WPCOM_Migration\Reprint\Key_Page;
 use Automattic\WPCOM_Migration\Reprint\Main_Screen;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
@@ -210,10 +211,16 @@ function wpcom_migration_e2e_menu_step( $step ) {
 
 		case 'activation-redirect-waits-for-ajax':
 		case 'activation-redirect-waits-for-post':
+		case 'activation-redirect-waits-for-admin-post':
+		case 'activation-redirect-waits-for-iframe':
 			if ( 'activation-redirect-waits-for-ajax' === $step ) {
 				add_filter( 'wp_doing_ajax', '__return_true' );
-			} else {
+			} elseif ( 'activation-redirect-waits-for-post' === $step ) {
 				$_SERVER['REQUEST_METHOD'] = 'POST';
+			} elseif ( 'activation-redirect-waits-for-admin-post' === $step ) {
+				$GLOBALS['pagenow'] = 'admin-post.php'; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- admin-post.php sets it so.
+			} else {
+				define( 'IFRAME_REQUEST', true );
 			}
 			$captured = null;
 			add_filter(
@@ -258,14 +265,46 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
 			$admin->initHandler();
 
-			if ( 'no' !== get_option( 'wpcomredirect' ) ) {
-				throw new RuntimeException( 'A blocked redirect should still use up the flag.' );
+			if ( 'yes' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'A blocked redirect should keep the flag until the page prints the script.' );
 			}
 			ob_start();
 			do_action( 'admin_print_scripts' );
 			$output = ob_get_clean();
 			if ( false === strpos( $output, 'window.location.replace' ) || false === strpos( $output, 'page=' . Settings_Page::PAGE_SLUG ) ) {
 				throw new RuntimeException( 'A blocked redirect should print a script to the Reprint screen, got: ' . $output );
+			}
+			if ( 'no' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'Printing the script should use up the flag.' );
+			}
+			break;
+
+		case 'activation-redirect-skips-own-screen':
+			// The WordPress.com connection return, already on the Reprint
+			// screen with an argument a redirect would drop.
+			$captured = null;
+			add_filter(
+				'wp_redirect',
+				function ( $location ) use ( &$captured ) {
+					$captured = $location;
+					return '';
+				}
+			);
+			update_option( 'wpcomredirect', 'yes' );
+			$_GET['page']                              = Settings_Page::PAGE_SLUG;
+			$_GET[ Connect_Page::CONNECTED_QUERY_ARG ] = '1';
+
+			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
+			$admin->initHandler();
+
+			if ( null !== $captured ) {
+				throw new RuntimeException( 'Already on the migration screen, nothing should redirect, got: ' . $captured );
+			}
+			if ( false !== has_action( 'admin_print_scripts', array( $admin, 'printRedirectScript' ) ) ) {
+				throw new RuntimeException( 'Already on the migration screen, no script should send the browser on.' );
+			}
+			if ( 'no' !== get_option( 'wpcomredirect' ) ) {
+				throw new RuntimeException( 'Reaching the migration screen should use up the flag.' );
 			}
 			break;
 
