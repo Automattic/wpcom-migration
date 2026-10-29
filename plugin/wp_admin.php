@@ -7,6 +7,7 @@ class WPCOMWPAdmin {
 	public $siteinfo;
 	public $bvinfo;
 	public $bvapi;
+	private $redirectScriptUrl;
 
 	function __construct($settings, $siteinfo, $bvapi = null) {
 		$this->settings = $settings;
@@ -67,15 +68,76 @@ class WPCOMWPAdmin {
 		if (!current_user_can('activate_plugins'))
 			return;
 
-		if ($this->bvinfo->isActivateRedirectSet()) {
-			$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
-			// A bulk activation lands on the plugin list; it stays there.
-			if (!wp_doing_ajax() && !isset($_GET['activate-multi'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-				if (wp_redirect($this->migrationScreenUrl())) {
-					exit;
-				}
-			}
+		if (!$this->bvinfo->isActivateRedirectSet()) {
+			return;
 		}
+
+		// Heartbeat, other plugins' AJAX calls and background requests run
+		// admin_init too, often before the user's next page load. The flag
+		// waits for a request that can show a screen.
+		if (!$this->isScreenRequest()) {
+			return;
+		}
+
+		// A bulk activation lands on the plugin list; it stays there.
+		if (isset($_GET['activate-multi'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+			$this->clearActivateRedirect();
+			return;
+		}
+
+		// Already on the migration screen, perhaps with query arguments
+		// such as the WordPress.com connection return's, which a redirect
+		// would drop.
+		$url = $this->migrationScreenUrl();
+		parse_str((string) wp_parse_url($url, PHP_URL_QUERY), $query);
+		if (isset($query['page']) && WPCOMHelper::getRawParam('GET', 'page') === $query['page']) {
+			$this->clearActivateRedirect();
+			return;
+		}
+
+		if (!headers_sent() && wp_redirect($url)) {
+			$this->clearActivateRedirect();
+			exit;
+		}
+
+		// Stray output sent the headers, or a wp_redirect filter blocked the
+		// redirect: the page sends the browser on instead. The flag waits
+		// for the script, in case this request ends before the page prints.
+		$this->redirectScriptUrl = $url;
+		add_action('admin_print_scripts', array($this, 'printRedirectScript'));
+	}
+
+	private function clearActivateRedirect() {
+		$this->settings->updateOption($this->bvinfo->plug_redirect, 'no');
+	}
+
+	/**
+	 * Whether this admin_init belongs to a normal admin page load.
+	 */
+	private function isScreenRequest() {
+		global $pagenow;
+
+		// Also async-upload.php, which defines DOING_AJAX.
+		if (wp_doing_ajax()) {
+			return false;
+		}
+		if ('admin-post.php' === $pagenow) {
+			return false;
+		}
+		if ('GET' !== strtoupper((string) WPCOMHelper::getRawParam('SERVER', 'REQUEST_METHOD'))) {
+			return false;
+		}
+		// Thickbox and plugin-information modals.
+		if (defined('IFRAME_REQUEST')) {
+			return false;
+		}
+
+		return true;
+	}
+
+	public function printRedirectScript() {
+		$this->clearActivateRedirect();
+		echo '<script>window.location.replace(' . wp_json_encode($this->redirectScriptUrl) . ');</script>' . "\n";
 	}
 
 	public function menu() {
