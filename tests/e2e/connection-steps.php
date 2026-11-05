@@ -237,6 +237,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected-and-ready':
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":true,"site_slug":"example.wordpress.com","url":"https://my.wordpress.com/sites/example.wordpress.com","ttl":3600}' );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
@@ -363,7 +365,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-not-connected':
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to your WordPress.com account', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
@@ -447,6 +449,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			break;
 
 		case 'render-connected':
+			// No answer from WordPress.com isn't a missing site: the screen stays as it is.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', 'fail' );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it&#8217;s copied.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
@@ -471,6 +476,25 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				throw new RuntimeException( "Step '$step': expected the default URL, got: " . Connect_Page::continue_url() );
 			}
 			wpcom_migration_e2e_expect_destination_requests( 0, $step );
+			break;
+
+		case 'render-connected-unmatched':
+			// No site is waiting on WordPress.com: send the user to begin there.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":60}' );
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Start on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'href="https://wordpress.com/move/"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is ready to migrate', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Continue on WordPress.com', $step );
+			// The next request reads the stored answer, and still knows it was no match.
+			$stored = get_transient( Continue_Url::transient() );
+			if ( ! is_array( $stored ) || empty( $stored['unmatched'] ) ) {
+				throw new RuntimeException( "Step '$step': the answer of no match should be stored: " . wp_json_encode( $stored ) );
+			}
 			break;
 
 		case 'continue-url-matched':
@@ -515,6 +539,9 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
 			if ( 'https://my.wordpress.com/sites' !== Connect_Page::continue_url() ) {
 				throw new RuntimeException( "Step '$step': a failed fetch should leave the default URL, got: " . Connect_Page::continue_url() );
+			}
+			if ( Continue_Url::is_unmatched() ) {
+				throw new RuntimeException( "Step '$step': a failed fetch is not an answer of no match." );
 			}
 			wpcom_migration_e2e_expect_destination_requests( $before + 1, $step );
 			$stored  = get_transient( Continue_Url::transient() );

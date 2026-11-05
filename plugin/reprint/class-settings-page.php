@@ -237,7 +237,8 @@ class Settings_Page {
 
 	/**
 	 * Renders what goes under the heading. A user connected to WordPress.com
-	 * is sent on to it; with a key stored, the primary button sends them on
+	 * is sent on to it, or to where a migration begins when no site of theirs
+	 * is waiting there; with a key stored, the primary button sends them on
 	 * too, while a secondary one still offers the connection; anyone else is
 	 * asked to connect, with the migration key as the fallback. Either way the
 	 * key button is there, adding one or managing the one stored.
@@ -251,8 +252,11 @@ class Settings_Page {
 		$section        = $this->connection_section;
 		$user_connected = null !== $section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 		$has_key        = '' !== Key_Page::stored_key();
+		$unmatched      = $user_connected && \Automattic\WPCOM_Migration\Continue_Url::is_unmatched();
 
-		if ( $user_connected ) {
+		if ( $unmatched ) {
+			self::render_sentence( __( 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', 'wpcom-migration' ) );
+		} elseif ( $user_connected ) {
 			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} elseif ( $has_key ) {
@@ -265,16 +269,14 @@ class Settings_Page {
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} else {
 			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
-			self::render_sentence(
-				/* translators: %s: a link reading "WordPress.com". */
-				__( 'Log in with your WordPress.com account to connect this site, then start the migration on %s. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ),
-				self::wordpress_com_link()
-			);
+			self::render_sentence( __( 'Connect this site to your WordPress.com account, and we\'ll take you to WordPress.com to start the migration. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ) );
 		}
 
 		echo '<div class="wpcom-migration-actions">';
 		if ( null !== $section ) {
-			if ( $user_connected ) {
+			if ( $unmatched ) {
+				$section->render_start_button();
+			} elseif ( $user_connected ) {
 				$section->render_continue_button();
 			} elseif ( $has_key ) {
 				$section->render_continue_button();
