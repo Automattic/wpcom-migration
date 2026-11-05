@@ -37,13 +37,13 @@ function wpcom_migration_e2e_screen_step( $step ) {
 	switch ( $step ) {
 		case 'render-unconfigured':
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to your WordPress.com account', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Use Migration Key Instead</a>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Then start the migration on <a class="wpcom-migration-external-link" href="https://my.wordpress.com/sites" target="_blank" rel="noreferrer">', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'aria-label="(opens in a new tab)"', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'then start the migration on WordPress.com.', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'wpcom-migration-external-link', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'By connecting, you agree to the', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Log in with WordPress.com', $step );
@@ -69,10 +69,10 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			// No connection bootstrap: the mode renders without its controls.
 			$bare = new Settings_Page( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
 			$html = wpcom_migration_e2e_render( $bare );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to your WordPress.com account', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 0, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'id="wpcom-migration-reprint-secret"', $step );
 			break;
@@ -119,15 +119,15 @@ function wpcom_migration_e2e_screen_step( $step ) {
 				throw new RuntimeException( 'Saving the secret should store a valid secret: ' . wp_json_encode( $state ) );
 			}
 			$html = wpcom_migration_e2e_render( $page );
-			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site, or copy over the Migration Key.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Can&#8217;t connect? Copy over the migration key instead.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Continue on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'By connecting, you agree to the', $step );
 			// The key screen manages keys only; on this host it can't show the secret.
-			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Use Migration Key Instead</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Manage Migration Key', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="' . esc_url( Key_Page::page_url() ) . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			// A key-only site has no connection to cut.
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
@@ -278,7 +278,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Migration key added. Head over to <a class="wpcom-migration-external-link" href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is ready to migrate', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			$_GET[ Manual_Page::NOTICE_QUERY_ARG ] = 'key_saved';
 			$manual_html                           = wpcom_migration_e2e_render_manual( $manual );
@@ -323,7 +323,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			if ( $state['has_credential'] || $state['has_credential'] ) {
 				throw new RuntimeException( "Step '$step': the other credential must count for nothing: " . wp_json_encode( $state ) );
 			}
-			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render( $page ), 'Add Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render( $page ), 'Use Migration Key Instead</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render_manual( $manual ), 'wpcom-migration-reprint-api-url', $step );
 
 			// Discarding also clears the options earlier versions kept.
@@ -342,7 +342,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, '<h1>Add Migration Key</h1>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-back-link" href="' . esc_url( Settings_Page::page_url() ) . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Copy the migration key from WordPress.com and paste it here.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Having trouble? Copy the migration key from <a class="wpcom-migration-external-link" href="https://my.wordpress.com/sites"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'name="' . Key_Page::KEY_FIELD . '"', $step );

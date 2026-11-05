@@ -237,10 +237,11 @@ class Settings_Page {
 
 	/**
 	 * Renders what goes under the heading. A user connected to WordPress.com
-	 * is sent on to it; with a key stored, the primary button sends them on
+	 * is sent on to it, or, without a key, to where a migration begins when no
+	 * site of theirs is waiting there; with a key stored, the primary button sends them on
 	 * too, while a secondary one still offers the connection; anyone else is
-	 * asked to connect or to add the migration key. Either way the key button
-	 * is there, adding one or managing the one stored.
+	 * asked to connect, with the migration key as the fallback. Either way the
+	 * key button is there, adding one or managing the one stored.
 	 */
 	private function render_body() {
 		if ( is_multisite() ) {
@@ -251,30 +252,31 @@ class Settings_Page {
 		$section        = $this->connection_section;
 		$user_connected = null !== $section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 		$has_key        = '' !== Key_Page::stored_key();
+		$unmatched      = $user_connected && ! $has_key && \Automattic\WPCOM_Migration\Continue_Url::is_unmatched();
 
-		if ( $user_connected ) {
-			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
+		if ( $unmatched ) {
+			self::render_sentence( __( 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', 'wpcom-migration' ) );
+		} elseif ( $user_connected ) {
+			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. This site will stay online while it\'s copied.', 'wpcom-migration' ) );
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} elseif ( $has_key ) {
 			// The key is stored, not known to be the right one, so this doesn't claim the site is ready.
 			self::render_sentence(
 				/* translators: %s: a link reading "WordPress.com". */
-				__( 'Migration key added. Head over to %s to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
+				__( 'Migration key added. Head over to %s to start and manage the migration. This site will stay online while it\'s copied.', 'wpcom-migration' ),
 				self::wordpress_com_link()
 			);
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} else {
-			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
-			self::render_sentence(
-				/* translators: %s: a link reading "WordPress.com". */
-				__( 'Log in with your WordPress.com account to connect this site, or copy over the Migration Key. Then start the migration on %s.', 'wpcom-migration' ),
-				self::wordpress_com_link()
-			);
+			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. This site will stay online while we copy it.', 'wpcom-migration' ) );
+			self::render_sentence( __( 'Connect this site to your WordPress.com account, then start the migration on WordPress.com. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ) );
 		}
 
 		echo '<div class="wpcom-migration-actions">';
 		if ( null !== $section ) {
-			if ( $user_connected ) {
+			if ( $unmatched ) {
+				$section->render_start_button();
+			} elseif ( $user_connected ) {
 				$section->render_continue_button();
 			} elseif ( $has_key ) {
 				$section->render_continue_button();
@@ -283,8 +285,16 @@ class Settings_Page {
 				$section->render_connect_button();
 			}
 		}
+		if ( $has_key ) {
+			$key_button = __( 'Manage Migration Key', 'wpcom-migration' );
+		} elseif ( null !== $section && ! $user_connected ) {
+			// Beside the connect button, the key reads as the fallback it is.
+			$key_button = __( 'Use Migration Key Instead', 'wpcom-migration' );
+		} else {
+			$key_button = __( 'Add Migration Key', 'wpcom-migration' );
+		}
 		echo '<a class="wpcom-migration-button wpcom-migration-button--secondary" href="' . esc_url( Key_Page::page_url() ) . '">'
-			. esc_html( $has_key ? __( 'Manage Migration Key', 'wpcom-migration' ) : __( 'Add Migration Key', 'wpcom-migration' ) )
+			. esc_html( $key_button )
 			. '</a>';
 		echo '</div>';
 

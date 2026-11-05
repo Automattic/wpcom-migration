@@ -17,13 +17,16 @@ use Automattic\Jetpack\Connection\Client;
  * the answer is theirs: it searches their sites. Keeps the matched URL, or
  * none, in a transient per user until the ttl runs out. A failed fetch keeps
  * none, so the button gets the default link, and asks again after
- * RETRY_AFTER. Without a connected user, or on a network, nothing is asked:
+ * RETRY_AFTER. Only an answer of no match counts as unmatched, so a failed
+ * fetch doesn't send anyone to start over. Without a connected user, or on a
+ * network, nothing is asked:
  * the screen only links to WordPress.com for a connected user.
  */
 class Continue_Url {
 
 	/**
-	 * Transient name, before the user ID, holding { destination }.
+	 * Transient name, before the user ID, holding { destination }, plus
+	 * { unmatched } after an answer of no match.
 	 *
 	 * @var string
 	 */
@@ -45,12 +48,27 @@ class Continue_Url {
 	const RETRY_AFTER = 300;
 
 	/**
+	 * Seconds an answer of no match is kept, whatever its ttl: the screen then
+	 * asks the user to set up a site, so it should notice soon once they have.
+	 *
+	 * @var int
+	 */
+	const UNMATCHED_TTL = MINUTE_IN_SECONDS;
+
+	/**
 	 * The destination for this request: a URL, null when there is none, or
 	 * false until looked up.
 	 *
 	 * @var string|null|false
 	 */
 	private static $destination = false;
+
+	/**
+	 * Whether WordPress.com answered that no site of the user's is waiting.
+	 *
+	 * @var bool
+	 */
+	private static $unmatched = false;
 
 	/**
 	 * Filters wpcom_migration_continue_url.
@@ -80,11 +98,22 @@ class Continue_Url {
 	}
 
 	/**
+	 * Whether WordPress.com answered that none of the user's sites is waiting
+	 * for this one, rather than not answering at all.
+	 *
+	 * @return bool
+	 */
+	public static function is_unmatched() {
+		return null === self::destination() && self::$unmatched;
+	}
+
+	/**
 	 * Deletes the current user's stored answer, so the next check asks
 	 * again. Runs when they authorize the connection or disconnect it.
 	 */
 	public static function forget() {
 		self::$destination = false;
+		self::$unmatched   = false;
 		delete_transient( self::transient() );
 	}
 
@@ -98,6 +127,7 @@ class Continue_Url {
 		global $wpdb;
 
 		self::$destination = false;
+		self::$unmatched   = false;
 		delete_option( self::LEGACY_OPTION );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- No API deletes transients by prefix.
@@ -127,13 +157,21 @@ class Continue_Url {
 	private static function lookup() {
 		$stored = get_transient( self::transient() );
 		if ( is_array( $stored ) && array_key_exists( 'destination', $stored ) ) {
+			self::$unmatched = ! empty( $stored['unmatched'] );
 			return is_string( $stored['destination'] ) ? $stored['destination'] : null;
 		}
 
-		$answer      = self::fetch();
-		$destination = null === $answer ? null : $answer['destination'];
+		$answer          = self::fetch();
+		$destination     = null === $answer ? null : $answer['destination'];
+		self::$unmatched = null !== $answer && null === $destination;
 
-		set_transient( self::transient(), array( 'destination' => $destination ), null === $answer ? self::RETRY_AFTER : $answer['ttl'] );
+		$value = array( 'destination' => $destination );
+		$ttl   = null === $answer ? self::RETRY_AFTER : $answer['ttl'];
+		if ( self::$unmatched ) {
+			$value['unmatched'] = true;
+			$ttl                = self::UNMATCHED_TTL;
+		}
+		set_transient( self::transient(), $value, $ttl );
 
 		return $destination;
 	}

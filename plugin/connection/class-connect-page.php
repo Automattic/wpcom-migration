@@ -265,7 +265,7 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
 			<button type="submit" class="wpcom-migration-button<?php echo $secondary ? ' wpcom-migration-button--secondary' : ''; ?>">
-				<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
+				<?php esc_html_e( 'Connect to WordPress.com', 'wpcom-migration' ); ?>
 			</button>
 		</form>
 		<?php
@@ -293,9 +293,27 @@ class Connect_Page {
 	 * nothing on this site.
 	 */
 	public function render_continue_button() {
+		self::render_wpcom_button( self::continue_url(), __( 'Continue on WordPress.com', 'wpcom-migration' ) );
+	}
+
+	/**
+	 * Renders the link to where a migration begins on WordPress.com, for a
+	 * user with no site waiting there.
+	 */
+	public function render_start_button() {
+		self::render_wpcom_button( WPCOM_MIGRATION_URI, __( 'Start on WordPress.com', 'wpcom-migration' ) );
+	}
+
+	/**
+	 * Renders a primary button leading to WordPress.com.
+	 *
+	 * @param string $url   Where it leads.
+	 * @param string $label What it reads.
+	 */
+	private static function render_wpcom_button( $url, $label ) {
 		?>
-		<a class="wpcom-migration-button" target="_top" href="<?php echo esc_url( self::continue_url() ); ?>">
-			<?php esc_html_e( 'Continue on WordPress.com', 'wpcom-migration' ); ?>
+		<a class="wpcom-migration-button" target="_top" href="<?php echo esc_url( $url ); ?>">
+			<?php echo esc_html( $label ); ?>
 			<svg class="wpcom-migration-button__icon" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false"><path d="M1.5 8.5l7-7M3 1.5h5.5V7" /></svg>
 		</a>
 		<?php
