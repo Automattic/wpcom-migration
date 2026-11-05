@@ -265,7 +265,7 @@ class Connect_Page {
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::CONNECT_ACTION ); ?>" />
 			<?php wp_nonce_field( self::CONNECT_ACTION ); ?>
 			<button type="submit" class="wpcom-migration-button<?php echo $secondary ? ' wpcom-migration-button--secondary' : ''; ?>">
-				<?php esc_html_e( 'Connect WordPress.com', 'wpcom-migration' ); ?>
+				<?php esc_html_e( 'Connect to WordPress.com', 'wpcom-migration' ); ?>
 			</button>
 		</form>
 		<?php

@@ -239,8 +239,8 @@ class Settings_Page {
 	 * Renders what goes under the heading. A user connected to WordPress.com
 	 * is sent on to it; with a key stored, the primary button sends them on
 	 * too, while a secondary one still offers the connection; anyone else is
-	 * asked to connect or to add the migration key. Either way the key button
-	 * is there, adding one or managing the one stored.
+	 * asked to connect, with the migration key as the fallback. Either way the
+	 * key button is there, adding one or managing the one stored.
 	 */
 	private function render_body() {
 		if ( is_multisite() ) {
@@ -267,7 +267,7 @@ class Settings_Page {
 			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
 			self::render_sentence(
 				/* translators: %s: a link reading "WordPress.com". */
-				__( 'Log in with your WordPress.com account to connect this site, or copy over the Migration Key. Then start the migration on %s.', 'wpcom-migration' ),
+				__( 'Log in with your WordPress.com account to connect this site, then start the migration on %s. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ),
 				self::wordpress_com_link()
 			);
 		}
@@ -283,8 +283,16 @@ class Settings_Page {
 				$section->render_connect_button();
 			}
 		}
+		if ( $has_key ) {
+			$key_button = __( 'Manage Migration Key', 'wpcom-migration' );
+		} elseif ( null !== $section && ! $user_connected ) {
+			// Beside the connect button, the key reads as the fallback it is.
+			$key_button = __( 'Use Migration Key Instead', 'wpcom-migration' );
+		} else {
+			$key_button = __( 'Add Migration Key', 'wpcom-migration' );
+		}
 		echo '<a class="wpcom-migration-button wpcom-migration-button--secondary" href="' . esc_url( Key_Page::page_url() ) . '">'
-			. esc_html( $has_key ? __( 'Manage Migration Key', 'wpcom-migration' ) : __( 'Add Migration Key', 'wpcom-migration' ) )
+			. esc_html( $key_button )
 			. '</a>';
 		echo '</div>';
 

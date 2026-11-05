@@ -243,7 +243,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::DISCONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connected with a migration key.', $step );
 			break;
@@ -330,7 +330,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_not_contains( $html, 'Connected as', $step );
 			// The key sends the user on; connecting is still offered, as a secondary button.
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
 			break;
@@ -364,7 +364,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Migrate your site to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Log in with your WordPress.com account to connect this site', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'value="' . Connect_Page::CONNECT_ACTION . '"', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Connect_Page::DISCONNECT_ACTION, $step );
@@ -458,7 +458,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, (string) WPCOM_MIGRATION_E2E_BLOG_ID, $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect to WordPress.com', $step );
 
 			// The blog ID lives on the by-hand screen now.
 			$manual_html = wpcom_migration_e2e_render_manual_page();
