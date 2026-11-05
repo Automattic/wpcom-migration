@@ -280,7 +280,7 @@ class Key_Page {
 		}
 
 		if ( '' === $key ) {
-			Settings_Page::render_sentence( __( 'Can\'t connect? Copy the migration key from WordPress.com and paste it here.', 'wpcom-migration' ) );
+			Settings_Page::render_sentence( __( 'Having trouble? Copy the migration key from WordPress.com and paste it here.', 'wpcom-migration' ) );
 		} else {
 			Settings_Page::render_sentence(
 				/* translators: %s: a link reading "WordPress.com". */

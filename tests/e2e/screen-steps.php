@@ -342,7 +342,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_contains( $html, '<h1>Add Migration Key</h1>', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'class="wpcom-migration-back-link" href="' . esc_url( Settings_Page::page_url() ) . '"', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Can&#8217;t connect? Copy the migration key from WordPress.com and paste it here.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Having trouble? Copy the migration key from WordPress.com and paste it here.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'WordPress.com Terms of Service</a>.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'name="' . Key_Page::KEY_FIELD . '"', $step );

@@ -453,7 +453,7 @@ function wpcom_migration_e2e_connection_step( $step ) {
 			Continue_Url::forget();
 			update_option( 'wpcom_migration_e2e_destination_response', 'fail' );
 			$html = wpcom_migration_e2e_render_connect_page();
-			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it&#8217;s copied.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. This site will stay online while it&#8217;s copied.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Keep this plugin active until the migration is done. We&#8217;ll email you when it&#8217;s finished.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'e2e@example.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );

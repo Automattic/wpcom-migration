@@ -257,18 +257,18 @@ class Settings_Page {
 		if ( $unmatched ) {
 			self::render_sentence( __( 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', 'wpcom-migration' ) );
 		} elseif ( $user_connected ) {
-			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ) );
+			self::render_sentence( __( 'Your site is ready to migrate. Head over to WordPress.com to start and manage the migration. This site will stay online while it\'s copied.', 'wpcom-migration' ) );
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} elseif ( $has_key ) {
 			// The key is stored, not known to be the right one, so this doesn't claim the site is ready.
 			self::render_sentence(
 				/* translators: %s: a link reading "WordPress.com". */
-				__( 'Migration key added. Head over to %s to start and manage the migration. Your site stays online and unchanged while it\'s copied.', 'wpcom-migration' ),
+				__( 'Migration key added. Head over to %s to start and manage the migration. This site will stay online while it\'s copied.', 'wpcom-migration' ),
 				self::wordpress_com_link()
 			);
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} else {
-			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. Your site stays online and unchanged while we copy it.', 'wpcom-migration' ) );
+			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. This site will stay online while we copy it.', 'wpcom-migration' ) );
 			self::render_sentence( __( 'Connect this site to your WordPress.com account, and we\'ll take you to WordPress.com to start the migration. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ) );
 		}
 
