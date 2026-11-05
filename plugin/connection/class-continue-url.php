@@ -25,7 +25,8 @@ use Automattic\Jetpack\Connection\Client;
 class Continue_Url {
 
 	/**
-	 * Transient name, before the user ID, holding { destination }.
+	 * Transient name, before the user ID, holding { destination }, plus
+	 * { unmatched } after an answer of no match.
 	 *
 	 * @var string
 	 */
@@ -45,6 +46,14 @@ class Continue_Url {
 	 * @var int
 	 */
 	const RETRY_AFTER = 300;
+
+	/**
+	 * Seconds an answer of no match is kept, whatever its ttl: the screen then
+	 * asks the user to set up a site, so it should notice soon once they have.
+	 *
+	 * @var int
+	 */
+	const UNMATCHED_TTL = MINUTE_IN_SECONDS;
 
 	/**
 	 * The destination for this request: a URL, null when there is none, or
@@ -157,10 +166,12 @@ class Continue_Url {
 		self::$unmatched = null !== $answer && null === $destination;
 
 		$value = array( 'destination' => $destination );
+		$ttl   = null === $answer ? self::RETRY_AFTER : $answer['ttl'];
 		if ( self::$unmatched ) {
 			$value['unmatched'] = true;
+			$ttl                = self::UNMATCHED_TTL;
 		}
-		set_transient( self::transient(), $value, null === $answer ? self::RETRY_AFTER : $answer['ttl'] );
+		set_transient( self::transient(), $value, $ttl );
 
 		return $destination;
 	}

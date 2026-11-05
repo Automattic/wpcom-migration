@@ -237,8 +237,8 @@ class Settings_Page {
 
 	/**
 	 * Renders what goes under the heading. A user connected to WordPress.com
-	 * is sent on to it, or to where a migration begins when no site of theirs
-	 * is waiting there; with a key stored, the primary button sends them on
+	 * is sent on to it, or, without a key, to where a migration begins when no
+	 * site of theirs is waiting there; with a key stored, the primary button sends them on
 	 * too, while a secondary one still offers the connection; anyone else is
 	 * asked to connect, with the migration key as the fallback. Either way the
 	 * key button is there, adding one or managing the one stored.
@@ -252,7 +252,7 @@ class Settings_Page {
 		$section        = $this->connection_section;
 		$user_connected = null !== $section && \Automattic\WPCOM_Migration\Connection::is_user_connected();
 		$has_key        = '' !== Key_Page::stored_key();
-		$unmatched      = $user_connected && \Automattic\WPCOM_Migration\Continue_Url::is_unmatched();
+		$unmatched      = $user_connected && ! $has_key && \Automattic\WPCOM_Migration\Continue_Url::is_unmatched();
 
 		if ( $unmatched ) {
 			self::render_sentence( __( 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', 'wpcom-migration' ) );
@@ -269,7 +269,7 @@ class Settings_Page {
 			self::render_sentence( __( 'Keep this plugin active until the migration is done. We\'ll email you when it\'s finished.', 'wpcom-migration' ) );
 		} else {
 			self::render_sentence( __( 'WordPress.com copies your posts, pages, media, themes, plugins, and settings. This site will stay online while we copy it.', 'wpcom-migration' ) );
-			self::render_sentence( __( 'Connect this site to your WordPress.com account, and we\'ll take you to WordPress.com to start the migration. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ) );
+			self::render_sentence( __( 'Connect this site to your WordPress.com account, then start the migration on WordPress.com. Can\'t connect? Copy over the migration key instead.', 'wpcom-migration' ) );
 		}
 
 		echo '<div class="wpcom-migration-actions">';

@@ -481,20 +481,43 @@ function wpcom_migration_e2e_connection_step( $step ) {
 		case 'render-connected-unmatched':
 			// No site is waiting on WordPress.com: send the user to begin there.
 			Continue_Url::forget();
-			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":60}' );
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":3600}' );
 			$html = wpcom_migration_e2e_render_connect_page();
 			wpcom_migration_e2e_expect_contains( $html, 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Start on WordPress.com', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'href="https://wordpress.com/move/"', $step );
 			wpcom_migration_e2e_expect_contains( $html, 'Connected as e2e-tester', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Add Migration Key</a>', $step );
 			wpcom_migration_e2e_expect_primary_count( $html, 1, $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Your site is ready to migrate', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Continue on WordPress.com', $step );
-			// The next request reads the stored answer, and still knows it was no match.
-			$stored = get_transient( Continue_Url::transient() );
-			if ( ! is_array( $stored ) || empty( $stored['unmatched'] ) ) {
-				throw new RuntimeException( "Step '$step': the answer of no match should be stored: " . wp_json_encode( $stored ) );
+			// Kept briefly whatever the ttl, so setting up a site shows soon.
+			$stored  = get_transient( Continue_Url::transient() );
+			$expires = (int) get_option( '_transient_timeout_' . Continue_Url::transient() );
+			if ( ! is_array( $stored ) || empty( $stored['unmatched'] ) || abs( time() + Continue_Url::UNMATCHED_TTL - $expires ) > 5 ) {
+				throw new RuntimeException( "Step '$step': the answer of no match should be stored for UNMATCHED_TTL: " . wp_json_encode( array( $stored, $expires ) ) );
 			}
+			break;
+
+		case 'render-connected-unmatched-stored':
+			// A later request renders from the stored answer, without asking again.
+			$before = (int) get_option( 'wpcom_migration_e2e_destination_requests', 0 );
+			$html   = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is connected. To migrate it, set up your new site on WordPress.com first.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'href="https://wordpress.com/move/"', $step );
+			wpcom_migration_e2e_expect_destination_requests( $before, $step );
+			break;
+
+		case 'render-connected-with-key-unmatched':
+			// A stored key means a site is set up, whatever WordPress.com matched.
+			Continue_Url::forget();
+			update_option( 'wpcom_migration_e2e_destination_response', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":60}' );
+			$html = wpcom_migration_e2e_render_connect_page();
+			wpcom_migration_e2e_expect_contains( $html, 'Your site is ready to migrate.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Continue on WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Manage Migration Key</a>', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'set up your new site', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'https://wordpress.com/move/', $step );
 			break;
 
 		case 'continue-url-matched':
