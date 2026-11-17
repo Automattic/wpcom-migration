@@ -185,27 +185,18 @@ class REST_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * An administrator, authenticated by a Jetpack user token or by core.
+	 * An administrator, or a super admin on a network, authenticated by a
+	 * Jetpack user token or by core.
 	 *
 	 * A role check, not a capability one: this installs a credential that
 	 * streams the whole database and file tree, and no capability says that.
 	 *
-	 * @return bool|WP_Error
+	 * @return bool
 	 */
 	public function permission_check() {
 		$user = wp_get_current_user();
 		if ( ! $user || ! $user->exists() ) {
 			return false;
-		}
-
-		// The exporter never serves on a network; refuse here rather than
-		// let both routes answer 200 for nothing.
-		if ( is_multisite() ) {
-			return new WP_Error(
-				'wpcom_migration_multisite_unsupported',
-				__( 'The exporter is not supported on networks.', 'wpcom-migration' ),
-				array( 'status' => 501 )
-			);
 		}
 
 		// Two ways in, neither weaker than the other: a Jetpack user token
@@ -215,6 +206,14 @@ class REST_Controller extends WP_REST_Controller {
 		// login on every request, say — is refused.
 		if ( ! Rest_Authentication::is_signed_with_user_token() && ! self::is_wordpress_authenticated() ) {
 			return false;
+		}
+
+		// On a network, only a super admin: an export also carries the shared
+		// plugins and themes and the network accounts of the site's members,
+		// which a site's own administrator has no say over. A super admin
+		// often has no role on the site at all.
+		if ( is_multisite() ) {
+			return is_super_admin( $user->ID );
 		}
 
 		return in_array( 'administrator', $user->roles, true );
