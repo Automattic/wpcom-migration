@@ -8,13 +8,13 @@
 namespace Automattic\WPCOM_Migration\Reprint;
 
 /**
- * A network option listing the IDs of the sites the exporter wrote a
- * credential to while the plugin was active.
+ * A network option listing the IDs of the sites the plugin wrote an export
+ * credential or a WordPress.com connection to while it was active.
  *
  * On a network, the plugin is activated once for every site, and the
  * activation and deactivation hooks run only on the main site. The list lets
- * those hooks reach the other sites' credentials without visiting every site
- * of a large network.
+ * those hooks reach the other sites' credentials and connections without
+ * visiting every site of a large network.
  *
  * It also decides which credentials count. A site missing from the list has
  * none, whatever its options hold. The list is deleted at every activation
@@ -89,11 +89,11 @@ class Network_Sites {
 	}
 
 	/**
-	 * Runs a callback on each site on the list, then empties the list.
+	 * Runs a callback on each site on the list.
 	 *
 	 * @param callable $callback Runs with each site switched to.
 	 */
-	public static function drain( callable $callback ) {
+	public static function each( callable $callback ) {
 		foreach ( self::ids() as $id ) {
 			if ( ! get_site( $id ) ) {
 				continue;
@@ -106,7 +106,15 @@ class Network_Sites {
 				restore_current_blog();
 			}
 		}
+	}
 
+	/**
+	 * Runs a callback on each site on the list, then empties the list.
+	 *
+	 * @param callable $callback Runs with each site switched to.
+	 */
+	public static function drain( callable $callback ) {
+		self::each( $callback );
 		delete_site_option( self::OPTION );
 	}
 

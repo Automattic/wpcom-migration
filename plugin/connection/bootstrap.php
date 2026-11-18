@@ -38,9 +38,11 @@ Connection::init();
 add_filter( 'wpcom_migration_continue_url', array( Continue_Url::class, 'filter' ) );
 add_action( 'jetpack_user_authorized', array( Continue_Url::class, 'forget' ) );
 
-// Leaving the plugin leaves the connection, and forgets every user's stored destination.
-register_deactivation_hook( $wpcom_migration_plugin_file, array( Connection::class, 'disconnect' ) );
-register_deactivation_hook( $wpcom_migration_plugin_file, array( Continue_Url::class, 'forget_all' ) );
+// Leaving the plugin leaves the connection, and forgets every user's stored
+// destination. Not register_deactivation_hook(): on a network this reads the
+// list of sites, so it runs at priority 5, before the exporter's hook at 10
+// empties the list.
+add_action( 'deactivate_' . plugin_basename( $wpcom_migration_plugin_file ), array( Connection::class, 'leave' ), 5 );
 
 if ( is_admin() ) {
 	$wpcom_migration_settings_page = wpcom_migration_settings_page();

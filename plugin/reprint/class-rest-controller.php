@@ -185,11 +185,8 @@ class REST_Controller extends WP_REST_Controller {
 	}
 
 	/**
-	 * An administrator, or a super admin on a network, authenticated by a
+	 * Someone who may migrate the site (see Access), authenticated by a
 	 * Jetpack user token or by core.
-	 *
-	 * A role check, not a capability one: this installs a credential that
-	 * streams the whole database and file tree, and no capability says that.
 	 *
 	 * @return bool
 	 */
@@ -208,15 +205,7 @@ class REST_Controller extends WP_REST_Controller {
 			return false;
 		}
 
-		// On a network, only a super admin: an export also carries the shared
-		// plugins and themes and the network accounts of the site's members,
-		// which a site's own administrator has no say over. A super admin
-		// often has no role on the site at all.
-		if ( is_multisite() ) {
-			return is_super_admin( $user->ID );
-		}
-
-		return in_array( 'administrator', $user->roles, true );
+		return Access::can_migrate( $user );
 	}
 
 	/**

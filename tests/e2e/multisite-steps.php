@@ -11,10 +11,17 @@
  * @package wpcom-migration
  */
 
+use Automattic\WPCOM_Migration\Connect_Page;
+use Automattic\WPCOM_Migration\Connection;
 use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Key_Page;
 use Automattic\WPCOM_Migration\Reprint\Multisite_Context;
 use Automattic\WPCOM_Migration\Reprint\Network_Sites;
 use Automattic\WPCOM_Migration\Reprint\REST_Controller;
+use Automattic\WPCOM_Migration\Reprint\Settings_Page;
+
+// The screen helpers: rendering, form posts and their expectations.
+require_once __DIR__ . '/screen-steps.php';
 
 // WordPress's fatal handler would swallow the message into a generic error
 // page; print it where run.sh shows the log instead.
@@ -25,9 +32,10 @@ set_exception_handler(
 	}
 );
 
-const WPCOM_MIGRATION_E2E_SHOP_PATH = '/shop/';
-const WPCOM_MIGRATION_E2E_PLUGIN    = 'wpcom-migration/wpcom_migration.php';
-const WPCOM_MIGRATION_E2E_MS_SECRET = 'multisite-secret-0123456789abcdef0123456789abcdef';
+const WPCOM_MIGRATION_E2E_SHOP_PATH   = '/shop/';
+const WPCOM_MIGRATION_E2E_PLUGIN      = 'wpcom-migration/wpcom_migration.php';
+const WPCOM_MIGRATION_E2E_PLUGIN_FILE = WP_PLUGIN_DIR . '/' . WPCOM_MIGRATION_E2E_PLUGIN;
+const WPCOM_MIGRATION_E2E_MS_SECRET   = 'multisite-secret-0123456789abcdef0123456789abcdef';
 
 // A network that can't find the requested site ends the request with exit
 // code 0 before the step runs, which Playground counts as a pass. Each step
@@ -46,6 +54,9 @@ const WPCOM_MIGRATION_E2E_MS_STEPS = array(
 	'shop-shared-table',
 	'main-shared-table',
 	'shop-rest-permission',
+	'shop-screens-site-admin',
+	'shop-screens-super-admin',
+	'shop-connect-enlists',
 	'network-deactivation',
 );
 
@@ -382,18 +393,132 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			}
 			break;
 
+		case 'shop-screens-site-admin':
+			// The shop's own administrator gets the screens' refusal, and
+			// their form posts die before they store anything.
+			wpcom_migration_e2e_expect_shop( $step );
+			wpcom_migration_e2e_reset_shop();
+			wp_set_current_user( get_user_by( 'login', 'shop-admin' )->ID );
+			if ( ! current_user_can( 'manage_options' ) ) {
+				throw new RuntimeException( "Step '$step': the shop's administrator should have manage_options." );
+			}
+			$refusal = esc_html( wptexturize( 'Only a super admin can migrate a site of this network.' ) );
+
+			$html = wpcom_migration_e2e_render_shop_screen();
+			wpcom_migration_e2e_expect_contains( $html, $refusal, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect to WordPress.com', $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Migration Key', $step );
+
+			$key_page = new Key_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE );
+			$html     = wpcom_migration_e2e_render_key( $key_page );
+			wpcom_migration_e2e_expect_contains( $html, $refusal, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
+
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			wpcom_migration_e2e_expect_key_denied( $key_page, $step );
+			wpcom_migration_e2e_expect_no_public_key( $step );
+
+			wpcom_migration_e2e_post( Connect_Page::CONNECT_ACTION, array() );
+			wpcom_migration_e2e_expect_dies(
+				function () {
+					( new Connect_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE ) )->handle_connect();
+				},
+				$step
+			);
+			if ( Network_Sites::has_current() ) {
+				throw new RuntimeException( "Step '$step': a refused post should leave the shop off the list." );
+			}
+			break;
+
+		case 'shop-screens-super-admin':
+			// A super admin with no role on the shop sees the screen a single
+			// site's administrator does, and a pasted key puts the shop on the
+			// list.
+			wpcom_migration_e2e_expect_shop( $step );
+			wpcom_migration_e2e_reset_shop();
+			remove_user_from_blog( 1, get_current_blog_id() );
+			wp_set_current_user( 1 );
+			if ( is_user_member_of_blog( 1 ) || ! is_super_admin( 1 ) ) {
+				throw new RuntimeException( "Step '$step': user 1 should be a super admin with no role on the shop." );
+			}
+
+			$html = wpcom_migration_e2e_render_shop_screen();
+			wpcom_migration_e2e_expect_contains( $html, 'Connect this site to your WordPress.com account', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Connect to WordPress.com', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Use Migration Key Instead</a>', $step );
+
+			$key_page = new Key_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE );
+			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render_key( $key_page ), '<textarea', $step );
+
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			wpcom_migration_e2e_expect_redirect( $key_page, Settings_Page::page_url(), $step );
+			if ( ! Network_Sites::has_current() || '' === Key_Page::stored_key() ) {
+				throw new RuntimeException( "Step '$step': the key should be stored and the shop on the list." );
+			}
+			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render_shop_screen(), 'Migration key added.', $step );
+
+			// Off the list, the key the shop's options still hold isn't shown.
+			wpcom_migration_e2e_delist_current();
+			if ( '' !== Key_Page::stored_key() ) {
+				throw new RuntimeException( "Step '$step': a site off the list should show no key." );
+			}
+			wpcom_migration_e2e_expect_not_contains( wpcom_migration_e2e_render_shop_screen(), 'Migration key added.', $step );
+			break;
+
+		case 'shop-connect-enlists':
+			// Connecting puts the shop on the list before any token is
+			// written, even when registration then fails.
+			wpcom_migration_e2e_expect_shop( $step );
+			wpcom_migration_e2e_reset_shop();
+			wp_set_current_user( 1 );
+			add_filter(
+				'jetpack_pre_register',
+				function () {
+					return new WP_Error( 'e2e_blocked', 'Blocked by the e2e scenario.' );
+				}
+			);
+			if ( ! is_wp_error( Connection::authorization_url( Connect_Page::return_url() ) ) ) {
+				throw new RuntimeException( "Step '$step': registration should have failed." );
+			}
+			if ( ! Network_Sites::has_current() ) {
+				throw new RuntimeException( "Step '$step': connecting should put the shop on the list." );
+			}
+			break;
+
 		case 'network-deactivation':
-			// Through WordPress, from the main site, so the hook gets the
-			// network-wide flag the way WordPress passes it.
+			// Through WordPress, from the main site, so the hooks get the
+			// network-wide flag the way WordPress passes it. The connection
+			// leaves every listed site before the exporter empties the list.
+			$hook = 'deactivate_' . plugin_basename( WPCOM_MIGRATION_E2E_PLUGIN_FILE );
+			if ( 5 !== has_action( $hook, array( Connection::class, 'leave' ) ) || 10 !== has_action( $hook, array( Exporter::class, 'discard_credentials' ) ) ) {
+				throw new RuntimeException( "Step '$step': the connection should leave at priority 5, before the exporter discards at 10." );
+			}
+
 			$shop_id = get_blog_id_from_url( 'localhost', WPCOM_MIGRATION_E2E_SHOP_PATH );
 			wpcom_migration_e2e_store_secret( $step );
 			switch_to_blog( $shop_id );
 			wpcom_migration_e2e_store_secret( $step );
+			\Jetpack_Options::update_option( 'id', 424242 );
+			\Jetpack_Options::update_option( 'blog_token', 'e2eblogkey.e2eblogsecret' );
+			if ( ! Connection::is_site_connected() ) {
+				throw new RuntimeException( "Step '$step': the shop should be connected." );
+			}
 			restore_current_blog();
 
+			// WordPress.com is unreachable; skip the deregister call.
+			add_filter( 'jetpack_connection_disconnect_site_wpcom', '__return_false' );
 			deactivate_plugins( WPCOM_MIGRATION_E2E_PLUGIN, false, true );
 			if ( is_plugin_active_for_network( WPCOM_MIGRATION_E2E_PLUGIN ) ) {
 				throw new RuntimeException( "Step '$step': the plugin should be inactive on the network." );
+			}
+
+			switch_to_blog( $shop_id );
+			$connected = Connection::is_site_connected();
+			restore_current_blog();
+			if ( $connected ) {
+				throw new RuntimeException( "Step '$step': the shop should be disconnected." );
 			}
 
 			foreach ( array( get_main_site_id(), $shop_id ) as $site_id ) {
@@ -472,6 +597,52 @@ function wpcom_migration_e2e_expect_tables( $selection, array $expected, $step )
 		if ( $included !== $selection->includes_table( $table ) ) {
 			throw new RuntimeException( "Step '$step': table $table should " . ( $included ? '' : 'not ' ) . 'be in the export.' );
 		}
+	}
+}
+
+/**
+ * Takes the shop off the list and deletes its credentials, so a step starts
+ * from nothing.
+ */
+function wpcom_migration_e2e_reset_shop() {
+	Exporter::discard_credentials( false );
+}
+
+/**
+ * Renders the migration screen with its connection section, as the
+ * bootstraps wire it.
+ *
+ * @return string
+ */
+function wpcom_migration_e2e_render_shop_screen() {
+	$page = new Settings_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE );
+	$page->set_connection_section( new Connect_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE ) );
+	return wpcom_migration_e2e_render( $page );
+}
+
+/**
+ * Fails unless the callback stops with wp_die().
+ *
+ * @param callable $callback Runs the handler.
+ * @param string   $step     Step name.
+ * @throws RuntimeException When the callback doesn't die.
+ */
+function wpcom_migration_e2e_expect_dies( callable $callback, $step ) {
+	$die_filter = static function () {
+		return static function () {
+			throw new RuntimeException( 'access denied' );
+		};
+	};
+	add_filter( 'wp_die_handler', $die_filter );
+	try {
+		$callback();
+		throw new RuntimeException( "Step '$step': the handler returned without denying access." );
+	} catch ( RuntimeException $exception ) {
+		if ( 'access denied' !== $exception->getMessage() ) {
+			throw $exception;
+		}
+	} finally {
+		remove_filter( 'wp_die_handler', $die_filter );
 	}
 }
 

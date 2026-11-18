@@ -304,8 +304,8 @@ function wpcom_migration_e2e_connection_step( $step ) {
 				false
 			);
 			$hook = 'deactivate_' . plugin_basename( WP_PLUGIN_DIR . '/wpcom-migration/wpcom_migration.php' );
-			if ( ! has_action( $hook, array( Continue_Url::class, 'forget_all' ) ) ) {
-				throw new RuntimeException( "Step '$step': forget_all() should run on deactivation." );
+			if ( ! has_action( $hook, array( Connection::class, 'leave' ) ) ) {
+				throw new RuntimeException( "Step '$step': Connection::leave() should run on deactivation." );
 			}
 			Continue_Url::forget_all();
 			wp_cache_flush();

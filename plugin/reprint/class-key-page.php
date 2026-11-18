@@ -101,7 +101,7 @@ class Key_Page {
 	 * @return string
 	 */
 	public static function stored_key() {
-		return Utils::key_auth_required() ? (string) get_option( Exporter::PUBLIC_KEY_OPTION, '' ) : '';
+		return Utils::key_auth_required() ? Exporter::stored_public_key() : '';
 	}
 
 	/**
@@ -206,18 +206,14 @@ class Key_Page {
 	}
 
 	/**
-	 * Stops a form post that is not a nonce-carrying administrator request on
-	 * a single site.
+	 * Stops a form post that is not a nonce-carrying request from someone
+	 * who may migrate the site. See Access.
 	 *
 	 * @param string $action The admin-post action being handled.
 	 */
 	private function authorize( $action ) {
-		if ( is_multisite() ) {
-			wp_die( esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
-		}
-
-		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			wp_die( esc_html__( 'Only an administrator can manage the exporter.', 'wpcom-migration' ) );
+		if ( ! Access::can_migrate() ) {
+			wp_die( esc_html( Access::refusal() ) );
 		}
 
 		check_admin_referer( $action );
@@ -264,13 +260,8 @@ class Key_Page {
 	 * @param string $key The stored key, or '' for none.
 	 */
 	private function render_body( $key ) {
-		if ( is_multisite() ) {
-			Settings_Page::render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
-			return;
-		}
-
-		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			Settings_Page::render_sentence( __( 'Only an administrator can connect this site with a migration key.', 'wpcom-migration' ) );
+		if ( ! Access::can_migrate() ) {
+			Settings_Page::render_sentence( Access::refusal() );
 			return;
 		}
 

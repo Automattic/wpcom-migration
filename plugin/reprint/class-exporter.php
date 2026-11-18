@@ -195,20 +195,46 @@ class Exporter {
 	private static function write_option( $option, $value ) {
 		self::$writing_own_options = true;
 		try {
-			// A site joins the network's list with nothing stored, so that
-			// whatever was written while it was off the list never counts.
-			// One that can't join gets nothing written.
-			if ( is_multisite() && ! Network_Sites::has_current() ) {
-				self::delete_credentials();
-				if ( ! Network_Sites::add_current() ) {
-					return false;
-				}
+			if ( ! self::join_network_list() ) {
+				return false;
 			}
 
 			return update_option( $option, $value, false );
 		} finally {
 			self::$writing_own_options = false;
 		}
+	}
+
+	/**
+	 * Puts the current site on the network's list, so that network
+	 * deactivation reaches it. The connection calls this before it writes
+	 * the site's WordPress.com tokens. Does nothing on a single site.
+	 *
+	 * @return bool Whether the site is on the list, or this is a single site.
+	 */
+	public static function enlist_current_site() {
+		self::$writing_own_options = true;
+		try {
+			return self::join_network_list();
+		} finally {
+			self::$writing_own_options = false;
+		}
+	}
+
+	/**
+	 * Adds the current site to the network's list. A site joins with
+	 * nothing stored, so that whatever was written while it was off the
+	 * list never counts. Call it with the guard held open.
+	 *
+	 * @return bool Whether the site is on the list, or this is a single site.
+	 */
+	private static function join_network_list() {
+		if ( ! is_multisite() || Network_Sites::has_current() ) {
+			return true;
+		}
+
+		self::delete_credentials();
+		return Network_Sites::add_current();
 	}
 
 	/**
@@ -383,6 +409,26 @@ class Exporter {
 	}
 
 	/**
+	 * The stored secret, or '' for none. On a network, a site off the list
+	 * has none, whatever its options hold.
+	 *
+	 * @return string
+	 */
+	public static function stored_secret() {
+		return self::get_state()['has_secret'] ? (string) get_option( self::SECRET_OPTION ) : '';
+	}
+
+	/**
+	 * The stored public key, or '' for none. On a network, a site off the
+	 * list has none, whatever its options hold.
+	 *
+	 * @return string
+	 */
+	public static function stored_public_key() {
+		return self::get_state()['has_public_key'] ? (string) get_option( self::PUBLIC_KEY_OPTION ) : '';
+	}
+
+	/**
 	 * How the stored public key got here.
 	 *
 	 * @return string 'api', 'pasted', or '' for a key stored before the
@@ -407,7 +453,7 @@ class Exporter {
 	public static function enroll_public_key( $pasted_key ): bool {
 		$public_key = PublicKeyServer::assert_valid_public_key( $pasted_key );
 
-		if ( get_option( self::PUBLIC_KEY_OPTION ) === $public_key ) {
+		if ( self::stored_public_key() === $public_key ) {
 			return false;
 		}
 
