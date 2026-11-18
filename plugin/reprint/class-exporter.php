@@ -101,6 +101,10 @@ class Exporter {
 	public static function maybe_init() {
 		self::protect_options();
 
+		// A deleted site's tables go with it; its place on the list must too,
+		// or a later site given the same ID would start on it.
+		add_action( 'wp_uninitialize_site', array( __CLASS__, 'delist_deleted_site' ) );
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( ! isset( $_GET[ self::QUERY_VAR ] ) ) {
 			return;
@@ -193,15 +197,41 @@ class Exporter {
 		try {
 			// A site joins the network's list with nothing stored, so that
 			// whatever was written while it was off the list never counts.
+			// One that can't join gets nothing written.
 			if ( is_multisite() && ! Network_Sites::has_current() ) {
 				self::delete_credentials();
-				Network_Sites::add_current();
+				if ( ! Network_Sites::add_current() ) {
+					return false;
+				}
 			}
 
 			return update_option( $option, $value, false );
 		} finally {
 			self::$writing_own_options = false;
 		}
+	}
+
+	/**
+	 * Takes a site off the network's list, with the guard held open.
+	 *
+	 * @param int $site_id The site's ID.
+	 */
+	private static function delist( $site_id ) {
+		self::$writing_own_options = true;
+		try {
+			Network_Sites::remove( $site_id );
+		} finally {
+			self::$writing_own_options = false;
+		}
+	}
+
+	/**
+	 * Takes a site being deleted off the network's list.
+	 *
+	 * @param \WP_Site $site The site being deleted.
+	 */
+	public static function delist_deleted_site( $site ) {
+		self::delist( (int) $site->blog_id );
 	}
 
 	/**
@@ -251,7 +281,7 @@ class Exporter {
 		}
 
 		self::discard_site_credentials();
-		Network_Sites::remove_current();
+		self::delist( get_current_blog_id() );
 	}
 
 	/**

@@ -22,6 +22,9 @@ namespace Automattic\WPCOM_Migration\Reprint;
  * by anything else, while the plugin was inactive say, never counts. On a
  * single site, Exporter deletes such credentials at activation instead.
  *
+ * Every write here, adding or removing, needs Exporter's guard held open:
+ * the guard turns any other write into a rewrite of the stored list.
+ *
  * Unused on single sites.
  */
 class Network_Sites {
@@ -43,24 +46,41 @@ class Network_Sites {
 	}
 
 	/**
-	 * Adds the current site. Write it only with Exporter's guard held open.
+	 * Adds the current site.
+	 *
+	 * Two sites joining at once can each write the list without the other,
+	 * so the add is read back from the database and tried once more when
+	 * another write won.
+	 *
+	 * @return bool Whether the site is on the list.
 	 */
 	public static function add_current() {
-		$ids = self::ids();
-		if ( in_array( get_current_blog_id(), $ids, true ) ) {
-			return;
+		$site_id = get_current_blog_id();
+		for ( $attempt = 0; $attempt < 2; $attempt++ ) {
+			$ids = self::ids( true );
+			if ( in_array( $site_id, $ids, true ) ) {
+				return true;
+			}
+
+			$ids[] = $site_id;
+			update_site_option( self::OPTION, $ids );
 		}
 
-		$ids[] = get_current_blog_id();
-		update_site_option( self::OPTION, $ids );
+		return in_array( $site_id, self::ids( true ), true );
 	}
 
 	/**
-	 * Removes the current site. Removing needs no guard: it only takes a
-	 * credential away.
+	 * Removes a site. Deletes the list once it is empty.
+	 *
+	 * @param int $site_id The site's ID.
 	 */
-	public static function remove_current() {
-		$ids = array_values( array_diff( self::ids(), array( get_current_blog_id() ) ) );
+	public static function remove( $site_id ) {
+		$listed = self::ids();
+		$ids    = array_values( array_diff( $listed, array( (int) $site_id ) ) );
+		if ( $ids === $listed ) {
+			return;
+		}
+
 		if ( array() === $ids ) {
 			delete_site_option( self::OPTION );
 			return;
@@ -93,9 +113,17 @@ class Network_Sites {
 	/**
 	 * The site IDs on the list.
 	 *
+	 * @param bool $fresh Whether to skip the object cache and read the
+	 *                    database, to see another request's write.
 	 * @return int[]
 	 */
-	private static function ids() {
+	private static function ids( $fresh = false ) {
+		if ( $fresh ) {
+			$network_id = get_current_network_id();
+			wp_cache_delete( $network_id . ':' . self::OPTION, 'site-options' );
+			wp_cache_delete( $network_id . ':notoptions', 'site-options' );
+		}
+
 		$ids = get_site_option( self::OPTION, array() );
 		return is_array( $ids ) ? array_map( 'intval', $ids ) : array();
 	}

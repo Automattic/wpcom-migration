@@ -26,6 +26,7 @@ set_exception_handler(
 );
 
 const WPCOM_MIGRATION_E2E_SHOP_PATH = '/shop/';
+const WPCOM_MIGRATION_E2E_PLUGIN    = 'wpcom-migration/wpcom_migration.php';
 const WPCOM_MIGRATION_E2E_MS_SECRET = 'multisite-secret-0123456789abcdef0123456789abcdef';
 
 // A network that can't find the requested site ends the request with exit
@@ -38,6 +39,10 @@ const WPCOM_MIGRATION_E2E_MS_STEPS = array(
 	'shop-context',
 	'shop-served',
 	'shop-off-list',
+	'shop-list-race',
+	'shop-selection',
+	'main-selection',
+	'deleted-site-delisted',
 	'shop-shared-table',
 	'shop-rest-permission',
 	'network-deactivation',
@@ -116,12 +121,24 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			break;
 
 		case 'shop-off-list':
-			// A credential on a site that's off the list doesn't count.
+			// A credential on a site that's off the list doesn't count. The
+			// main site is on the list too, so taking the shop off is a real
+			// update, not the delete an emptied list gets.
 			wpcom_migration_e2e_expect_shop( $step );
+			$main_id = get_main_site_id();
+			switch_to_blog( $main_id );
+			wpcom_migration_e2e_store_secret( $step );
+			restore_current_blog();
 			if ( ! Exporter::get_state()['has_credential'] ) {
 				throw new RuntimeException( "Step '$step': the shop should still hold its credential." );
 			}
-			Network_Sites::remove_current();
+			wpcom_migration_e2e_delist_current();
+			if ( Network_Sites::has_current() ) {
+				throw new RuntimeException( "Step '$step': the shop should be off the list, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
+			}
+			if ( array( $main_id ) !== get_site_option( Network_Sites::OPTION ) ) {
+				throw new RuntimeException( "Step '$step': the main site should stay on the list, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
+			}
 			if ( Exporter::get_state()['has_credential'] ) {
 				throw new RuntimeException( "Step '$step': a site off the list should have no credential." );
 			}
@@ -138,6 +155,144 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			}
 			if ( ! Network_Sites::has_current() || ! Exporter::get_state()['has_public_key'] ) {
 				throw new RuntimeException( "Step '$step': storing a key should put the shop back on the list." );
+			}
+
+			// Deactivating on one site takes it off the list and leaves the others.
+			Exporter::discard_credentials( false );
+			if ( Network_Sites::has_current() || false !== get_option( Exporter::PUBLIC_KEY_OPTION ) ) {
+				throw new RuntimeException( "Step '$step': deactivating on the shop should delete its key and take it off the list." );
+			}
+			if ( array( $main_id ) !== get_site_option( Network_Sites::OPTION ) ) {
+				throw new RuntimeException( "Step '$step': the main site should stay on the list, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
+			}
+			break;
+
+		case 'shop-list-race':
+			// Another site's request writes the list right after the shop's
+			// write, without the shop. The shop sees that and joins again.
+			wpcom_migration_e2e_expect_shop( $step );
+			global $wpdb;
+			$main_id = get_main_site_id();
+			if ( array( $main_id ) !== get_site_option( Network_Sites::OPTION ) ) {
+				throw new RuntimeException( "Step '$step': expected only the main site on the list, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
+			}
+			$lost = 0;
+			$race = static function () use ( $wpdb, $main_id, &$race, &$lost ) {
+				remove_action( 'update_site_option_' . Network_Sites::OPTION, $race );
+				++$lost;
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery -- Stands in for another request's write.
+				$wpdb->update( $wpdb->sitemeta, array( 'meta_value' => maybe_serialize( array( $main_id ) ) ), array( 'meta_key' => Network_Sites::OPTION ) );
+			};
+			add_action( 'update_site_option_' . Network_Sites::OPTION, $race );
+			if ( ! Exporter::store_secret( WPCOM_MIGRATION_E2E_MS_SECRET ) ) {
+				throw new RuntimeException( "Step '$step': the secret should be stored." );
+			}
+			wp_cache_delete( get_current_network_id() . ':' . Network_Sites::OPTION, 'site-options' );
+			if ( 1 !== $lost || array( $main_id, get_current_blog_id() ) !== get_site_option( Network_Sites::OPTION ) ) {
+				throw new RuntimeException( "Step '$step': the shop should have joined again after the lost write, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
+			}
+			break;
+
+		case 'shop-selection':
+			// What Reprint itself makes of the shop's context: the filters its
+			// file_index and sql_chunk endpoints apply, and its dispatcher.
+			wpcom_migration_e2e_expect_shop( $step );
+			global $wpdb;
+			$context = Multisite_Context::build();
+			$shop_id = get_current_blog_id();
+			$content = rtrim( WP_CONTENT_DIR, '/' );
+			wpcom_migration_e2e_expect_paths(
+				new \WordPress\Reprint\Server\MultisiteFileSelection( $context ),
+				array(
+					$content . "/uploads/sites/$shop_id/2026/01/shop.jpg" => true,
+					$content . '/plugins/hello.php'        => true,
+					// The exporter's own folder stays out, though shared plugins go.
+					$content . '/plugins/wpcom-migration/wpcom_migration.php' => false,
+					ABSPATH . 'wp-includes/version.php'    => true,
+					$content . '/uploads/2026/01/main.jpg' => false,
+					$content . '/uploads/sites/999/2026/01/other.jpg' => false,
+				),
+				$step
+			);
+			wpcom_migration_e2e_expect_tables(
+				new \WordPress\Reprint\Server\MultisiteDatabaseSelection( $wpdb->base_prefix, $context['site_id'], $context['network_id'] ),
+				array(
+					$wpdb->prefix . 'posts'          => true,
+					$wpdb->prefix . 'options'        => true,
+					$wpdb->base_prefix . 'posts'     => false,
+					$wpdb->base_prefix . 'options'   => false,
+					$wpdb->base_prefix . '999_posts' => false,
+				),
+				$step
+			);
+
+			// The dispatcher takes the context and refuses an old client.
+			$server = new \WordPress\Reprint\Server\HTTPServer( array( 'multisite' => $context ) );
+			try {
+				$server->normalize_config( array( 'endpoint' => 'preflight' ) );
+				throw new RuntimeException( "Step '$step': a client without multisite_mode should be refused." );
+			} catch ( InvalidArgumentException $exception ) {
+				// Expected.
+			}
+			$config = $server->normalize_config(
+				array(
+					'endpoint'       => 'preflight',
+					'multisite_mode' => 'one-site-network-v1',
+				)
+			);
+			if ( $shop_id !== $config['_multisite']['site_id'] ) {
+				throw new RuntimeException( "Step '$step': the dispatcher should carry the shop's context, got: " . wp_json_encode( $config['_multisite'] ) );
+			}
+			break;
+
+		case 'main-selection':
+			// The main site's uploads root holds every other site's uploads,
+			// and its tables have no number.
+			if ( ! is_main_site() ) {
+				throw new RuntimeException( "Step '$step': this request should have loaded the main site." );
+			}
+			global $wpdb;
+			$context = Multisite_Context::build();
+			$shop_id = get_blog_id_from_url( 'localhost', WPCOM_MIGRATION_E2E_SHOP_PATH );
+			$content = rtrim( WP_CONTENT_DIR, '/' );
+			wpcom_migration_e2e_expect_paths(
+				new \WordPress\Reprint\Server\MultisiteFileSelection( $context ),
+				array(
+					$content . '/uploads/2026/01/main.jpg' => true,
+					$content . "/uploads/sites/$shop_id/2026/01/shop.jpg" => false,
+				),
+				$step
+			);
+			wpcom_migration_e2e_expect_tables(
+				new \WordPress\Reprint\Server\MultisiteDatabaseSelection( $wpdb->base_prefix, $context['site_id'], $context['network_id'] ),
+				array(
+					$wpdb->base_prefix . 'posts' => true,
+					$wpdb->base_prefix . $shop_id . '_posts' => false,
+				),
+				$step
+			);
+			break;
+
+		case 'deleted-site-delisted':
+			// A deleted site leaves the list, so a later site given its ID
+			// doesn't start on it.
+			$temp_id = wpmu_create_blog( 'localhost', '/temp/', 'Temp', 1 );
+			if ( is_wp_error( $temp_id ) ) {
+				throw new RuntimeException( "Step '$step': " . $temp_id->get_error_message() );
+			}
+			switch_to_blog( $temp_id );
+			wpcom_migration_e2e_store_secret( $step );
+			$listed = Network_Sites::has_current();
+			restore_current_blog();
+			if ( ! $listed ) {
+				throw new RuntimeException( "Step '$step': the temporary site should be on the list." );
+			}
+			$deleted = wp_delete_site( $temp_id );
+			if ( is_wp_error( $deleted ) ) {
+				throw new RuntimeException( "Step '$step': " . $deleted->get_error_message() );
+			}
+			if ( in_array( $temp_id, (array) get_site_option( Network_Sites::OPTION, array() ), true ) ) {
+				throw new RuntimeException( "Step '$step': a deleted site should leave the list, got: " . wp_json_encode( get_site_option( Network_Sites::OPTION ) ) );
 			}
 			break;
 
@@ -203,14 +358,18 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			break;
 
 		case 'network-deactivation':
-			// Run from the main site, as WordPress runs the hook.
+			// Through WordPress, from the main site, so the hook gets the
+			// network-wide flag the way WordPress passes it.
 			$shop_id = get_blog_id_from_url( 'localhost', WPCOM_MIGRATION_E2E_SHOP_PATH );
 			wpcom_migration_e2e_store_secret( $step );
 			switch_to_blog( $shop_id );
 			wpcom_migration_e2e_store_secret( $step );
 			restore_current_blog();
 
-			Exporter::discard_credentials( true );
+			deactivate_plugins( WPCOM_MIGRATION_E2E_PLUGIN, false, true );
+			if ( is_plugin_active_for_network( WPCOM_MIGRATION_E2E_PLUGIN ) ) {
+				throw new RuntimeException( "Step '$step': the plugin should be inactive on the network." );
+			}
 
 			foreach ( array( get_main_site_id(), $shop_id ) as $site_id ) {
 				switch_to_blog( $site_id );
@@ -223,6 +382,11 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			if ( false !== get_site_option( Network_Sites::OPTION ) ) {
 				throw new RuntimeException( "Step '$step': the list should be gone." );
 			}
+
+			$activated = activate_plugin( WPCOM_MIGRATION_E2E_PLUGIN, '', true );
+			if ( is_wp_error( $activated ) ) {
+				throw new RuntimeException( "Step '$step': " . $activated->get_error_message() );
+			}
 			break;
 
 		case 'all-ran':
@@ -230,7 +394,7 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			if ( WPCOM_MIGRATION_E2E_MS_STEPS !== $ran ) {
 				throw new RuntimeException( "Step '$step': expected " . wp_json_encode( WPCOM_MIGRATION_E2E_MS_STEPS ) . ' to run, got: ' . wp_json_encode( $ran ) );
 			}
-			if ( ! is_plugin_active_for_network( 'wpcom-migration/wpcom_migration.php' ) ) {
+			if ( ! is_plugin_active_for_network( WPCOM_MIGRATION_E2E_PLUGIN ) ) {
 				throw new RuntimeException( "Step '$step': the plugin should be active on the network." );
 			}
 			return;
@@ -242,6 +406,48 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 	$ran   = get_site_option( WPCOM_MIGRATION_E2E_MS_RAN, array() );
 	$ran[] = $step;
 	update_site_option( WPCOM_MIGRATION_E2E_MS_RAN, $ran );
+}
+
+/**
+ * Takes the current site off the list and leaves its credential stored, as
+ * a write that put the credential there while the plugin was inactive would.
+ */
+function wpcom_migration_e2e_delist_current() {
+	$delist = new ReflectionMethod( Exporter::class, 'delist' );
+	$delist->setAccessible( true );
+	$delist->invoke( null, get_current_blog_id() );
+}
+
+/**
+ * Fails unless Reprint's file selection takes and leaves the given paths.
+ *
+ * @param \WordPress\Reprint\Server\MultisiteFileSelection $selection The selection.
+ * @param array<string,bool>                               $expected  Whether each path is in the export.
+ * @param string                                           $step      Step name.
+ * @throws RuntimeException When a path is taken or left wrongly.
+ */
+function wpcom_migration_e2e_expect_paths( $selection, array $expected, $step ) {
+	foreach ( $expected as $path => $included ) {
+		if ( $included !== $selection->includes_path( $path ) ) {
+			throw new RuntimeException( "Step '$step': $path should " . ( $included ? '' : 'not ' ) . 'be in the export.' );
+		}
+	}
+}
+
+/**
+ * Fails unless Reprint's database selection takes and leaves the given tables.
+ *
+ * @param \WordPress\Reprint\Server\MultisiteDatabaseSelection $selection The selection.
+ * @param array<string,bool>                                   $expected  Whether each table is in the export.
+ * @param string                                               $step      Step name.
+ * @throws RuntimeException When a table is taken or left wrongly.
+ */
+function wpcom_migration_e2e_expect_tables( $selection, array $expected, $step ) {
+	foreach ( $expected as $table => $included ) {
+		if ( $included !== $selection->includes_table( $table ) ) {
+			throw new RuntimeException( "Step '$step': table $table should " . ( $included ? '' : 'not ' ) . 'be in the export.' );
+		}
+	}
 }
 
 /**
