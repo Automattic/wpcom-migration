@@ -10,6 +10,8 @@
 
 namespace Automattic\WPCOM_Migration;
 
+use Automattic\WPCOM_Migration\Reprint\Access;
+
 /**
  * WordPress.com connection section of the Reprint migration screen.
  *
@@ -143,7 +145,7 @@ class Connect_Page {
 		}
 		// phpcs:enable
 
-		if ( is_multisite() || ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
+		if ( ! Access::can_migrate() ) {
 			return;
 		}
 
@@ -216,22 +218,14 @@ class Connect_Page {
 	}
 
 	/**
-	 * Stops a form post that is not a nonce-carrying administrator request on
-	 * a single site.
-	 *
-	 * A role check, not a capability one: connecting hands WordPress.com the
-	 * whole site, and plugins grant manage_options to roles that should not
-	 * be able to do that.
+	 * Stops a form post that is not a nonce-carrying request from someone
+	 * who may migrate the site. See Access.
 	 *
 	 * @param string $action The admin-post action being handled.
 	 */
 	private function authorize( $action ) {
-		if ( is_multisite() ) {
-			wp_die( esc_html__( 'The WordPress.com connection is not supported on networks.', 'wpcom-migration' ) );
-		}
-
-		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			wp_die( esc_html__( 'Only an administrator can connect this site to WordPress.com.', 'wpcom-migration' ) );
+		if ( ! Access::can_migrate() ) {
+			wp_die( esc_html( Access::refusal() ) );
 		}
 
 		check_admin_referer( $action );
@@ -322,8 +316,8 @@ class Connect_Page {
 	/**
 	 * Renders the WordPress.com account the current user is connected as:
 	 * the avatar, the name, then on one line the email and either the
-	 * plugins the connection is shared with or, for an administrator, the
-	 * disconnect link. Disconnecting would leave a shared connection in
+	 * plugins the connection is shared with or, for whoever may migrate the
+	 * site, the disconnect link. Disconnecting would leave a shared connection in
 	 * place, so it isn't offered then. Without the account's details it says
 	 * only that the user is connected.
 	 */
@@ -332,7 +326,7 @@ class Connect_Page {
 		$name        = $user['display_name'] ?? $user['login'] ?? '';
 		$email       = $user['email'] ?? '';
 		$shared_with = Connection::other_connected_plugins();
-		$disconnect  = array() === $shared_with && in_array( 'administrator', wp_get_current_user()->roles, true );
+		$disconnect  = array() === $shared_with && Access::can_migrate();
 
 		$details = array();
 		if ( '' !== $email ) {

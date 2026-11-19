@@ -18,9 +18,9 @@ use Automattic\Jetpack\Connection\Client;
  * none, in a transient per user until the ttl runs out. A failed fetch keeps
  * none, so the button gets the default link, and asks again after
  * RETRY_AFTER. Only an answer of no match counts as unmatched, so a failed
- * fetch doesn't send anyone to start over. Without a connected user, or on a
- * network, nothing is asked:
- * the screen only links to WordPress.com for a connected user.
+ * fetch doesn't send anyone to start over. Without a connected user nothing
+ * is asked: the screen only links to WordPress.com for a connected user. On a
+ * network, each site asks for itself, with its own URL.
  */
 class Continue_Url {
 
@@ -86,7 +86,7 @@ class Continue_Url {
 	 * @return string|null
 	 */
 	public static function destination() {
-		if ( is_multisite() || ! Connection::is_user_connected() ) {
+		if ( ! Connection::is_user_connected() ) {
 			return null;
 		}
 

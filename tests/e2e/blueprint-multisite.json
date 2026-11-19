@@ -23,10 +23,6 @@
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/'; require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/screen-steps.php'; wpcom_migration_e2e_screen_step( 'multisite-key-page' );"
-		},
-		{
-			"step": "runPHP",
 			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/'; require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'create-shop' );"
 		},
 		{
@@ -72,6 +68,22 @@
 		{
 			"step": "runPHP",
 			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/shop/'; require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'shop-rest-permission' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/shop/'; define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'shop-screens-site-admin' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/shop/'; require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'shop-screens-super-admin-no-role' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/shop/'; define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'shop-screens-super-admin' );"
+		},
+		{
+			"step": "runPHP",
+			"code": "<?php $_SERVER['HTTP_HOST'] = 'localhost'; $_SERVER['REQUEST_URI'] = '/shop/'; define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/multisite-steps.php'; wpcom_migration_e2e_multisite_step( 'shop-connect-enlists' );"
 		},
 		{
 			"step": "runPHP",

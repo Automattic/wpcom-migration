@@ -10,6 +10,8 @@ namespace Automattic\WPCOM_Migration;
 use Automattic\Jetpack\Config;
 use Automattic\Jetpack\Connection\Manager;
 use Automattic\Jetpack\Connection\Rest_Authentication;
+use Automattic\WPCOM_Migration\Reprint\Exporter;
+use Automattic\WPCOM_Migration\Reprint\Network_Sites;
 use WP_Error;
 
 /**
@@ -167,6 +169,12 @@ class Connection {
 	 * @return string|WP_Error The authorization URL, or why registration failed.
 	 */
 	public static function authorization_url( $return_url ) {
+		// Before any token is written, so network deactivation finds the site.
+		if ( ! Exporter::enlist_current_site() ) {
+			self::record_event( 'registration_failed', array( 'code' => 'network_list_unavailable' ) );
+			return new WP_Error( 'network_list_unavailable', 'The site could not be added to the network\'s list of migrating sites.' );
+		}
+
 		$manager = self::manager();
 
 		if ( ! $manager->is_connected() ) {
@@ -219,6 +227,32 @@ class Connection {
 		}
 
 		return $names;
+	}
+
+	/**
+	 * Leaves WordPress.com on deactivation: disconnects and forgets every
+	 * user's stored destination, on the current site and, on a network
+	 * deactivation, on every site on the network's list.
+	 *
+	 * Must run before Exporter::discard_credentials() empties the list.
+	 *
+	 * @param bool $network_wide Whether WordPress is deactivating the plugin
+	 *                           for the whole network.
+	 */
+	public static function leave( $network_wide = false ) {
+		if ( is_multisite() && $network_wide ) {
+			Network_Sites::each( array( __CLASS__, 'leave_site' ) );
+		}
+
+		self::leave_site();
+	}
+
+	/**
+	 * Disconnects the current site and forgets its stored destinations.
+	 */
+	public static function leave_site() {
+		self::disconnect();
+		Continue_Url::forget_all();
 	}
 
 	/**

@@ -323,8 +323,8 @@ function wpcom_migration_e2e_menu_step( $step ) {
 
 		case 'multisite-subsite':
 			// The plugin's entry points on a network lead to the old screen
-			// in the network admin; a subsite has no row, since the Reprint
-			// screen can't migrate a network.
+			// in the network admin; a subsite has no row, since only super
+			// admins may migrate one and they reach the screens by URL.
 			do_action( 'admin_enqueue_scripts', '' );
 
 			if ( array() !== $slugs ) {

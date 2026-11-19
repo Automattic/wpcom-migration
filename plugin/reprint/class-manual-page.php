@@ -211,7 +211,7 @@ class Manual_Page {
 			$this->redirect_with_notice( 'not_configured' );
 		}
 
-		if ( get_option( Exporter::SECRET_OPTION ) === $secret ) {
+		if ( Exporter::stored_secret() === $secret ) {
 			$this->redirect_with_notice( 'unchanged' );
 		}
 
@@ -270,18 +270,14 @@ class Manual_Page {
 	}
 
 	/**
-	 * Stops a form post that is not a nonce-carrying administrator request on
-	 * a single site.
+	 * Stops a form post that is not a nonce-carrying request from someone
+	 * who may migrate the site. See Access.
 	 *
 	 * @param string $action The admin-post action being handled.
 	 */
 	private function authorize( $action ) {
-		if ( is_multisite() ) {
-			wp_die( esc_html__( 'The exporter is not supported on networks.', 'wpcom-migration' ) );
-		}
-
-		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			wp_die( esc_html__( 'Only an administrator can manage the exporter.', 'wpcom-migration' ) );
+		if ( ! Access::can_migrate() ) {
+			wp_die( esc_html( Access::refusal() ) );
 		}
 
 		check_admin_referer( $action );
@@ -307,13 +303,7 @@ class Manual_Page {
 	 * credential is valid; the blog ID when connected.
 	 */
 	public function render_page() {
-		if ( ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
-			return;
-		}
-
-		if ( is_multisite() ) {
-			echo '<div class="wrap"><h1>' . esc_html__( 'Set up Reprint manually', 'wpcom-migration' ) . '</h1>';
-			echo '<p>' . esc_html__( 'The exporter runs on single sites only.', 'wpcom-migration' ) . '</p></div>';
+		if ( ! Access::can_migrate() ) {
 			return;
 		}
 
@@ -354,7 +344,7 @@ class Manual_Page {
 	 * @param array $state Exporter::get_state().
 	 */
 	private function render_secret_form( array $state ) {
-		$stored_secret = $state['has_secret'] ? (string) get_option( Exporter::SECRET_OPTION, '' ) : '';
+		$stored_secret = Exporter::stored_secret();
 		?>
 		<h2><?php esc_html_e( 'Export secret', 'wpcom-migration' ); ?></h2>
 		<p><?php esc_html_e( 'Paste the secret supplied by WordPress.com.', 'wpcom-migration' ); ?></p>
@@ -423,7 +413,7 @@ class Manual_Page {
 		}
 
 		try {
-			$key_id = Utils::public_key_fingerprint( (string) get_option( Exporter::PUBLIC_KEY_OPTION, '' ) );
+			$key_id = Utils::public_key_fingerprint( Exporter::stored_public_key() );
 		} catch ( InvalidArgumentException $exception ) {
 			$key_id = '—';
 		}

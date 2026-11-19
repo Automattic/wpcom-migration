@@ -463,7 +463,7 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			$html = wpcom_migration_e2e_render_key( $key_page );
 			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, 'Contact WordPress.com support', $step );
-			wpcom_migration_e2e_expect_contains( $html, 'Only an administrator can connect this site with a migration key.', $step );
+			wpcom_migration_e2e_expect_contains( $html, 'Only an administrator can migrate this site.', $step );
 			wpcom_migration_e2e_expect_plain_language( $html, $step );
 
 			try {
@@ -569,17 +569,6 @@ function wpcom_migration_e2e_screen_step( $step ) {
 			wpcom_migration_e2e_expect_contains( $html, 'Migration key deleted.', $step );
 			wpcom_migration_e2e_expect_contains( $html, '<h1>Add Migration Key</h1>', $step );
 			wpcom_migration_e2e_expect_not_contains( $html, Key_Page::DELETE_ACTION, $step );
-			break;
-
-		case 'multisite-key-page':
-			$html = wpcom_migration_e2e_render_key( $key_page );
-			wpcom_migration_e2e_expect_contains( $html, 'runs on single sites only', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, '<textarea', $step );
-			wpcom_migration_e2e_expect_not_contains( $html, 'Connect with your WordPress.com account instead', $step );
-			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
-			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
-			wpcom_migration_e2e_expect_key_denied( $key_page, $step );
-			wpcom_migration_e2e_expect_no_public_key( $step );
 			break;
 
 		case 'render-key-page-unsupported':

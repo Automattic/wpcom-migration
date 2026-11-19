@@ -117,7 +117,8 @@ class Settings_Page {
 
 	/**
 	 * Whether the screen gets the plugin's sidebar row, with Connection and
-	 * Migration Key under it: on a single site, never on a network.
+	 * Migration Key under it: on a single site. Never on a network, where
+	 * only super admins may migrate and they reach the screen by its URL.
 	 *
 	 * @return bool
 	 */
@@ -225,8 +226,8 @@ class Settings_Page {
 	 * key button is there, adding one or managing the one stored.
 	 */
 	private function render_body() {
-		if ( is_multisite() ) {
-			self::render_sentence( __( 'The exporter runs on single sites only, so this site can\'t be migrated from here.', 'wpcom-migration' ) );
+		if ( ! Access::can_migrate() ) {
+			self::render_sentence( Access::refusal() );
 			return;
 		}
 
