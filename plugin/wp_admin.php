@@ -25,27 +25,28 @@ class WPCOMWPAdmin {
 	}
 
 	/**
-	 * Where the plugin's own entry points send the user: the Reprint screen
-	 * wherever it is main, else the old screen.
+	 * Where the plugin's own entry points send the user: the Reprint screen,
+	 * else the old screen. On a network, the main site's Reprint screen: the
+	 * network admin has none, and each site is migrated from its own
+	 * dashboard.
 	 *
 	 * Not simply mainUrl(): siteInfoTags() posts that to the app as
 	 * `adminurl`, where it still describes the old screen.
 	 */
 	public function migrationScreenUrl() {
 		if ($this->reprintIsMain()) {
-			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
+			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url(is_multisite() ? get_main_site_id() : null);
 		}
 		return $this->mainUrl();
 	}
 
 	/**
-	 * Whether the Reprint screen is the main one: on a single site with the
-	 * Reprint classes loaded. Not on a network, where the Reprint screen
-	 * can't migrate, nor in a source checkout without plugin/vendor/, where
-	 * the Reprint classes are absent.
+	 * Whether the Reprint screen is the main one: wherever the Reprint
+	 * classes are loaded. Not in a source checkout without plugin/vendor/,
+	 * where they are absent.
 	 */
 	private function reprintIsMain() {
-		return !is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page');
+		return class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page');
 	}
 
 	function removeAdminNotices() {
@@ -142,10 +143,10 @@ class WPCOMWPAdmin {
 		// Wherever the Reprint screen is main, it owns the sidebar entry.
 		// Removing the page from the $menu global leaves its callback
 		// hooked and its $_registered_pages entry set, so
-		// admin.php?page=wpcom-migration still renders and keeps the
-		// toplevel_page_wpcom-migration hook suffix its stylesheet and
-		// notice handling key on. The network admin, where the Reprint
-		// screen doesn't run, keeps this row.
+		// admin.php?page=wpcom-migration still renders and keeps the hook
+		// suffix its stylesheet and notice handling key on. On a network
+		// this row is the network admin's, which loses it too: each site is
+		// migrated from its own dashboard.
 		if ($this->reprintIsMain()) {
 			remove_menu_page($this->bvinfo->plugname);
 			add_action('load-'.$hook, array($this, 'setScreenTitle'));

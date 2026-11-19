@@ -49,6 +49,35 @@ function wpcom_migration_e2e_menu_step( $step ) {
 		update_option( 'wpcombrand', array( 'hide_from_menu' => true ) );
 	}
 
+	if ( 'multisite-site-admin' === $step ) {
+		// A site's own administrator, not a super admin.
+		$admin    = get_user_by( 'login', 'site-admin' );
+		$admin_id = $admin ? $admin->ID : wp_insert_user(
+			array(
+				'user_login' => 'site-admin',
+				'user_pass'  => wp_generate_password(),
+				'user_email' => 'site-admin@example.com',
+				'role'       => 'administrator',
+			)
+		);
+		if ( is_wp_error( $admin_id ) ) {
+			throw new RuntimeException( $admin_id->get_error_message() );
+		}
+		wp_set_current_user( $admin_id );
+		if ( is_super_admin() || ! current_user_can( 'manage_options' ) ) {
+			throw new RuntimeException( 'The site admin should have manage_options and not be a super admin.' );
+		}
+	}
+
+	if ( 'multisite-super-admin-no-role' === $step ) {
+		// A super admin who isn't a member of the site.
+		remove_user_from_blog( 1, get_current_blog_id() );
+		wp_set_current_user( 1 );
+		if ( is_user_member_of_blog( 1 ) || ! is_super_admin() ) {
+			throw new RuntimeException( 'User 1 should be a super admin with no role on the site.' );
+		}
+	}
+
 	$slugs = array();
 
 	// These steps drive admin_menu themselves, with $pagenow and
@@ -322,17 +351,17 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			break;
 
 		case 'multisite-subsite':
-			// The plugin's entry points on a network lead to the old screen
-			// in the network admin; a subsite has no row, since only super
-			// admins may migrate one and they reach the screens by URL.
+			// A super admin gets each site's Reprint row, as on a single
+			// site; the plugin's entry points lead to the main site's screen.
 			do_action( 'admin_enqueue_scripts', '' );
 
-			if ( array() !== $slugs ) {
-				throw new RuntimeException( 'A subsite of a network should have no plugin row, got: ' . wp_json_encode( $slugs ) );
+			if ( array( Settings_Page::PAGE_SLUG ) !== $slugs ) {
+				throw new RuntimeException( 'A super admin should get the Reprint row on a site of a network, got: ' . wp_json_encode( $slugs ) );
 			}
+			wpcom_migration_e2e_assert_flyout( 'On a site of a network, the Reprint screen' );
 
 			$admin    = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
-			$expected = network_admin_url( 'admin.php?page=wpcom-migration' );
+			$expected = Settings_Page::page_url( get_main_site_id() );
 			if ( $expected !== $admin->migrationScreenUrl() ) {
 				throw new RuntimeException( 'On a network the plugin should send users to ' . $expected . ', got: ' . $admin->migrationScreenUrl() );
 			}
@@ -341,9 +370,30 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG ) );
 			break;
 
+		case 'multisite-site-admin':
+			// A site's own administrator can't migrate it, so gets no row.
+			do_action( 'admin_enqueue_scripts', '' );
+			if ( array() !== $slugs ) {
+				throw new RuntimeException( 'A site admin on a network should have no plugin row, got: ' . wp_json_encode( $slugs ) );
+			}
+			break;
+
+		case 'multisite-super-admin-no-role':
+			// They can't migrate yet, but get the row: the screen tells them
+			// to add themselves as an administrator.
+			do_action( 'admin_enqueue_scripts', '' );
+			$has_row = array( Settings_Page::PAGE_SLUG ) === $slugs;
+			add_user_to_blog( get_current_blog_id(), 1, 'administrator' );
+			if ( ! $has_row ) {
+				throw new RuntimeException( 'A super admin with no role on the site should still get the Reprint row, got: ' . wp_json_encode( $slugs ) );
+			}
+			break;
+
 		case 'multisite-network':
-			if ( array( 'wpcom-migration' ) !== $slugs ) {
-				throw new RuntimeException( 'The network admin should keep the old screen\'s row, got: ' . wp_json_encode( $slugs ) );
+			// The network admin has no row: each site is migrated from its
+			// own dashboard. The old screen stays reachable at its URL.
+			if ( array() !== $slugs ) {
+				throw new RuntimeException( 'The network admin should have no plugin row, got: ' . wp_json_encode( $slugs ) );
 			}
 
 			$admin = new WPCOMWPAdmin( new WPCOMWPSettings(), new WPCOMWPSiteInfo() );
