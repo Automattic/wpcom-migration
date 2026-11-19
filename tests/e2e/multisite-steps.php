@@ -55,6 +55,7 @@ const WPCOM_MIGRATION_E2E_MS_STEPS = array(
 	'main-shared-table',
 	'shop-rest-permission',
 	'shop-screens-site-admin',
+	'shop-screens-super-admin-no-role',
 	'shop-screens-super-admin',
 	'shop-connect-enlists',
 	'network-deactivation',
@@ -383,13 +384,29 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 				throw new RuntimeException( "Step '$step': a site administrator should be refused on a network." );
 			}
 
-			// A super admin is, with no role on the shop.
-			wpcom_migration_e2e_rest_login( 1 );
+			// Nor is a super admin with no role on the shop: the export
+			// carries only the shop's own users, so they'd be missing.
 			if ( ! is_super_admin( 1 ) ) {
 				throw new RuntimeException( "Step '$step': user 1 should be a super admin." );
 			}
+			remove_user_from_blog( 1, get_current_blog_id() );
+			wpcom_migration_e2e_rest_login( 1 );
+			if ( true === $controller->permission_check() ) {
+				throw new RuntimeException( "Step '$step': a super admin with no role on the shop should be refused." );
+			}
+
+			// Nor one with a lesser role there.
+			add_user_to_blog( get_current_blog_id(), 1, 'editor' );
+			wpcom_migration_e2e_rest_login( 1 );
+			if ( true === $controller->permission_check() ) {
+				throw new RuntimeException( "Step '$step': a super admin who is an editor of the shop should be refused." );
+			}
+
+			// A super admin who administers the shop is let in.
+			add_user_to_blog( get_current_blog_id(), 1, 'administrator' );
+			wpcom_migration_e2e_rest_login( 1 );
 			if ( true !== $controller->permission_check() ) {
-				throw new RuntimeException( "Step '$step': a super admin should be let in on a network." );
+				throw new RuntimeException( "Step '$step': a super admin who administers the shop should be let in." );
 			}
 			break;
 
@@ -402,7 +419,7 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			if ( ! current_user_can( 'manage_options' ) ) {
 				throw new RuntimeException( "Step '$step': the shop's administrator should have manage_options." );
 			}
-			$refusal = esc_html( wptexturize( 'Only a super admin can migrate a site of this network.' ) );
+			$refusal = esc_html( wptexturize( 'Only a super admin who is also an administrator of this site can migrate it.' ) );
 
 			$html = wpcom_migration_e2e_render_shop_screen();
 			wpcom_migration_e2e_expect_contains( $html, $refusal, $step );
@@ -431,16 +448,52 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			}
 			break;
 
-		case 'shop-screens-super-admin':
-			// A super admin with no role on the shop sees the screen a single
-			// site's administrator does, and a pasted key puts the shop on the
-			// list.
+		case 'shop-screens-super-admin-no-role':
+			// A super admin with no role on the shop is told how to get one,
+			// and their form posts die before they store anything.
 			wpcom_migration_e2e_expect_shop( $step );
 			wpcom_migration_e2e_reset_shop();
 			remove_user_from_blog( 1, get_current_blog_id() );
 			wp_set_current_user( 1 );
 			if ( is_user_member_of_blog( 1 ) || ! is_super_admin( 1 ) ) {
 				throw new RuntimeException( "Step '$step': user 1 should be a super admin with no role on the shop." );
+			}
+			$refusal = esc_html( wptexturize( 'To migrate this site, first add yourself as one of its administrators: in Network Admin, go to Sites, edit this site, and add yourself under Users.' ) );
+
+			$html = wpcom_migration_e2e_render_shop_screen();
+			wpcom_migration_e2e_expect_contains( $html, $refusal, $step );
+			wpcom_migration_e2e_expect_not_contains( $html, 'Connect to WordPress.com', $step );
+
+			$key_page = new Key_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE );
+			wpcom_migration_e2e_expect_contains( wpcom_migration_e2e_render_key( $key_page ), $refusal, $step );
+
+			list( , $public_key ) = \WordPress\Reprint\Server\PublicKeyClient::generate_keypair();
+			wpcom_migration_e2e_post( Key_Page::CONNECT_ACTION, array( Key_Page::KEY_FIELD => \WordPress\Reprint\Server\Utils::public_key_to_pem( $public_key ) ) );
+			wpcom_migration_e2e_expect_key_denied( $key_page, $step );
+			wpcom_migration_e2e_expect_no_public_key( $step );
+
+			wpcom_migration_e2e_post( Connect_Page::CONNECT_ACTION, array() );
+			wpcom_migration_e2e_expect_dies(
+				function () {
+					( new Connect_Page( WPCOM_MIGRATION_E2E_PLUGIN_FILE ) )->handle_connect();
+				},
+				$step
+			);
+			if ( Network_Sites::has_current() ) {
+				throw new RuntimeException( "Step '$step': a refused post should leave the shop off the list." );
+			}
+			break;
+
+		case 'shop-screens-super-admin':
+			// A super admin who administers the shop sees the screen a single
+			// site's administrator does, and a pasted key puts the shop on the
+			// list.
+			wpcom_migration_e2e_expect_shop( $step );
+			wpcom_migration_e2e_reset_shop();
+			add_user_to_blog( get_current_blog_id(), 1, 'administrator' );
+			wp_set_current_user( 1 );
+			if ( ! is_super_admin( 1 ) || ! in_array( 'administrator', wp_get_current_user()->roles, true ) ) {
+				throw new RuntimeException( "Step '$step': user 1 should be a super admin and an administrator of the shop." );
 			}
 
 			$html = wpcom_migration_e2e_render_shop_screen();
