@@ -55,6 +55,8 @@ $wpcom_migration_own_classes = array(
 	'Automattic\\WPCOM_Migration\\Reprint\\Exporter',
 	'Automattic\\WPCOM_Migration\\Reprint\\Key_Page',
 	'Automattic\\WPCOM_Migration\\Reprint\\Manual_Page',
+	'Automattic\\WPCOM_Migration\\Reprint\\Multisite_Context',
+	'Automattic\\WPCOM_Migration\\Reprint\\Network_Sites',
 	'Automattic\\WPCOM_Migration\\Reprint\\REST_Controller',
 	'Automattic\\WPCOM_Migration\\Reprint\\Settings_Page',
 );

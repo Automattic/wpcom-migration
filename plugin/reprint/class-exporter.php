@@ -9,6 +9,7 @@
 
 namespace Automattic\WPCOM_Migration\Reprint;
 
+use RuntimeException;
 use WordPress\Reprint\Server\HTTPServer;
 use WordPress\Reprint\Server\PublicKeyServer;
 use WordPress\Reprint\Server\RequestAuthenticator;
@@ -100,6 +101,10 @@ class Exporter {
 	public static function maybe_init() {
 		self::protect_options();
 
+		// A deleted site's tables go with it; its place on the list must too,
+		// or a later site given the same ID would start on it.
+		add_action( 'wp_uninitialize_site', array( __CLASS__, 'delist_deleted_site' ) );
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( ! isset( $_GET[ self::QUERY_VAR ] ) ) {
 			return;
@@ -126,6 +131,11 @@ class Exporter {
 		// add_option() has no filter that can cancel a write, only actions either
 		// side of the insert, so stopping the request is the only lever.
 		add_action( 'add_option', array( __CLASS__, 'veto_foreign_add' ), 10, 1 );
+
+		// The network's list of sites with a credential. Network options have
+		// no pre-insert action, but every add and update on a network runs
+		// sanitize_option() before writing.
+		add_filter( 'sanitize_option_' . Network_Sites::OPTION, array( __CLASS__, 'veto_foreign_network_write' ), PHP_INT_MAX );
 	}
 
 	/**
@@ -137,6 +147,21 @@ class Exporter {
 	 */
 	public static function veto_foreign_update( $value, $old_value ) {
 		return self::$writing_own_options ? $value : $old_value;
+	}
+
+	/**
+	 * Cancels a foreign write to the network's site list by writing back the
+	 * value already stored.
+	 *
+	 * @param mixed $value The incoming value.
+	 * @return mixed The incoming value for our own writes, the stored one otherwise.
+	 */
+	public static function veto_foreign_network_write( $value ) {
+		if ( self::$writing_own_options ) {
+			return $value;
+		}
+
+		return get_site_option( Network_Sites::OPTION, array() );
 	}
 
 	/**
@@ -170,10 +195,43 @@ class Exporter {
 	private static function write_option( $option, $value ) {
 		self::$writing_own_options = true;
 		try {
+			// A site joins the network's list with nothing stored, so that
+			// whatever was written while it was off the list never counts.
+			// One that can't join gets nothing written.
+			if ( is_multisite() && ! Network_Sites::has_current() ) {
+				self::delete_credentials();
+				if ( ! Network_Sites::add_current() ) {
+					return false;
+				}
+			}
+
 			return update_option( $option, $value, false );
 		} finally {
 			self::$writing_own_options = false;
 		}
+	}
+
+	/**
+	 * Takes a site off the network's list, with the guard held open.
+	 *
+	 * @param int $site_id The site's ID.
+	 */
+	private static function delist( $site_id ) {
+		self::$writing_own_options = true;
+		try {
+			Network_Sites::remove( $site_id );
+		} finally {
+			self::$writing_own_options = false;
+		}
+	}
+
+	/**
+	 * Takes a site being deleted off the network's list.
+	 *
+	 * @param \WP_Site $site The site being deleted.
+	 */
+	public static function delist_deleted_site( $site ) {
+		self::delist( (int) $site->blog_id );
 	}
 
 	/**
@@ -202,9 +260,48 @@ class Exporter {
 	 * Discards any stored export credentials.
 	 *
 	 * Runs on plugin activation and deactivation, clearing whatever was
-	 * written while protect_options() was not in place; and on disconnect.
+	 * written while protect_options() was not in place. On a network
+	 * activation or deactivation, which runs on the main site only, it
+	 * clears every site on the network's list and empties the list.
+	 *
+	 * @param bool $network_wide Whether WordPress is activating or
+	 *                           deactivating the plugin for the whole network.
 	 */
-	public static function discard_credentials() {
+	public static function discard_credentials( $network_wide = false ) {
+		if ( ! is_multisite() ) {
+			self::discard_site_credentials();
+			return;
+		}
+
+		if ( $network_wide ) {
+			Network_Sites::drain( array( __CLASS__, 'discard_site_credentials' ) );
+			// The main site may hold credentials written by something else.
+			self::discard_site_credentials();
+			return;
+		}
+
+		self::discard_site_credentials();
+		self::delist( get_current_blog_id() );
+	}
+
+	/**
+	 * Discards the current site's credentials and reports it.
+	 */
+	public static function discard_site_credentials() {
+		if ( self::delete_credentials() ) {
+			self::record_event(
+				'credentials_discarded',
+				array( 'boundary' => current_filter() )
+			);
+		}
+	}
+
+	/**
+	 * Deletes the current site's credentials and the options kept with them.
+	 *
+	 * @return bool Whether a credential was deleted.
+	 */
+	private static function delete_credentials() {
 		$had_any = false;
 		foreach ( self::GUARDED_OPTIONS as $option ) {
 			$had_any = delete_option( $option ) || $had_any;
@@ -213,13 +310,7 @@ class Exporter {
 		foreach ( self::OBSOLETE_OPTIONS as $option ) {
 			delete_option( $option );
 		}
-
-		if ( $had_any ) {
-			self::record_event(
-				'credentials_discarded',
-				array( 'boundary' => current_filter() )
-			);
-		}
+		return $had_any;
 	}
 
 	/**
@@ -350,6 +441,15 @@ class Exporter {
 	 * }
 	 */
 	public static function get_state() {
+		// On a network, a site off the list has no credential that counts.
+		if ( is_multisite() && ! Network_Sites::has_current() ) {
+			return array(
+				'has_secret'     => false,
+				'has_public_key' => false,
+				'has_credential' => false,
+			);
+		}
+
 		$secret         = get_option( self::SECRET_OPTION, '' );
 		$has_secret     = is_string( $secret ) && '' !== $secret;
 		$public_key     = get_option( self::PUBLIC_KEY_OPTION, '' );
@@ -371,11 +471,6 @@ class Exporter {
 	public function handle_request() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( ! isset( $_GET[ self::QUERY_VAR ] ) ) {
-			return;
-		}
-
-		// Multisite is out of scope; the screen refuses networks, so never serve one.
-		if ( is_multisite() ) {
 			return;
 		}
 
@@ -419,7 +514,14 @@ class Exporter {
 		}
 
 		try {
-			$this->serve_export();
+			$options = $this->server_options();
+		} catch ( RuntimeException $exception ) {
+			$this->error( 400, $exception->getMessage(), 'multisite_unsupported' );
+			return;
+		}
+
+		try {
+			$this->serve_export( $options );
 		} catch ( \InvalidArgumentException $exception ) {
 			$this->error( 400, $exception->getMessage() );
 			return;
@@ -475,13 +577,34 @@ class Exporter {
 	}
 
 	/**
+	 * The options for HTTPServer. On a network, they limit the export to the
+	 * site this request's URL belongs to; without them, Reprint would export
+	 * the whole network.
+	 *
+	 * Built after the signature check: it runs SHOW TABLES, and its refusals
+	 * describe the network's layout.
+	 *
+	 * @return array
+	 * @throws RuntimeException When the network can't be exported one site at a time.
+	 */
+	protected function server_options() {
+		$options = array( 'default_directory' => ABSPATH );
+		if ( is_multisite() ) {
+			$options['multisite'] = Multisite_Context::build();
+		}
+		return $options;
+	}
+
+	/**
 	 * Streams the export response.
 	 *
 	 * Seam so a test double can skip a real export.
+	 *
+	 * @param array $options HTTPServer options, from server_options().
 	 */
-	protected function serve_export() {
+	protected function serve_export( array $options ) {
 		$this->send_cors_headers();
-		HTTPServer::serve( array( 'default_directory' => ABSPATH ) );
+		HTTPServer::serve( $options );
 	}
 
 	/**
