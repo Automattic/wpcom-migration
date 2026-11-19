@@ -84,7 +84,7 @@ class Multisite_Context {
 			throw new RuntimeException( 'This site keeps its uploads in a custom directory, which can\'t be migrated one site at a time: ' . $uploads['basedir'] );
 		}
 
-		self::assert_tables_separable( $base_prefix, $network_id );
+		self::assert_tables_separable( $base_prefix, $network_id, $site_id );
 
 		return array(
 			'site_id'             => $site_id,
@@ -110,11 +110,16 @@ class Multisite_Context {
 	 * site's. Asks Reprint's rules, not $wpdb->tables: a plugin registering
 	 * its table must not make it exportable. Runs on every export request.
 	 *
+	 * Only the main site's export checks the tables without a site number.
+	 * They are usually the main site's own, such as Action Scheduler's, and
+	 * Reprint leaves them out of every other site's export.
+	 *
 	 * @param string $base_prefix Network table prefix.
 	 * @param int    $network_id  Selected network ID.
+	 * @param int    $site_id     Selected site ID.
 	 * @throws RuntimeException Naming the first table without a rule.
 	 */
-	private static function assert_tables_separable( $base_prefix, $network_id ) {
+	private static function assert_tables_separable( $base_prefix, $network_id, $site_id ) {
 		global $wpdb;
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- Needs the current table list, including tables added since the last request.
@@ -132,7 +137,11 @@ class Multisite_Context {
 			}
 
 			$table_site_id = preg_match( '/^([1-9][0-9]*)_/', $suffix, $matches ) ? (int) $matches[1] : 1;
-			$selection     = new MultisiteDatabaseSelection( $base_prefix, $table_site_id, $network_id );
+			if ( 1 === $table_site_id && 1 !== $site_id ) {
+				continue;
+			}
+
+			$selection = new MultisiteDatabaseSelection( $base_prefix, $table_site_id, $network_id );
 			if ( $table === $selection->get_user_table_name() ) {
 				continue;
 			}

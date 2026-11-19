@@ -44,6 +44,7 @@ const WPCOM_MIGRATION_E2E_MS_STEPS = array(
 	'main-selection',
 	'deleted-site-delisted',
 	'shop-shared-table',
+	'main-shared-table',
 	'shop-rest-permission',
 	'network-deactivation',
 );
@@ -297,8 +298,31 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			break;
 
 		case 'shop-shared-table':
-			// A table that may hold several sites' rows stops the export.
+			// A table without a site number is usually the main site's own,
+			// such as Action Scheduler's. The shop's export leaves it out.
 			wpcom_migration_e2e_expect_shop( $step );
+			global $wpdb;
+			$main = $wpdb->base_prefix . 'e2e_main_orders';
+			$bv   = $wpdb->base_prefix . 'bv_e2e';
+			// phpcs:disable WordPress.DB.DirectDatabaseQuery,WordPress.DB.PreparedSQL.InterpolatedNotPrepared,WordPress.DB.DirectDatabaseQuery.SchemaChange
+			$wpdb->query( "CREATE TABLE `$bv` (id INT)" );
+			$wpdb->query( "CREATE TABLE `$main` (id INT)" );
+			wpcom_migration_e2e_store_secret( $step );
+			$exporter = wpcom_migration_e2e_run_exporter();
+			$wpdb->query( "DROP TABLE `$main`" );
+			$wpdb->query( "DROP TABLE `$bv`" );
+			// phpcs:enable
+
+			if ( null === $exporter->served ) {
+				throw new RuntimeException( "Step '$step': the main site's tables should not stop the shop's export, got: " . wp_json_encode( $exporter->errors ) );
+			}
+			break;
+
+		case 'main-shared-table':
+			// The main site's export would lose such a table, so it stops.
+			if ( ! is_main_site() ) {
+				throw new RuntimeException( "Step '$step': this request should have loaded the main site." );
+			}
 			global $wpdb;
 			$shared = $wpdb->base_prefix . 'e2e_shared_orders';
 			$bv     = $wpdb->base_prefix . 'bv_e2e';
@@ -307,6 +331,7 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			try {
 				Multisite_Context::build();
 			} catch ( RuntimeException $exception ) {
+				$wpdb->query( "DROP TABLE `$bv`" );
 				throw new RuntimeException( "Step '$step': BlogVault's tables should not stop the export, got: " . $exception->getMessage() );
 			}
 
@@ -318,7 +343,7 @@ function wpcom_migration_e2e_multisite_step( $step ) {
 			// phpcs:enable
 
 			if ( null !== $exporter->served || ! isset( $exporter->errors[0] ) ) {
-				throw new RuntimeException( "Step '$step': a shared table should stop the export." );
+				throw new RuntimeException( "Step '$step': a table without a site number should stop the main site's export." );
 			}
 			$error = $exporter->errors[0];
 			if ( 400 !== $error['code'] || 'multisite_unsupported' !== $error['reason'] || false === strpos( $error['message'], $shared ) ) {
