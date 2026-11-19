@@ -68,10 +68,11 @@ class Settings_Page {
 	/**
 	 * The screen's URL.
 	 *
+	 * @param int|null $site_id A site of the network, or null for the current site.
 	 * @return string
 	 */
-	public static function page_url() {
-		return admin_url( 'admin.php?page=' . self::PAGE_SLUG );
+	public static function page_url( $site_id = null ) {
+		return get_admin_url( $site_id, 'admin.php?page=' . self::PAGE_SLUG );
 	}
 
 	/**
@@ -117,13 +118,18 @@ class Settings_Page {
 
 	/**
 	 * Whether the screen gets the plugin's sidebar row, with Connection and
-	 * Migration Key under it: on a single site. Never on a network, where
-	 * only super admins may migrate and they reach the screen by its URL.
+	 * Migration Key under it: on a single site, and on every site of a
+	 * network for super admins, who alone may migrate one. The network
+	 * admin has no row.
+	 *
+	 * Every super admin, not only those Access lets migrate this site: one
+	 * with no administrator role here finds the row, and the screen tells
+	 * them how to get the role.
 	 *
 	 * @return bool
 	 */
 	public static function owns_menu() {
-		return ! is_multisite();
+		return ! is_multisite() || is_super_admin();
 	}
 
 	/**
@@ -229,6 +235,14 @@ class Settings_Page {
 		if ( ! Access::can_migrate() ) {
 			self::render_sentence( Access::refusal() );
 			return;
+		}
+
+		if ( is_multisite() ) {
+			self::render_sentence(
+				/* translators: %s: the site's address, such as example.com/shop. */
+				__( 'This moves only this site of the network, %s. To move another site, open its dashboard and choose Migrate to WordPress.com there.', 'wpcom-migration' ),
+				'<strong>' . esc_html( untrailingslashit( preg_replace( '#^https?://#', '', home_url() ) ) ) . '</strong>'
+			);
 		}
 
 		$section        = $this->connection_section;
