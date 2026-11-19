@@ -35,9 +35,7 @@ Deactivating the plugin disconnects it and discards the credentials.
 - *Connection* (`admin.php?page=wpcom-migration-status`) — connects the site to WordPress.com, then sends the user on to the migration there.
 - *Migration Key* (`admin.php?page=wpcom-migration-key`) — where an administrator pastes the migration key.
 - `admin.php?page=wpcom-migration-manual` — a debugging screen for setting up the credential by hand. Nothing links to it.
-- `admin.php?page=wpcom-migration` — the BlogVault screen the plugin had before Reprint.
-
-Until the WordPress.com side of Reprint ships, WordPress.com decides whether the Reprint or the BlogVault screen is the main one, which gets the sidebar row and the activation redirect. The other stays reachable at its URL. Reprint can't migrate a network, so on multisite only the BlogVault screen is offered. Meanwhile, Automattic-proxied users on the BlogVault screen get a notice linking to the Reprint screen (`Proxied_Notice`).
+- `admin.php?page=wpcom-migration` — the BlogVault screen the plugin had before Reprint, kept as a fallback. Nothing links to it on a single site. On multisite it is the only screen, since Reprint can't migrate a network.
 
 ## Releasing
 

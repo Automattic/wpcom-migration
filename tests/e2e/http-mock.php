@@ -1,18 +1,14 @@
 <?php
 /**
- * Answers the main screen flag endpoint and the destination endpoint inside
- * Playground, so no scenario calls public-api.wordpress.com.
- * install-flag-mock.php loads it as a must-use plugin.
+ * Answers the destination endpoint inside Playground, so no scenario calls
+ * public-api.wordpress.com. install-http-mock.php loads it as a must-use
+ * plugin.
  *
- * The answer is {"main_screen":"reprint","ttl":300} with a 200 unless a step
- * sets wpcom_migration_e2e_flag_response (a raw body, or "fail" for a
- * transport error) or wpcom_migration_e2e_flag_status. Every request bumps
- * wpcom_migration_e2e_flag_requests and is recorded in
- * wpcom_migration_e2e_flag_last.
- *
- * The destination endpoint answers the same way through the
- * wpcom_migration_e2e_destination_* options, with an unmatched answer by
- * default.
+ * The answer is unmatched with a 200 unless a step sets
+ * wpcom_migration_e2e_destination_response (a raw body, or "fail" for a
+ * transport error) or wpcom_migration_e2e_destination_status. Every request
+ * bumps wpcom_migration_e2e_destination_requests and is recorded in
+ * wpcom_migration_e2e_destination_last.
  *
  * @package wpcom-migration
  */
@@ -20,7 +16,7 @@
 /**
  * Records a mocked request and builds its response.
  *
- * @param string $prefix       Option prefix, e.g. wpcom_migration_e2e_flag.
+ * @param string $prefix       Option prefix, e.g. wpcom_migration_e2e_destination.
  * @param string $default_body Body when the step set none.
  * @param string $url          Requested URL.
  * @param array  $args         Request arguments.
@@ -65,20 +61,6 @@ add_filter(
 		}
 
 		return wpcom_migration_e2e_mock_response( 'wpcom_migration_e2e_destination', '{"matched":false,"site_slug":null,"url":"https://my.wordpress.com/sites","ttl":60}', $url, $args );
-	},
-	10,
-	3
-);
-
-add_filter(
-	'pre_http_request',
-	function ( $response, $args, $url ) {
-		// Without the class (plugin inactive, or not built yet) nothing asks.
-		if ( ! class_exists( \Automattic\WPCOM_Migration\Reprint\Main_Screen::class ) || 0 !== strpos( $url, \Automattic\WPCOM_Migration\Reprint\Main_Screen::ENDPOINT ) ) {
-			return $response;
-		}
-
-		return wpcom_migration_e2e_mock_response( 'wpcom_migration_e2e_flag', '{"main_screen":"reprint","ttl":300}', $url, $args );
 	},
 	10,
 	3
