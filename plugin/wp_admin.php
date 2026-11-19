@@ -25,36 +25,27 @@ class WPCOMWPAdmin {
 	}
 
 	/**
-	 * Where the plugin's own entry points send the user. The Reprint screen
-	 * on a single site when it is loaded. While WordPress.com names the old
-	 * screen main, the old screen. The old screen on a network, where
-	 * the Reprint screen can't migrate, and in a source checkout without
-	 * plugin/vendor/, where the Reprint classes are absent.
+	 * Where the plugin's own entry points send the user: the Reprint screen
+	 * wherever it is main, else the old screen.
 	 *
 	 * Not simply mainUrl(): siteInfoTags() posts that to the app as
 	 * `adminurl`, where it still describes the old screen.
 	 */
 	public function migrationScreenUrl() {
-		if (!is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && $this->reprintIsMain()) {
+		if ($this->reprintIsMain()) {
 			return \Automattic\WPCOM_Migration\Reprint\Settings_Page::page_url();
 		}
 		return $this->mainUrl();
 	}
 
 	/**
-	 * Whether WordPress.com names the Reprint screen main. False in a source
-	 * checkout without plugin/vendor/, where the Reprint classes are absent.
+	 * Whether the Reprint screen is the main one: on a single site with the
+	 * Reprint classes loaded. Not on a network, where the Reprint screen
+	 * can't migrate, nor in a source checkout without plugin/vendor/, where
+	 * the Reprint classes are absent.
 	 */
 	private function reprintIsMain() {
-		return class_exists('\Automattic\WPCOM_Migration\Reprint\Main_Screen') && \Automattic\WPCOM_Migration\Reprint\Main_Screen::is_reprint();
-	}
-
-	/**
-	 * Whether the Reprint screen has the sidebar row; see
-	 * Settings_Page::owns_menu(). False where the Reprint classes are absent.
-	 */
-	private function reprintOwnsMenu() {
-		return class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page') && \Automattic\WPCOM_Migration\Reprint\Settings_Page::owns_menu();
+		return !is_multisite() && class_exists('\Automattic\WPCOM_Migration\Reprint\Settings_Page');
 	}
 
 	function removeAdminNotices() {
@@ -148,16 +139,14 @@ class WPCOMWPAdmin {
 			$hook = add_menu_page($bname, $bname, 'manage_options', $this->bvinfo->plugname,
 					array($this, 'adminPage'), $icon);
 
-			// On a single site the Reprint screen owns the sidebar entry.
+			// Wherever the Reprint screen is main, it owns the sidebar entry.
 			// Removing the page from the $menu global leaves its callback
 			// hooked and its $_registered_pages entry set, so
 			// admin.php?page=wpcom-migration still renders and keeps the
 			// toplevel_page_wpcom-migration hook suffix its stylesheet and
 			// notice handling key on. The network admin, where the Reprint
-			// screen doesn't run, keeps this row, and so does a single site
-			// while WordPress.com names this screen main, unless the user is
-			// on the Reprint screens, which then own the menu.
-			if (!is_multisite() && ($this->reprintIsMain() || $this->reprintOwnsMenu())) {
+			// screen doesn't run, keeps this row.
+			if ($this->reprintIsMain()) {
 				remove_menu_page($this->bvinfo->plugname);
 				add_action('load-'.$hook, array($this, 'setScreenTitle'));
 			}

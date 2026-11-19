@@ -1,6 +1,6 @@
 <?php
 /**
- * Installs flag-mock.php as a must-use plugin. Every blueprint runs this
+ * Installs http-mock.php as a must-use plugin. Every blueprint runs this
  * first, so no request of any scenario reaches public-api.wordpress.com.
  *
  * @package wpcom-migration
@@ -13,7 +13,7 @@ if ( ! is_dir( $wpcom_migration_mu_dir ) && ! mkdir( $wpcom_migration_mu_dir, 07
 	exit( 1 );
 }
 file_put_contents(
-	$wpcom_migration_mu_dir . '/wpcom-migration-e2e-flag.php',
-	"<?php require '/wordpress/wp-content/wpcom-migration-e2e/flag-mock.php';\n"
+	$wpcom_migration_mu_dir . '/wpcom-migration-e2e-http.php',
+	"<?php require '/wordpress/wp-content/wpcom-migration-e2e/http-mock.php';\n"
 );
 // phpcs:enable WordPress.WP.AlternativeFunctions

@@ -8,7 +8,7 @@
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
+			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-http-mock.php';"
 		},
 		{
 			"step": "defineWpConfigConsts",

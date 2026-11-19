@@ -4,7 +4,7 @@
 	"steps": [
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-flag-mock.php';"
+			"code": "<?php require '/wordpress/wp-content/wpcom-migration-e2e/install-http-mock.php';"
 		},
 		{
 			"step": "activatePlugin",
@@ -84,63 +84,7 @@
 		},
 		{
 			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-fetch' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-cached' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-expired' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-ttl' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-bad-answers' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-failure-keeps' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-stored-unknown' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-forget' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php require '/wordpress/wp-load.php'; require_once ABSPATH . 'wp-admin/includes/plugin.php'; require '/wordpress/wp-content/wpcom-migration-e2e/flag-steps.php'; wpcom_migration_e2e_flag_step( 'flag-reactivate' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'flag-blogvault' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'flag-blogvault-on-new-screen' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'flag-redirect-first' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'flag-failure-fresh' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'flag-failure-keeps-row' );"
-		},
-		{
-			"step": "runPHP",
-			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'proxied-script' );"
+			"code": "<?php define( 'WP_ADMIN', true ); require '/wordpress/wp-load.php'; require '/wordpress/wp-content/wpcom-migration-e2e/menu-steps.php'; wpcom_migration_e2e_menu_step( 'stored-main-screen-deleted' );"
 		}
 	]
 }

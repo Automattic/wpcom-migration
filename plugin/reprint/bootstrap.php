@@ -7,15 +7,27 @@
 
 use Automattic\WPCOM_Migration\Reprint\Exporter;
 use Automattic\WPCOM_Migration\Reprint\Key_Page;
-use Automattic\WPCOM_Migration\Reprint\Main_Screen;
 use Automattic\WPCOM_Migration\Reprint\Manual_Page;
-use Automattic\WPCOM_Migration\Reprint\Proxied_Notice;
 use Automattic\WPCOM_Migration\Reprint\REST_Controller;
 use Automattic\WPCOM_Migration\Reprint\Settings_Page;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
+// Versions up to 6.78 cached WordPress.com's answer to which screen is main
+// in this option. Updates don't run the activation hook, so the first admin
+// load after one deletes it. Once it is gone, get_option() answers from the
+// object cache where there is one; delete_option() would always query.
+// Remove once no site runs 6.78 or earlier.
+add_action(
+	'admin_init',
+	function () {
+		if ( false !== get_option( 'wpcom_migration_main_screen' ) ) {
+			delete_option( 'wpcom_migration_main_screen' );
+		}
+	}
+);
 
 $wpcom_migration_plugin_file        = dirname( __DIR__ ) . '/wpcom_migration.php';
 $wpcom_migration_reprint_autoloader = dirname( __DIR__ ) . '/vendor/autoload_packages.php';
@@ -38,11 +50,6 @@ add_action( 'rest_api_init', array( new REST_Controller(), 'register_routes' ) )
 register_activation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 register_deactivation_hook( $wpcom_migration_plugin_file, array( Exporter::class, 'discard_credentials' ) );
 
-// A reactivated plugin asks WordPress.com for the main screen again, also
-// after a deactivation that skipped its hooks.
-register_activation_hook( $wpcom_migration_plugin_file, array( Main_Screen::class, 'forget' ) );
-register_deactivation_hook( $wpcom_migration_plugin_file, array( Main_Screen::class, 'forget' ) );
-
 /**
  * Holds the screen so the connection bootstrap can attach its section.
  *
@@ -61,7 +68,6 @@ if ( is_admin() ) {
 	wpcom_migration_settings_page( new Settings_Page( $wpcom_migration_plugin_file ) );
 	new Manual_Page( $wpcom_migration_plugin_file );
 	new Key_Page( $wpcom_migration_plugin_file );
-	new Proxied_Notice( $wpcom_migration_plugin_file );
 }
 
 unset( $wpcom_migration_plugin_file, $wpcom_migration_reprint_autoloader );

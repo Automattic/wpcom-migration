@@ -117,10 +117,8 @@ class Settings_Page {
 
 	/**
 	 * Whether the screen gets the plugin's sidebar row, with Connection and
-	 * Migration Key under it: while WordPress.com names it main, and while
-	 * the user is on it or the key screen, so whoever reached the new
-	 * screens can move between them. Never on a network. The old screen
-	 * gives up its row whenever this one has it.
+	 * Migration Key under it: unless the row is filtered away, and never on
+	 * a network.
 	 *
 	 * @return bool
 	 */
@@ -134,14 +132,7 @@ class Settings_Page {
 		 *
 		 * @param bool $show Whether the screen gets a sidebar row.
 		 */
-		if ( ! apply_filters( 'wpcom_migration_show_menu', true ) || is_multisite() ) {
-			return false;
-		}
-
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Comparing the page slug selects a display behaviour.
-		$page = sanitize_key( wp_unslash( $_GET['page'] ?? '' ) );
-
-		return Main_Screen::is_reprint() || in_array( $page, array( self::PAGE_SLUG, Key_Page::PAGE_SLUG ), true );
+		return apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite();
 	}
 
 	/**
