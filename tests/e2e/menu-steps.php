@@ -43,13 +43,9 @@ function wpcom_migration_e2e_menu_step( $step ) {
 	// runPHP is no page load; the activation redirect only fires on a GET.
 	$_SERVER['REQUEST_METHOD'] = 'GET';
 
-	if ( 'suppressed' === $step ) {
-		add_filter( 'wpcom_migration_show_menu', '__return_false', 99 );
-	}
-
 	if ( 'whitelabelled' === $step ) {
-		// The brand option WPCOMInfo::getBrandInfo() reads; menu() then
-		// registers no old screen and asks the Reprint screen to hide.
+		// The brand option WPCOMInfo::getBrandInfo() reads. BlogVault can
+		// set it, but it no longer hides any sidebar row.
 		update_option( 'wpcombrand', array( 'hide_from_menu' => true ) );
 	}
 
@@ -117,26 +113,12 @@ function wpcom_migration_e2e_menu_step( $step ) {
 			}
 			break;
 
-		case 'suppressed':
-			if ( array() !== $slugs ) {
-				throw new RuntimeException( 'wpcom_migration_show_menu=false should leave no sidebar row, got: ' . wp_json_encode( $slugs ) );
-			}
-			wpcom_migration_e2e_assert_title( Settings_Page::PAGE_SLUG, __( 'Migrate to WordPress.com', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_title( Manual_Page::PAGE_SLUG, __( 'Set up Reprint manually', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_title( Key_Page::PAGE_SLUG, __( 'Migration Key', 'wpcom-migration' ) );
-			wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
-			break;
-
 		case 'whitelabelled':
 			try {
-				if ( array() !== $slugs ) {
-					throw new RuntimeException( 'A brand with hide_from_menu should leave no sidebar row, got: ' . wp_json_encode( $slugs ) );
+				if ( array( Settings_Page::PAGE_SLUG ) !== $slugs ) {
+					throw new RuntimeException( 'A brand with hide_from_menu should still leave the Reprint row, got: ' . wp_json_encode( $slugs ) );
 				}
-				if ( false !== apply_filters( 'wpcom_migration_show_menu', true ) ) {
-					throw new RuntimeException( 'A brand with hide_from_menu should turn wpcom_migration_show_menu off.' );
-				}
-				// The brand drops the old screen entirely, as it always has.
-				wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG ) );
+				wpcom_migration_e2e_assert_screens_reachable( array( Settings_Page::PAGE_SLUG, Manual_Page::PAGE_SLUG, Key_Page::PAGE_SLUG, 'wpcom-migration' ) );
 			} finally {
 				delete_option( 'wpcombrand' );
 			}

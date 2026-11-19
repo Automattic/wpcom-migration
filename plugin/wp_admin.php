@@ -132,27 +132,23 @@ class WPCOMWPAdmin {
 	}
 
 	public function menu() {
-		$brand = $this->bvinfo->getBrandInfo();
-		if (!is_array($brand) || (!array_key_exists('hide', $brand) && !array_key_exists('hide_from_menu', $brand))) {
-			$bname = $this->bvinfo->getBrandName();
-			$icon = $this->bvinfo->getBrandIcon();
-			$hook = add_menu_page($bname, $bname, 'manage_options', $this->bvinfo->plugname,
-					array($this, 'adminPage'), $icon);
+		// The brand's hide and hide_from_menu settings are ignored: BlogVault
+		// no longer decides whether the plugin has a sidebar row.
+		$bname = $this->bvinfo->getBrandName();
+		$icon = $this->bvinfo->getBrandIcon();
+		$hook = add_menu_page($bname, $bname, 'manage_options', $this->bvinfo->plugname,
+				array($this, 'adminPage'), $icon);
 
-			// Wherever the Reprint screen is main, it owns the sidebar entry.
-			// Removing the page from the $menu global leaves its callback
-			// hooked and its $_registered_pages entry set, so
-			// admin.php?page=wpcom-migration still renders and keeps the
-			// toplevel_page_wpcom-migration hook suffix its stylesheet and
-			// notice handling key on. The network admin, where the Reprint
-			// screen doesn't run, keeps this row.
-			if ($this->reprintIsMain()) {
-				remove_menu_page($this->bvinfo->plugname);
-				add_action('load-'.$hook, array($this, 'setScreenTitle'));
-			}
-		} else {
-			// Whitelabelled out of the menu: the Reprint screen drops its row too.
-			add_filter('wpcom_migration_show_menu', '__return_false');
+		// Wherever the Reprint screen is main, it owns the sidebar entry.
+		// Removing the page from the $menu global leaves its callback
+		// hooked and its $_registered_pages entry set, so
+		// admin.php?page=wpcom-migration still renders and keeps the
+		// toplevel_page_wpcom-migration hook suffix its stylesheet and
+		// notice handling key on. The network admin, where the Reprint
+		// screen doesn't run, keeps this row.
+		if ($this->reprintIsMain()) {
+			remove_menu_page($this->bvinfo->plugname);
+			add_action('load-'.$hook, array($this, 'setScreenTitle'));
 		}
 	}
 

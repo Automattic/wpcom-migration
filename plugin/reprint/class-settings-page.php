@@ -117,22 +117,12 @@ class Settings_Page {
 
 	/**
 	 * Whether the screen gets the plugin's sidebar row, with Connection and
-	 * Migration Key under it: unless the row is filtered away, and never on
-	 * a network.
+	 * Migration Key under it: on a single site, never on a network.
 	 *
 	 * @return bool
 	 */
 	public static function owns_menu() {
-		/**
-		 * Filters whether the screen gets a sidebar row. The screen stays
-		 * reachable at its URL either way.
-		 *
-		 * The old BlogVault screen answers false when the plugin is
-		 * whitelabelled to hide. Delete the filter with that screen.
-		 *
-		 * @param bool $show Whether the screen gets a sidebar row.
-		 */
-		return apply_filters( 'wpcom_migration_show_menu', true ) && ! is_multisite();
+		return ! is_multisite();
 	}
 
 	/**
